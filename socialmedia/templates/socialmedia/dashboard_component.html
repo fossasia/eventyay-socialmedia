@@ -7,11 +7,10 @@
     </div>
     <div class="panel-body">
         <p>
-            {% trans "Schedule and export social media announcements for speakers, sessions, tickets, and more." %}
+            {% trans "Automate and schedule social media announcements for your event. Customize templates, set trigger offsets, and export announcements to CSV." %}
         </p>
         <p>
             {% trans "Go to" %} <a href="{% url 'plugins:socialmedia:index' organizer=request.organizer.slug event=request.event.slug %}">{% trans "Social Media Dashboard" %}</a>
-            {% trans "to preview, edit, and export posts as a CSV." %}
         </p>
     </div>
 </div>
