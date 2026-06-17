@@ -72,8 +72,7 @@
           <div class="dt-time">${escHtml(p.post_time)}</div>
         </td>
         <td class="dt-cell">
-          <input type="time" class="form-control input-sm" value="${escHtml(p.post_time)}"
-            style="width:90px;"
+          <input type="time" class="form-control input-sm sm-time-input" value="${escHtml(p.post_time)}"
             onchange="allPosts[${idx}].post_time = this.value; syncTimeDisplay(${idx}, this.value);">
         </td>
         <td class="post-text-cell">

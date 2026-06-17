@@ -1,5 +1,7 @@
 /* ---- Page Layout ---- */
-.sm-page { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+.sm-page {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
 
 /* ---- Toolbar ---- */
 .sm-toolbar {
@@ -9,6 +11,7 @@
   gap: 10px;
   margin-bottom: 20px;
 }
+
 .sm-toolbar h1 {
   font-size: 22px;
   font-weight: 700;
@@ -16,6 +19,7 @@
   color: #222;
   flex: 1;
 }
+
 .sm-toolbar h1 small {
   font-size: 14px;
   color: #888;
@@ -24,7 +28,13 @@
 }
 
 /* ---- Filter Pills ---- */
-.sm-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.sm-filters {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
 .sm-filter-btn {
   border: 1px solid #d0d0d0;
   background: #fff;
@@ -35,19 +45,25 @@
   transition: all .15s;
   color: #555;
 }
-.sm-filter-btn.active, .sm-filter-btn:hover {
+
+.sm-filter-btn.active,
+.sm-filter-btn:hover {
   background: #0077cc;
   border-color: #0077cc;
   color: #fff;
 }
+
 .sm-filter-btn .count {
-  background: rgba(0,0,0,.1);
+  background: rgba(0, 0, 0, .1);
   border-radius: 10px;
   padding: 0 6px;
   font-size: 11px;
   margin-left: 4px;
 }
-.sm-filter-btn.active .count { background: rgba(255,255,255,.25); }
+
+.sm-filter-btn.active .count {
+  background: rgba(255, 255, 255, .25);
+}
 
 /* ---- Action bar ---- */
 .sm-actions {
@@ -57,18 +73,31 @@
   margin-bottom: 10px;
   flex-wrap: wrap;
 }
-.sm-actions .btn { font-size: 13px; }
-.sm-count { font-size: 13px; color: #777; margin-left: auto; }
+
+.sm-actions .btn {
+  font-size: 13px;
+}
+
+.sm-count {
+  font-size: 13px;
+  color: #777;
+  margin-left: auto;
+}
 
 /* ---- Table ---- */
 .sm-table-wrap {
   background: #fff;
   border: 1px solid #e4e4e4;
   border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+  overflow-x: auto;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .06);
 }
-.sm-table { width: 100%; border-collapse: collapse; }
+
+.sm-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
 .sm-table thead th {
   background: #f5f6f8;
   font-size: 12px;
@@ -81,13 +110,41 @@
   text-align: left;
   white-space: nowrap;
 }
-.sm-table thead th:first-child { width: 36px; text-align: center; }
-.sm-table tbody tr { border-bottom: 1px solid #f0f0f0; }
-.sm-table tbody tr:last-child { border-bottom: none; }
-.sm-table tbody tr:hover { background: #fafbfc; }
-.sm-table tbody tr.row-disabled { opacity: .45; }
-.sm-table tbody td { padding: 10px 12px; vertical-align: top; font-size: 13px; }
-.sm-table tbody td:first-child { text-align: center; vertical-align: middle; }
+
+.sm-table thead th:first-child {
+  width: 36px;
+  text-align: center;
+}
+
+.sm-table tbody tr {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.sm-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.sm-table tbody tr:hover {
+  background: #fafbfc;
+}
+
+.sm-table tbody tr.row-disabled {
+  opacity: .45;
+}
+
+.sm-table tbody td {
+  padding: 10px 12px;
+  vertical-align: middle;
+  font-size: 13px;
+}
+
+.sm-table tbody td:first-child {
+  text-align: center;
+}
+
+.sm-table tbody td.post-text-cell {
+  vertical-align: top;
+}
 
 /* Type badge */
 .type-badge {
@@ -98,19 +155,52 @@
   font-weight: 600;
   white-space: nowrap;
 }
-.type-cfp      { background: #e8f4fd; color: #0077cc; }
-.type-speaker  { background: #fdf0e8; color: #cc5500; }
-.type-session  { background: #e8fdf0; color: #007a3d; }
-.type-ticket   { background: #f0e8fd; color: #6600cc; }
-.type-schedule { background: #fdfbe8; color: #7a6000; }
+
+.type-cfp {
+  background: #e8f4fd;
+  color: #0077cc;
+}
+
+.type-speaker {
+  background: #fdf0e8;
+  color: #cc5500;
+}
+
+.type-session {
+  background: #e8fdf0;
+  color: #007a3d;
+}
+
+.type-ticket {
+  background: #f0e8fd;
+  color: #6600cc;
+}
+
+.type-schedule {
+  background: #fdfbe8;
+  color: #7a6000;
+}
 
 /* Date/time cell */
-.dt-cell { white-space: nowrap; }
-.dt-date { font-weight: 600; color: #333; }
-.dt-time { color: #888; font-size: 12px; }
+.dt-cell {
+  white-space: nowrap;
+}
+
+.dt-date {
+  font-weight: 600;
+  color: #333;
+}
+
+.dt-time {
+  color: #888;
+  font-size: 12px;
+}
 
 /* Editable text cell */
-.post-text-cell { min-width: 300px; }
+.post-text-cell {
+  min-width: 300px;
+}
+
 .post-text-view {
   cursor: pointer;
   line-height: 1.5;
@@ -120,8 +210,16 @@
   margin: -2px -4px;
   display: block;
 }
-.post-text-view:hover { background: #f0f4ff; outline: 1px dashed #aac4ff; }
-.post-text-view.editing { display: none; }
+
+.post-text-view:hover {
+  background: #f0f4ff;
+  outline: 1px dashed #aac4ff;
+}
+
+.post-text-view.editing {
+  display: none;
+}
+
 .post-text-edit {
   width: 100%;
   border: 1px solid #aac4ff;
@@ -135,12 +233,27 @@
   display: none;
   background: #f8faff;
 }
-.post-text-edit.editing { display: block; }
-.edit-hint { font-size: 11px; color: #aaa; margin-top: 4px; display: none; }
-.post-text-view:hover + .post-text-edit + .edit-hint { display: block; }
+
+.post-text-edit.editing {
+  display: block;
+}
+
+.edit-hint {
+  font-size: 11px;
+  color: #aaa;
+  margin-top: 4px;
+  display: none;
+}
+
+.post-text-view:hover+.post-text-edit+.edit-hint {
+  display: block;
+}
 
 /* ---- Skeleton loader ---- */
-.skeleton-row td { padding: 12px; }
+.skeleton-row td {
+  padding: 12px;
+}
+
 .skeleton-bar {
   height: 14px;
   background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
@@ -148,7 +261,16 @@
   animation: shimmer 1.4s infinite;
   border-radius: 4px;
 }
-@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
 
 /* ---- Empty state ---- */
 .sm-empty {
@@ -156,7 +278,12 @@
   padding: 60px 20px;
   color: #aaa;
 }
-.sm-empty i { font-size: 40px; margin-bottom: 12px; display: block; }
+
+.sm-empty i {
+  font-size: 40px;
+  margin-bottom: 12px;
+  display: block;
+}
 
 /* ---- Advanced Settings accordion ---- */
 .adv-section {
@@ -165,6 +292,7 @@
   border-radius: 8px;
   overflow: hidden;
 }
+
 .adv-header {
   background: #f8f8f8;
   padding: 14px 18px;
@@ -180,15 +308,31 @@
   width: 100%;
   text-align: left;
 }
-.adv-header:hover { background: #f0f0f0; }
-.adv-header .adv-chevron { margin-left: auto; transition: transform .2s; color: #999; }
-.adv-header.open .adv-chevron { transform: rotate(180deg); }
+
+.adv-header:hover {
+  background: #f0f0f0;
+}
+
+.adv-header .adv-chevron {
+  margin-left: auto;
+  transition: transform .2s;
+  color: #999;
+}
+
+.adv-header.open .adv-chevron {
+  transform: rotate(180deg);
+}
+
 .adv-body {
   display: none;
   padding: 20px;
   border-top: 1px solid #e4e4e4;
 }
-.adv-body.open { display: block; }
+
+.adv-body.open {
+  display: block;
+}
+
 .adv-group {
   border: 1px solid #ebebeb;
   border-radius: 6px;
@@ -196,6 +340,7 @@
   margin-bottom: 16px;
   background: #fafafa;
 }
+
 .adv-group-title {
   font-size: 13px;
   font-weight: 700;
@@ -205,6 +350,7 @@
   align-items: center;
   gap: 6px;
 }
+
 .default-template-preview {
   background: #f0f4ff;
   border: 1px solid #c8d8f0;
@@ -215,13 +361,20 @@
   margin-bottom: 10px;
   font-style: italic;
 }
-.default-template-preview strong { display: block; font-size: 11px; color: #888; margin-bottom: 3px; font-style: normal; }
+
+.default-template-preview strong {
+  display: block;
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 3px;
+  font-style: normal;
+}
 
 /* ---- Export button bar ---- */
 .export-bar {
   position: sticky;
   bottom: 0;
-  background: rgba(255,255,255,.95);
+  background: rgba(255, 255, 255, .95);
   backdrop-filter: blur(4px);
   border-top: 1px solid #e4e4e4;
   padding: 12px 0;
@@ -233,5 +386,45 @@
   padding-left: 15px;
   padding-right: 15px;
 }
-.export-bar .selected-count { font-size: 13px; color: #666; }
-.export-bar .btn-export { margin-left: auto; }
+
+.export-bar .selected-count {
+  font-size: 13px;
+  color: #666;
+}
+
+.export-bar .btn-export {
+  margin-left: auto;
+}
+
+/* Time input styling to ensure AM/PM and clock picker are fully visible */
+.form-control.sm-time-input {
+  width: 110px;
+  display: inline-block;
+}
+
+/* ---- Responsive Layout ---- */
+@media (max-width: 768px) {
+  .sm-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .sm-toolbar h1 {
+    margin-bottom: 10px;
+  }
+  .sm-filters {
+    gap: 4px;
+  }
+  .sm-filter-btn {
+    padding: 4px 10px;
+    font-size: 12px;
+  }
+  .export-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .export-bar .btn-export {
+    width: 100%;
+    margin-left: 0;
+  }
+}
