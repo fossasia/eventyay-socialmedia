@@ -239,12 +239,12 @@ def build_posts(event, request=None):
                             if speaker.pk in seen_speakers:
                                 continue
                             seen_speakers.add(speaker.pk)
-                            try:
-                                profile = speaker.event_profile(event)
+                            if speaker.code:
                                 spk_url = event_absolute_url(
-                                    profile.urls.public, request
+                                    f"{event.urls.base}speakers/{speaker.code}/",
+                                    request,
                                 )
-                            except Exception:
+                            else:
                                 spk_url = event_link
                             text = safe_format(
                                 _get_template(event, "speaker"),
@@ -272,9 +272,11 @@ def build_posts(event, request=None):
                     local_start = localize(talk_start, event)
                     names = ", ".join(s.get_display_name() for s in sub.speakers.all())
                     room = talk.room.name if talk.room else "TBA"
-                    try:
-                        talk_url = event_absolute_url(sub.urls.public, request)
-                    except Exception:
+                    if sub.code:
+                        talk_url = event_absolute_url(
+                            f"{event.urls.base}talk/{sub.code}/", request
+                        )
+                    else:
                         talk_url = event_link
                     text = safe_format(
                         _get_template(event, "session"),
