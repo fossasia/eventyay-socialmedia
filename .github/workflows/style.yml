@@ -13,8 +13,8 @@ on:
       - 'socialmedia/static/**'
 
 jobs:
-  ruff:
-    name: ruff
+  pre-commit:
+    name: pre-commit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,9 +30,7 @@ jobs:
             ${{ runner.os }}-pip-
       - name: Install pretix
         run: pip3 install pretix
-      - name: Install Dependencies
-        run: pip3 install -U ruff -e .
-      - name: Run ruff check
-        run: ruff check .
-      - name: Run ruff format
-        run: ruff format --check .
+      - name: Install pre-commit
+        run: pip3 install pre-commit
+      - name: Run pre-commit
+        run: pre-commit run --all-files

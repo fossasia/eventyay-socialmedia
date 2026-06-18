@@ -13,24 +13,73 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    name: Tests
+    name: Social Media Plugin Tests
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: eventyay-db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+      - name: Checkout eventyay_socialmedia plugin
+        uses: actions/checkout@v6
+
+      - name: Clone eventyay
+        run: |
+          git clone https://github.com/fossasia/eventyay.git ../eventyay
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
         with:
-          python-version: 3.12
-      - uses: actions/cache@v4
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
         with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/setup.py') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+          enable-cache: true
+
       - name: Install system dependencies
-        run: sudo apt update && sudo apt install gettext
-      - name: Install pretix
-        run: pip3 install pretix
-      - name: Install Dependencies
-        run: pip3 install -U pytest pytest-django -e .
-      - name: Run checks
-        run: py.test tests
+        run: sudo apt-get update && sudo apt-get install -y gettext libjpeg-dev zlib1g-dev libpq-dev
+
+      - name: Set up eventyay environment
+        run: |
+          cd ../eventyay/app
+          uv sync --all-extras --all-groups
+          # Install socialmedia plugin and coverage in the eventyay environment
+          uv pip install pytest-cov
+          uv pip install -e ../../eventyay-socialmedia
+
+      - name: Compile translations
+        run: |
+          . ../eventyay/app/.venv/bin/activate
+          make
+
+      - name: Run tests with coverage
+        env:
+          EVY_RUNNING_ENVIRONMENT: testing
+          EVY_POSTGRES_HOST: localhost
+          EVY_POSTGRES_PORT: 5432
+          EVY_POSTGRES_USER: postgres
+          EVY_POSTGRES_PASSWORD: postgres
+          EVY_POSTGRES_DB: eventyay-db
+        run: |
+          . ../eventyay/app/.venv/bin/activate
+          pytest tests --cov=socialmedia --cov-report=xml
