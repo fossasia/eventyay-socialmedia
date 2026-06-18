@@ -87,9 +87,7 @@ def test_socialmedia_settings_view_post(
 
 
 @pytest.mark.django_db
-def test_preview_posts_view(
-    logged_in_organizer_client, organizer, event, settings
-):
+def test_preview_posts_view(logged_in_organizer_client, organizer, event, settings):
     settings.SITE_URL = "https://testserver"
     url = reverse(
         "plugins:socialmedia:preview",
@@ -102,9 +100,7 @@ def test_preview_posts_view(
 
 
 @pytest.mark.django_db
-def test_export_csv_view(
-    logged_in_organizer_client, organizer, event, settings
-):
+def test_export_csv_view(logged_in_organizer_client, organizer, event, settings):
     settings.SITE_URL = "https://testserver"
     url = reverse(
         "plugins:socialmedia:export",
