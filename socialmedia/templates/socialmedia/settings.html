@@ -1,0 +1,199 @@
+{% extends "eventyay_common/event/base.html" %}
+{% load i18n %}
+{% load bootstrap3 %}
+{% load static %}
+
+{% block title %}{% trans "Social Media" %} :: {{ event.name }}{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" type="text/css" href="{% static 'socialmedia/css/settings.css' %}">
+
+<div class="sm-page">
+
+  <!-- Toolbar -->
+  <div class="sm-toolbar">
+    <h1>
+      {% trans "Social Media Posts" %}
+      <small>{{ event.name }}</small>
+    </h1>
+    <button id="btn-regenerate" class="btn btn-default" onclick="loadPosts()">
+      <i class="fa fa-refresh"></i> {% trans "Regenerate" %}
+    </button>
+  </div>
+
+  <!-- Filter pills -->
+  <div class="sm-filters" id="filter-pills">
+    <button class="sm-filter-btn active" data-type="all" onclick="filterPosts('all', this)">
+      {% trans "All" %} <span class="count" id="cnt-all">0</span>
+    </button>
+    <button class="sm-filter-btn" data-type="cfp" onclick="filterPosts('cfp', this)">
+      {% trans "CFP" %} <span class="count" id="cnt-cfp">0</span>
+    </button>
+    <button class="sm-filter-btn" data-type="speaker" onclick="filterPosts('speaker', this)">
+      {% trans "Speakers" %} <span class="count" id="cnt-speaker">0</span>
+    </button>
+    <button class="sm-filter-btn" data-type="session" onclick="filterPosts('session', this)">
+      {% trans "Sessions" %} <span class="count" id="cnt-session">0</span>
+    </button>
+    <button class="sm-filter-btn" data-type="ticket" onclick="filterPosts('ticket', this)">
+      {% trans "Tickets" %} <span class="count" id="cnt-ticket">0</span>
+    </button>
+    <button class="sm-filter-btn" data-type="schedule" onclick="filterPosts('schedule', this)">
+      {% trans "Schedule" %} <span class="count" id="cnt-schedule">0</span>
+    </button>
+  </div>
+
+  <!-- Action bar -->
+  <div class="sm-actions">
+    <button class="btn btn-default btn-sm" onclick="selectAll(true)">
+      <i class="fa fa-check-square-o"></i> {% trans "Select All" %}
+    </button>
+    <button class="btn btn-default btn-sm" onclick="selectAll(false)">
+      <i class="fa fa-square-o"></i> {% trans "Deselect All" %}
+    </button>
+    <span class="sm-count" id="selected-count">–</span>
+  </div>
+
+  <!-- Post table -->
+  <div class="sm-table-wrap">
+    <table class="sm-table">
+      <thead>
+        <tr>
+          <th><input type="checkbox" id="chk-all" onchange="selectAll(this.checked)" title="{% trans 'Toggle all' %}"></th>
+          <th>{% trans "Type" %}</th>
+          <th>{% trans "Date" %}</th>
+          <th>{% trans "Time" %}</th>
+          <th>{% trans "Post Text" %} <span style="font-weight:400;color:#aaa;font-size:11px;">— {% trans "click to edit" %}</span></th>
+        </tr>
+      </thead>
+      <tbody id="posts-tbody">
+        <!-- Skeleton rows -->
+        {% for i in "12345" %}
+        <tr class="skeleton-row">
+          <td><div class="skeleton-bar" style="width:16px;height:16px;border-radius:3px;"></div></td>
+          <td><div class="skeleton-bar" style="width:60px;"></div></td>
+          <td><div class="skeleton-bar" style="width:80px;"></div></td>
+          <td><div class="skeleton-bar" style="width:50px;"></div></td>
+          <td><div class="skeleton-bar" style="width:100%;"></div></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Sticky export bar -->
+  <div class="export-bar">
+    <span class="selected-count" id="export-count">0 {% trans "posts selected" %}</span>
+    <button class="btn btn-primary btn-export" onclick="exportCSV()">
+      <i class="fa fa-download"></i> {% trans "Export CSV" %}
+    </button>
+  </div>
+
+  <!-- ================================================================
+       Advanced Settings (collapsible)
+       ================================================================ -->
+  <div class="adv-section">
+    <button class="adv-header" id="adv-toggle" onclick="toggleAdv()">
+      <i class="fa fa-cog"></i>
+      {% trans "Advanced Settings" %}
+      <span style="font-size:12px;font-weight:400;color:#aaa;">
+        — {% trans "customize templates, offsets, hashtags" %}
+      </span>
+      <i class="fa fa-chevron-down adv-chevron"></i>
+    </button>
+    <div class="adv-body" id="adv-body">
+      <form action="" method="post" class="form-horizontal">
+        {% csrf_token %}
+        {% bootstrap_form_errors form %}
+
+        <!-- Global -->
+        <div class="adv-group">
+          <div class="adv-group-title"><i class="fa fa-globe"></i> {% trans "Global" %}</div>
+          {% bootstrap_field form.socialmedia_event_link layout="horizontal" %}
+          {% bootstrap_field form.socialmedia_default_hashtags layout="horizontal" %}
+        </div>
+
+        <!-- CFP -->
+        <div class="adv-group">
+          <div class="adv-group-title"><i class="fa fa-bullhorn"></i> {% trans "CFP" %}</div>
+          {% bootstrap_field form.socialmedia_cfp_enabled layout="horizontal" %}
+          {% bootstrap_field form.socialmedia_cfp_offset layout="horizontal" %}
+          <div class="default-template-preview">
+            <strong>{% trans "Default template:" %}</strong>
+            {{ form.default_template_preview.cfp }}
+          </div>
+          {% bootstrap_field form.socialmedia_cfp_template layout="horizontal" %}
+        </div>
+
+        <!-- Speaker -->
+        <div class="adv-group">
+          <div class="adv-group-title"><i class="fa fa-user"></i> {% trans "Speaker" %}</div>
+          {% bootstrap_field form.socialmedia_speaker_enabled layout="horizontal" %}
+          {% bootstrap_field form.socialmedia_speaker_offset layout="horizontal" %}
+          <div class="default-template-preview">
+            <strong>{% trans "Default template:" %}</strong>
+            {{ form.default_template_preview.speaker }}
+          </div>
+          {% bootstrap_field form.socialmedia_speaker_template layout="horizontal" %}
+        </div>
+
+        <!-- Session -->
+        <div class="adv-group">
+          <div class="adv-group-title"><i class="fa fa-calendar"></i> {% trans "Session" %}</div>
+          {% bootstrap_field form.socialmedia_session_enabled layout="horizontal" %}
+          {% bootstrap_field form.socialmedia_session_offset layout="horizontal" %}
+          <div class="default-template-preview">
+            <strong>{% trans "Default template:" %}</strong>
+            {{ form.default_template_preview.session }}
+          </div>
+          {% bootstrap_field form.socialmedia_session_template layout="horizontal" %}
+        </div>
+
+        <!-- Ticket -->
+        <div class="adv-group">
+          <div class="adv-group-title"><i class="fa fa-ticket"></i> {% trans "Ticket" %}</div>
+          {% bootstrap_field form.socialmedia_ticket_enabled layout="horizontal" %}
+          {% bootstrap_field form.socialmedia_ticket_offset layout="horizontal" %}
+          <div class="default-template-preview">
+            <strong>{% trans "Default template:" %}</strong>
+            {{ form.default_template_preview.ticket }}
+          </div>
+          {% bootstrap_field form.socialmedia_ticket_template layout="horizontal" %}
+        </div>
+
+        <!-- Schedule -->
+        <div class="adv-group">
+          <div class="adv-group-title"><i class="fa fa-list-alt"></i> {% trans "Schedule" %}</div>
+          {% bootstrap_field form.socialmedia_schedule_enabled layout="horizontal" %}
+          {% bootstrap_field form.socialmedia_schedule_offset layout="horizontal" %}
+          <div class="default-template-preview">
+            <strong>{% trans "Default template:" %}</strong>
+            {{ form.default_template_preview.schedule }}
+          </div>
+          {% bootstrap_field form.socialmedia_schedule_template layout="horizontal" %}
+        </div>
+
+        <div style="padding-top: 10px; border-top: 1px solid #eee; display:flex; gap:10px;">
+          <button type="submit" class="btn btn-primary">
+            <i class="fa fa-save"></i> {% trans "Save Settings" %}
+          </button>
+          <button type="button" class="btn btn-default" onclick="loadPosts()">
+            <i class="fa fa-refresh"></i> {% trans "Save & Regenerate Preview" %}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div><!-- /sm-page -->
+<script id="socialmedia-config" type="application/json">
+  {
+    "previewUrl": "{{ preview_url }}",
+    "exportUrl": "{{ export_url }}",
+    "csrfToken": "{{ csrf_token }}",
+    "transSelectAtLeastOne": "{% trans 'Please select at least one post to export.' %}",
+    "transClickToEdit": "{% trans 'Click to edit · Ctrl+Enter to save' %}"
+  }
+</script>
+<script src="{% static 'socialmedia/js/settings.js' %}"></script>
+{% endblock %}
