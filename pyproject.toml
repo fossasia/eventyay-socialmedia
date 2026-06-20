@@ -34,6 +34,15 @@ repository = "https://github.com/fossasia/eventyay-socialmedia"
 [tool.setuptools]
 include-package-data = true
 
+[tool.setuptools.package-data]
+socialmedia = [
+    "templates/socialmedia/*.html",
+    "static/socialmedia/css/*.css",
+    "static/socialmedia/js/*.js",
+    "locale/*/LC_MESSAGES/*.po",
+    "locale/*/LC_MESSAGES/*.mo",
+]
+
 [tool.setuptools.dynamic]
 version = {attr = "socialmedia.__version__"}
 
