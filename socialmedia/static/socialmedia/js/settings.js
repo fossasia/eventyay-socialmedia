@@ -13,7 +13,7 @@
   let activeFilter = "all";
 
   // ---- Load posts from server ----
-  window.loadPosts = function () {
+  function loadPosts() {
     const btn = document.getElementById("btn-regenerate");
     if (!btn) return;
     btn.disabled = true;
@@ -39,7 +39,7 @@
         btn.disabled = false;
         btn.innerHTML = '<i class="fa fa-refresh"></i> Regenerate';
       });
-  };
+  }
 
   // ---- Render table rows ----
   function renderTable(posts, filter) {
@@ -63,8 +63,7 @@
       <tr data-idx="${idx}" data-type="${p.type}" class="${p.enabled ? "" : "row-disabled"}">
         <td>
           <input type="checkbox" class="row-chk" data-idx="${idx}"
-            ${p.enabled ? "checked" : ""}
-            onchange="toggleRow(${idx}, this.checked)">
+            ${p.enabled ? "checked" : ""}>
         </td>
         <td><span class="type-badge type-${p.type}">${escHtml(p.type_label)}</span></td>
         <td class="dt-cell">
@@ -72,15 +71,11 @@
           <div class="dt-time">${escHtml(p.post_time)}</div>
         </td>
         <td class="dt-cell">
-          <input type="time" class="form-control input-sm sm-time-input" value="${escHtml(p.post_time)}"
-            onchange="allPosts[${idx}].post_time = this.value; syncTimeDisplay(${idx}, this.value);">
+          <input type="time" class="form-control input-sm sm-time-input" value="${escHtml(p.post_time)}">
         </td>
         <td class="post-text-cell">
-          <span class="post-text-view" onclick="startEdit(${idx}, this)" data-idx="${idx}">${escHtml(p.post_text)}</span>
-          <textarea class="post-text-edit" data-idx="${idx}"
-            onblur="finishEdit(${idx}, this)"
-            onkeydown="if((event.metaKey||event.ctrlKey)&&event.key==='Enter') this.blur();"
-          >${escHtml(p.post_text)}</textarea>
+          <span class="post-text-view" data-idx="${idx}">${escHtml(p.post_text)}</span>
+          <textarea class="post-text-edit" data-idx="${idx}">${escHtml(p.post_text)}</textarea>
           <span class="edit-hint">${escHtml(TRANS_CLICK_TO_EDIT)}</span>
         </td>
       </tr>`;
@@ -101,34 +96,35 @@
   }
 
   // ---- Inline editing ----
-  window.startEdit = function (idx, span) {
+  function startEdit(idx, span) {
     const ta = span.nextElementSibling;
     span.classList.add("editing");
     ta.classList.add("editing");
     ta.style.display = "block";
     ta.focus();
     ta.setSelectionRange(ta.value.length, ta.value.length);
-  };
+  }
 
-  window.finishEdit = function (idx, ta) {
+  // Focusout / blur
+  function finishEdit(idx, ta) {
     allPosts[idx].post_text = ta.value;
     const span = ta.previousElementSibling;
     span.textContent = ta.value;
     span.classList.remove("editing");
     ta.classList.remove("editing");
     ta.style.display = "none";
-  };
+  }
 
   // ---- Toggle row ----
-  window.toggleRow = function (idx, enabled) {
+  function toggleRow(idx, enabled) {
     allPosts[idx].enabled = enabled;
     const row = document.querySelector(`tr[data-idx="${idx}"]`);
     if (row) row.classList.toggle("row-disabled", !enabled);
     updateSelectedCount();
-  };
+  }
 
   // ---- Select all / none ----
-  window.selectAll = function (val) {
+  function selectAll(val) {
     allPosts.forEach((p, i) => { p.enabled = val; });
     document.querySelectorAll(".row-chk").forEach(chk => {
       const idx = parseInt(chk.dataset.idx);
@@ -142,15 +138,15 @@
       chkAll.indeterminate = false;
     }
     updateSelectedCount();
-  };
+  }
 
   // ---- Filter ----
-  window.filterPosts = function (type, btn) {
+  function filterPosts(type, btn) {
     activeFilter = type;
     document.querySelectorAll(".sm-filter-btn").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
     renderTable(allPosts, type);
-  };
+  }
 
   // ---- Update counters ----
   function updateCounts() {
@@ -181,7 +177,7 @@
   }
 
   // ---- Export CSV ----
-  window.exportCSV = function () {
+  function exportCSV() {
     const selected = allPosts.filter(p => p.enabled);
     if (!selected.length) {
       alert(TRANS_SELECT_AT_LEAST_ONE);
@@ -212,17 +208,17 @@
         URL.revokeObjectURL(url);
       })
       .catch(err => alert("Export error: " + err.message));
-  };
+  }
 
   // ---- Advanced settings toggle ----
-  window.toggleAdv = function () {
+  function toggleAdv() {
     const body = document.getElementById("adv-body");
     const hdr  = document.getElementById("adv-toggle");
     if (body && hdr) {
       const open = body.classList.toggle("open");
       hdr.classList.toggle("open", open);
     }
-  };
+  }
 
   // ---- Skeleton helper ----
   function showSkeleton() {
@@ -247,6 +243,98 @@
       .replace(/"/g, "&quot;");
   }
 
-  // Auto-load on page ready
-  document.addEventListener("DOMContentLoaded", loadPosts);
+  // ---- Event Bindings ----
+  function bindEvents() {
+    const btnRegen = document.getElementById("btn-regenerate");
+    if (btnRegen) btnRegen.addEventListener("click", loadPosts);
+
+    const btnSaveRegen = document.getElementById("btn-save-regenerate");
+    if (btnSaveRegen) btnSaveRegen.addEventListener("click", loadPosts);
+
+    const filterPills = document.getElementById("filter-pills");
+    if (filterPills) {
+      filterPills.addEventListener("click", function (e) {
+        const btn = e.target.closest(".sm-filter-btn");
+        if (btn) {
+          filterPosts(btn.dataset.type, btn);
+        }
+      });
+    }
+
+    const btnSelectAll = document.getElementById("btn-select-all");
+    if (btnSelectAll) {
+      btnSelectAll.addEventListener("click", () => selectAll(true));
+    }
+
+    const btnDeselectAll = document.getElementById("btn-deselect-all");
+    if (btnDeselectAll) {
+      btnDeselectAll.addEventListener("click", () => selectAll(false));
+    }
+
+    const chkAll = document.getElementById("chk-all");
+    if (chkAll) {
+      chkAll.addEventListener("change", function () {
+        selectAll(this.checked);
+      });
+    }
+
+    const btnExport = document.getElementById("btn-export");
+    if (btnExport) {
+      btnExport.addEventListener("click", exportCSV);
+    }
+
+    const advToggle = document.getElementById("adv-toggle");
+    if (advToggle) {
+      advToggle.addEventListener("click", toggleAdv);
+    }
+
+    // Attach tbody event delegation
+    const tbody = document.getElementById("posts-tbody");
+    if (tbody) {
+      tbody.addEventListener("click", function (e) {
+        if (e.target.classList.contains("post-text-view")) {
+          const idx = parseInt(e.target.dataset.idx);
+          startEdit(idx, e.target);
+        }
+      });
+
+      tbody.addEventListener("change", function (e) {
+        if (e.target.classList.contains("row-chk")) {
+          const idx = parseInt(e.target.dataset.idx);
+          toggleRow(idx, e.target.checked);
+        } else if (e.target.classList.contains("sm-time-input")) {
+          const row = e.target.closest("tr");
+          const idx = parseInt(row.dataset.idx);
+          allPosts[idx].post_time = e.target.value;
+          syncTimeDisplay(idx, e.target.value);
+        }
+      });
+
+      tbody.addEventListener("keydown", function (e) {
+        if (e.target.classList.contains("post-text-edit")) {
+          if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+            e.target.blur();
+          }
+        }
+      });
+
+      tbody.addEventListener("focusout", function (e) {
+        if (e.target.classList.contains("post-text-edit")) {
+          const idx = parseInt(e.target.dataset.idx);
+          finishEdit(idx, e.target);
+        }
+      });
+    }
+  }
+
+  // Auto-load and bind on page ready
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => {
+      bindEvents();
+      loadPosts();
+    });
+  } else {
+    bindEvents();
+    loadPosts();
+  }
 })();
