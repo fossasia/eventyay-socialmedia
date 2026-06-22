@@ -59,13 +59,14 @@
 
     tbody.innerHTML = visible.map((p, i) => {
       const idx = allPosts.indexOf(p);
+      const safeType = escHtml(p.type);
       return `
-      <tr data-idx="${idx}" data-type="${p.type}" class="${p.enabled ? "" : "row-disabled"}">
+      <tr data-idx="${idx}" data-type="${safeType}" class="${p.enabled ? "" : "row-disabled"}">
         <td>
           <input type="checkbox" class="row-chk" data-idx="${idx}"
             ${p.enabled ? "checked" : ""}>
         </td>
-        <td><span class="type-badge type-${p.type}">${escHtml(p.type_label)}</span></td>
+        <td><span class="type-badge type-${safeType}">${escHtml(p.type_label)}</span></td>
         <td class="dt-cell">
           <div class="dt-date">${escHtml(p.post_date)}</div>
           <div class="dt-time">${escHtml(p.post_time)}</div>
