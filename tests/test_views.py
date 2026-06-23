@@ -1,4 +1,5 @@
 import json
+
 import pytest
 from django.urls import reverse
 from django_scopes import scope

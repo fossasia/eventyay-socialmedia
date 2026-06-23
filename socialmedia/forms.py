@@ -1,6 +1,5 @@
 from django import forms
 from django.utils.translation import gettext_lazy as _
-
 from eventyay.base.forms import SettingsForm
 
 from .export import DEFAULT_TEMPLATES
@@ -21,7 +20,8 @@ class SocialMediaSettingsForm(SettingsForm):
     socialmedia_default_hashtags = forms.CharField(
         label=_("Default Hashtags"),
         help_text=_(
-            "Space-separated hashtags appended to every post. E.g. #fossasia #conference"
+            "Space-separated hashtags appended to every post. "
+            "E.g. #fossasia #conference"
         ),
         required=False,
         max_length=200,
@@ -73,7 +73,8 @@ class SocialMediaSettingsForm(SettingsForm):
         required=False,
         help_text=_(
             "Leave blank to use the default template. "
-            "Available: {event_name}, {speaker_name}, {speaker_link}, {talk_title}, {hashtags}"
+            "Available: {event_name}, {speaker_name}, {speaker_link}, "
+            "{talk_title}, {hashtags}"
         ),
     )
 
@@ -128,7 +129,8 @@ class SocialMediaSettingsForm(SettingsForm):
         required=False,
         help_text=_(
             "Leave blank to use the default template. "
-            "Available: {event_name}, {ticket_name}, {ticket_price}, {ticket_link}, {hashtags}"
+            "Available: {event_name}, {ticket_name}, {ticket_price}, "
+            "{ticket_link}, {hashtags}"
         ),
     )
 
@@ -162,12 +164,13 @@ class SocialMediaSettingsForm(SettingsForm):
         """Return the baked-in defaults for display in the UI."""
 
         class _AttrDict(dict):
-            """Dict subclass that supports attribute-style access for Django templates."""
+            """Dict subclass that supports attribute-style access for
+            Django templates."""
 
             def __getattr__(self, item):
                 try:
                     return self[item]
-                except KeyError:
-                    raise AttributeError(item)
+                except KeyError as e:
+                    raise AttributeError(item) from e
 
         return _AttrDict(DEFAULT_TEMPLATES)
