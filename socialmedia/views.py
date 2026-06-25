@@ -8,7 +8,6 @@ from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_POST
 from django.views.generic import FormView
-
 from eventyay.control.views.event import DecoupleMixin
 
 from .export import build_posts, generate_csv_from_posts

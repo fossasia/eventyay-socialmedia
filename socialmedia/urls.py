@@ -1,5 +1,4 @@
 from django.urls import path
-
 from eventyay.common.urls import OrganizerSlugConverter  # noqa: F401
 
 from . import views
