@@ -90,6 +90,9 @@
   border: 1px solid #e4e4e4;
   border-radius: 8px;
   overflow-x: auto;
+  overflow-y: auto;
+  max-height: 500px;
+  position: relative;
   box-shadow: 0 1px 4px rgba(0, 0, 0, .06);
 }
 
@@ -99,6 +102,9 @@
 }
 
 .sm-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   background: #f5f6f8;
   font-size: 12px;
   font-weight: 600;
@@ -106,7 +112,7 @@
   letter-spacing: .04em;
   color: #777;
   padding: 10px 12px;
-  border-bottom: 1px solid #e4e4e4;
+  border-bottom: 1.5px solid #e4e4e4;
   text-align: left;
   white-space: nowrap;
 }
@@ -400,6 +406,84 @@
 .form-control.sm-time-input {
   width: 110px;
   display: inline-block;
+}
+
+.bulk-schedule-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bulk-schedule-select {
+  width: auto;
+  min-width: 150px;
+}
+
+.bulk-schedule-custom-inputs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Date input styling */
+.form-control.sm-date-input {
+  width: 135px;
+  display: inline-block;
+}
+
+/* Reference date */
+.dt-ref-date {
+  font-size: 11px;
+  color: #888;
+  margin-top: 3px;
+}
+
+/* Modified state styling */
+.sm-table tbody input.is-modified,
+.sm-table tbody textarea.is-modified {
+  background-color: #fff9e6 !important;
+  border-color: #f0a818 !important;
+  box-shadow: 0 0 2px rgba(240, 168, 24, 0.4);
+}
+
+.is-modified-label {
+  font-size: 10px;
+  color: #c08000;
+  margin-top: 2px;
+  font-weight: bold;
+}
+
+/* Validation warning styles */
+.sm-table tbody input.has-warning,
+.sm-table tbody textarea.has-warning {
+  border-color: #d9534f !important;
+}
+
+.validation-warning-badge {
+  color: #d9534f;
+  font-size: 11px;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+}
+
+/* Revert text link */
+.btn-revert-text {
+  color: #0077cc;
+  font-size: 11px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  display: inline-block;
+  margin-top: 4px;
+}
+
+.btn-revert-text:hover {
+  text-decoration: underline;
+  color: #005599;
 }
 
 /* ---- Responsive Layout ---- */

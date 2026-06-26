@@ -123,13 +123,19 @@ def build_posts(event, request=None):
             cfp_link=cfp_url,
             hashtags=hashtags,
         )
+        ref_date = localize(cfp.deadline, event).strftime("%Y-%m-%d")
         posts.append(
             {
+                "id": "cfp",
                 "type": "cfp",
                 "type_label": TYPE_LABELS["cfp"],
                 "post_date": trigger.strftime("%Y-%m-%d"),
                 "post_time": trigger.strftime("%H:%M"),
                 "post_text": text,
+                "default_text": text,
+                "reference_date": ref_date,
+                "original_post_date": trigger.strftime("%Y-%m-%d"),
+                "original_post_time": trigger.strftime("%H:%M"),
             }
         )
 
@@ -147,13 +153,19 @@ def build_posts(event, request=None):
             schedule_link=schedule_url,
             hashtags=hashtags,
         )
+        ref_date = localize(event.date_from, event).strftime("%Y-%m-%d")
         posts.append(
             {
+                "id": "schedule",
                 "type": "schedule",
                 "type_label": TYPE_LABELS["schedule"],
                 "post_date": trigger.strftime("%Y-%m-%d"),
                 "post_time": trigger.strftime("%H:%M"),
                 "post_text": text,
+                "default_text": text,
+                "reference_date": ref_date,
+                "original_post_date": trigger.strftime("%Y-%m-%d"),
+                "original_post_time": trigger.strftime("%H:%M"),
             }
         )
 
@@ -184,13 +196,19 @@ def build_posts(event, request=None):
                 ticket_link=event_link,
                 hashtags=hashtags,
             )
+            ref_date = localize(event.date_from, event).strftime("%Y-%m-%d")
             posts.append(
                 {
+                    "id": f"ticket_{ticket.pk}",
                     "type": "ticket",
                     "type_label": TYPE_LABELS["ticket"],
                     "post_date": trigger.strftime("%Y-%m-%d"),
                     "post_time": trigger.strftime("%H:%M"),
                     "post_text": text,
+                    "default_text": text,
+                    "reference_date": ref_date,
+                    "original_post_date": trigger.strftime("%Y-%m-%d"),
+                    "original_post_time": trigger.strftime("%H:%M"),
                 }
             )
 
@@ -254,13 +272,23 @@ def build_posts(event, request=None):
                                 talk_title=sub.title,
                                 hashtags=hashtags,
                             )
+                            ref_date = (
+                                localize(base_time, event).strftime("%Y-%m-%d")
+                                if base_time
+                                else None
+                            )
                             posts.append(
                                 {
+                                    "id": f"speaker_{speaker.pk}_{talk.pk}",
                                     "type": "speaker",
                                     "type_label": TYPE_LABELS["speaker"],
                                     "post_date": trigger.strftime("%Y-%m-%d"),
                                     "post_time": trigger.strftime("%H:%M"),
                                     "post_text": text,
+                                    "default_text": text,
+                                    "reference_date": ref_date,
+                                    "original_post_date": trigger.strftime("%Y-%m-%d"),
+                                    "original_post_time": trigger.strftime("%H:%M"),
                                 }
                             )
 
@@ -288,13 +316,23 @@ def build_posts(event, request=None):
                         talk_link=talk_url,
                         hashtags=hashtags,
                     )
+                    ref_date = (
+                        localize(talk_start, event).strftime("%Y-%m-%d")
+                        if talk_start
+                        else None
+                    )
                     posts.append(
                         {
+                            "id": f"session_{talk.pk}",
                             "type": "session",
                             "type_label": TYPE_LABELS["session"],
                             "post_date": trigger.strftime("%Y-%m-%d"),
                             "post_time": trigger.strftime("%H:%M"),
                             "post_text": text,
+                            "default_text": text,
+                            "reference_date": ref_date,
+                            "original_post_date": trigger.strftime("%Y-%m-%d"),
+                            "original_post_time": trigger.strftime("%H:%M"),
                         }
                     )
 
