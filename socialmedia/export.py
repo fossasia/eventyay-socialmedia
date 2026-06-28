@@ -136,6 +136,8 @@ def build_posts(event, request=None):
                 "reference_date": ref_date,
                 "original_post_date": trigger.strftime("%Y-%m-%d"),
                 "original_post_time": trigger.strftime("%H:%M"),
+                "event_schedule_display": "N/A",
+                "is_schedule_associated": False,
             }
         )
 
@@ -166,6 +168,8 @@ def build_posts(event, request=None):
                 "reference_date": ref_date,
                 "original_post_date": trigger.strftime("%Y-%m-%d"),
                 "original_post_time": trigger.strftime("%H:%M"),
+                "event_schedule_display": "N/A",
+                "is_schedule_associated": False,
             }
         )
 
@@ -209,6 +213,8 @@ def build_posts(event, request=None):
                     "reference_date": ref_date,
                     "original_post_date": trigger.strftime("%Y-%m-%d"),
                     "original_post_time": trigger.strftime("%H:%M"),
+                    "event_schedule_display": "N/A",
+                    "is_schedule_associated": False,
                 }
             )
 
@@ -221,30 +227,40 @@ def build_posts(event, request=None):
     )
 
     if speaker_enabled or session_enabled:
-        schedule = getattr(event, "current_schedule", None) or getattr(
-            event, "wip_schedule", None
-        )
-        if schedule:
-            filters = {"submission__isnull": False}
+        submissions_mgr = getattr(event, "submissions", None)
+        if submissions_mgr:
+            filters = {}
             if SubmissionStates:
-                filters["submission__state__in"] = [
-                    SubmissionStates.CONFIRMED,
-                    SubmissionStates.ACCEPTED,
-                ]
-            talks = list(
-                schedule.talks.filter(**filters)
-                .select_related("submission", "room")
-                .prefetch_related("submission__speakers")
+                filters["state"] = SubmissionStates.CONFIRMED
+            confirmed_subs = list(
+                submissions_mgr.filter(**filters).prefetch_related("speakers")
             )
+
+            schedule = getattr(event, "current_schedule", None) or getattr(
+                event, "wip_schedule", None
+            )
+            talks_by_sub = {}
+            if schedule:
+                talk_qs = schedule.talks.filter(
+                    submission__in=confirmed_subs
+                ).select_related("submission", "room")
+                for talk in talk_qs:
+                    talks_by_sub[talk.submission_id] = talk
 
             spk_offset = _get_offset(event, "speaker", 3)
             sess_offset = _get_offset(event, "session", 30)  # minutes
 
             seen_speakers = set()
 
-            for talk in talks:
-                sub = talk.submission
-                talk_start = talk.start
+            for sub in confirmed_subs:
+                talk = talks_by_sub.get(sub.pk)
+                talk_start = talk.start if talk else None
+
+                if talk_start:
+                    local_start = localize(talk_start, event)
+                    sched_display = local_start.strftime("%b %d, %Y %H:%M")
+                else:
+                    sched_display = "Unscheduled"
 
                 # Speaker post (one per unique speaker)
                 if speaker_enabled:
@@ -277,9 +293,10 @@ def build_posts(event, request=None):
                                 if base_time
                                 else None
                             )
+                            talk_pk = talk.pk if talk else sub.pk
                             posts.append(
                                 {
-                                    "id": f"speaker_{speaker.pk}_{talk.pk}",
+                                    "id": f"speaker_{speaker.pk}_{talk_pk}",
                                     "type": "speaker",
                                     "type_label": TYPE_LABELS["speaker"],
                                     "post_date": trigger.strftime("%Y-%m-%d"),
@@ -289,52 +306,66 @@ def build_posts(event, request=None):
                                     "reference_date": ref_date,
                                     "original_post_date": trigger.strftime("%Y-%m-%d"),
                                     "original_post_time": trigger.strftime("%H:%M"),
+                                    "event_schedule_display": sched_display,
+                                    "is_schedule_associated": True,
                                 }
                             )
 
                 # Session post
-                if session_enabled and talk_start:
-                    trigger = localize(
-                        talk_start - timedelta(minutes=sess_offset), event
-                    )
-                    local_start = localize(talk_start, event)
-                    names = ", ".join(s.get_display_name() for s in sub.speakers.all())
-                    room = talk.room.name if talk.room else "TBA"
-                    if sub.code:
-                        talk_url = event_absolute_url(
-                            f"{event.urls.base}talk/{sub.code}/", request
+                if session_enabled:
+                    base_time = talk_start or getattr(event, "date_from", None)
+                    if base_time:
+                        if talk_start:
+                            trigger = localize(
+                                talk_start - timedelta(minutes=sess_offset), event
+                            )
+                            local_start = localize(talk_start, event)
+                            talk_time_str = local_start.strftime("%H:%M")
+                        else:
+                            trigger = localize(base_time - timedelta(days=1), event)
+                            talk_time_str = "TBA"
+                        names = ", ".join(
+                            s.get_display_name() for s in sub.speakers.all()
                         )
-                    else:
-                        talk_url = event_link
-                    text = safe_format(
-                        _get_template(event, "session"),
-                        event_name=str(event.name),
-                        talk_title=sub.title,
-                        talk_room=room,
-                        talk_start_time=local_start.strftime("%H:%M"),
-                        speaker_names=names,
-                        talk_link=talk_url,
-                        hashtags=hashtags,
-                    )
-                    ref_date = (
-                        localize(talk_start, event).strftime("%Y-%m-%d")
-                        if talk_start
-                        else None
-                    )
-                    posts.append(
-                        {
-                            "id": f"session_{talk.pk}",
-                            "type": "session",
-                            "type_label": TYPE_LABELS["session"],
-                            "post_date": trigger.strftime("%Y-%m-%d"),
-                            "post_time": trigger.strftime("%H:%M"),
-                            "post_text": text,
-                            "default_text": text,
-                            "reference_date": ref_date,
-                            "original_post_date": trigger.strftime("%Y-%m-%d"),
-                            "original_post_time": trigger.strftime("%H:%M"),
-                        }
-                    )
+                        room = talk.room.name if (talk and talk.room) else "TBA"
+                        if sub.code:
+                            talk_url = event_absolute_url(
+                                f"{event.urls.base}talk/{sub.code}/", request
+                            )
+                        else:
+                            talk_url = event_link
+                        text = safe_format(
+                            _get_template(event, "session"),
+                            event_name=str(event.name),
+                            talk_title=sub.title,
+                            talk_room=room,
+                            talk_start_time=talk_time_str,
+                            speaker_names=names,
+                            talk_link=talk_url,
+                            hashtags=hashtags,
+                        )
+                        ref_date = (
+                            localize(base_time, event).strftime("%Y-%m-%d")
+                            if base_time
+                            else None
+                        )
+                        talk_pk = talk.pk if talk else sub.pk
+                        posts.append(
+                            {
+                                "id": f"session_{talk_pk}",
+                                "type": "session",
+                                "type_label": TYPE_LABELS["session"],
+                                "post_date": trigger.strftime("%Y-%m-%d"),
+                                "post_time": trigger.strftime("%H:%M"),
+                                "post_text": text,
+                                "default_text": text,
+                                "reference_date": ref_date,
+                                "original_post_date": trigger.strftime("%Y-%m-%d"),
+                                "original_post_time": trigger.strftime("%H:%M"),
+                                "event_schedule_display": sched_display,
+                                "is_schedule_associated": True,
+                            }
+                        )
 
     # Sort chronologically
     posts.sort(key=lambda p: (p["post_date"], p["post_time"]))

@@ -123,9 +123,27 @@
       const timeClass = isTimeModified ? "is-modified" : "";
       const textClass = isTextModified ? "is-modified" : "";
 
-      const refHtml = p.reference_date ? `<div class="dt-ref-date"><i class="fa fa-info-circle"></i> Ref: ${escHtml(p.reference_date)}</div>` : "";
       const dateWarn = isPast ? `<div class="validation-warning-badge"><i class="fa fa-exclamation-triangle"></i> Scheduled in past</div>` : "";
       const textWarn = hasPlaceholder ? `<div class="validation-warning-badge"><i class="fa fa-exclamation-triangle"></i> Unresolved placeholders</div>` : "";
+
+      let schedHtml = `<span class="sched-badge sched-na">N/A</span>`;
+      if (p.is_schedule_associated) {
+        if (p.event_schedule_display === "Unscheduled") {
+          schedHtml = `<span class="sched-badge sched-unscheduled"><i class="fa fa-clock-o"></i> Unscheduled</span>`;
+        } else if (p.event_schedule_display) {
+          const parts = p.event_schedule_display.split(" ");
+          if (parts.length >= 3) {
+            const dateStr = parts.slice(0, 3).join(" ");
+            const timeStr = parts.slice(3).join(" ");
+            schedHtml = `<div class="sched-box sched-active">
+              <div class="sched-date-row"><i class="fa fa-calendar"></i> ${escHtml(dateStr)}</div>
+              <div class="sched-time-row"><i class="fa fa-clock-o"></i> ${escHtml(timeStr)}</div>
+            </div>`;
+          } else {
+            schedHtml = `<span class="sched-badge sched-active"><i class="fa fa-calendar"></i> ${escHtml(p.event_schedule_display)}</span>`;
+          }
+        }
+      }
 
       const revertBtn = isTextModified ? `<button class="btn-revert-text" data-idx="${idx}" type="button"><i class="fa fa-undo"></i> Revert to default</button>` : "";
       const charCount = p.post_text.length;
@@ -138,15 +156,16 @@
         <td>
           <span class="type-badge type-${safeType}">${escHtml(p.type_label)}</span>
         </td>
-        <td>
-          <input type="date" class="form-control input-sm sm-date-input ${dateClass}" data-idx="${idx}" value="${escHtml(p.post_date)}">
-          ${isDateModified ? '<div class="is-modified-label">Modified</div>' : ''}
-          ${refHtml}
-          ${dateWarn}
+        <td class="event-schedule-cell">
+          ${schedHtml}
         </td>
         <td>
-          <input type="time" class="form-control input-sm sm-time-input ${timeClass}" data-idx="${idx}" value="${escHtml(p.post_time)}">
-          ${isTimeModified ? '<div class="is-modified-label">Modified</div>' : ''}
+          <div class="post-schedule-cell-wrap">
+            <input type="date" class="form-control input-sm sm-date-input ${dateClass}" data-idx="${idx}" value="${escHtml(p.post_date)}">
+            <input type="time" class="form-control input-sm sm-time-input ${timeClass}" data-idx="${idx}" value="${escHtml(p.post_time)}">
+            ${isDateModified || isTimeModified ? '<div class="is-modified-label">Modified</div>' : ''}
+            ${dateWarn}
+          </div>
         </td>
         <td class="post-text-cell">
           <span class="post-text-view ${textClass}" data-idx="${idx}" tabindex="0">${escHtml(p.post_text)}</span>
@@ -403,8 +422,8 @@
         ${[...Array(5)].map(() => `<tr class="skeleton-row">
           <td><div class="skeleton-bar" style="width:16px;height:16px;border-radius:3px;"></div></td>
           <td><div class="skeleton-bar" style="width:60px;"></div></td>
-          <td><div class="skeleton-bar" style="width:130px;"></div></td>
-          <td><div class="skeleton-bar" style="width:100px;"></div></td>
+          <td><div class="skeleton-bar" style="width:110px;"></div></td>
+          <td><div class="skeleton-bar" style="width:125px;"></div></td>
           <td><div class="skeleton-bar"></div></td>
         </tr>`).join("")}`;
     }

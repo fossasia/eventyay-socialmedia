@@ -78,12 +78,12 @@
         <tr>
           <th><input type="checkbox" id="chk-all" title="{% trans 'Toggle all' %}"></th>
           <th>{% trans "Type" %}</th>
+          <th><span title="{% trans 'Official date & time of the session on the event agenda schedule.' %}" style="cursor:help;border-bottom:1px dotted #ccc;">{% trans "Schedule Date & Time" %}</span></th>
           <th>
-            <span title="{% trans 'The date this post is scheduled to be published.' %}" style="cursor:help;border-bottom:1px dotted #ccc;">{% trans "Scheduled Date" %}</span>
+            <span title="{% trans 'The date & time this social media post is scheduled to be published.' %}" style="cursor:help;border-bottom:1px dotted #ccc;">{% trans "Post Schedule Date & Time" %}</span>
             <div style="font-size: 10px; font-weight: normal; color: #888; text-transform: none; margin-top: 2px;">{{ event.timezone }}</div>
           </th>
-          <th><span title="{% trans 'The time this post is scheduled to be published.' %}" style="cursor:help;border-bottom:1px dotted #ccc;">{% trans "Scheduled Time" %}</span></th>
-          <th>{% trans "Post Text" %} <span style="font-weight:400;color:#aaa;font-size:11px;">— {% trans "click to edit" %}</span></th>
+          <th>{% trans "Content" %} <span style="font-weight:400;color:#aaa;font-size:11px;">— {% trans "click to edit" %}</span></th>
         </tr>
       </thead>
       <tbody id="posts-tbody">
@@ -92,8 +92,8 @@
         <tr class="skeleton-row">
           <td><div class="skeleton-bar" style="width:16px;height:16px;border-radius:3px;"></div></td>
           <td><div class="skeleton-bar" style="width:60px;"></div></td>
-          <td><div class="skeleton-bar" style="width:80px;"></div></td>
-          <td><div class="skeleton-bar" style="width:50px;"></div></td>
+          <td><div class="skeleton-bar" style="width:110px;"></div></td>
+          <td><div class="skeleton-bar" style="width:125px;"></div></td>
           <td><div class="skeleton-bar" style="width:100%;"></div></td>
         </tr>
         {% endfor %}
