@@ -35,12 +35,14 @@ class SocialMediaSettingsForm(SettingsForm):
         required=False,
         initial=True,
     )
-    socialmedia_cfp_offset = forms.IntegerField(
+    socialmedia_cfp_offset = forms.CharField(
         label=_("Days before CFP deadline"),
-        help_text=_("How many days before the deadline to schedule the announcement."),
+        help_text=_(
+            "Days before deadline to schedule. Enter a number or "
+            "comma-separated values (e.g., 14, 7, 1)."
+        ),
         required=False,
-        initial=7,
-        min_value=0,
+        initial="7",
     )
     socialmedia_cfp_template = forms.CharField(
         label=_("CFP post template (optional)"),
@@ -60,12 +62,14 @@ class SocialMediaSettingsForm(SettingsForm):
         required=False,
         initial=True,
     )
-    socialmedia_speaker_offset = forms.IntegerField(
+    socialmedia_speaker_offset = forms.CharField(
         label=_("Days before session (speakers)"),
-        help_text=_("How many days before the speaker's session to announce them."),
+        help_text=_(
+            "Days before speaker's session. Enter a number or "
+            "comma-separated values (e.g., 30, 7, 1)."
+        ),
         required=False,
-        initial=3,
-        min_value=0,
+        initial="3",
     )
     socialmedia_speaker_template = forms.CharField(
         label=_("Speaker post template (optional)"),
@@ -86,14 +90,14 @@ class SocialMediaSettingsForm(SettingsForm):
         required=False,
         initial=True,
     )
-    socialmedia_session_offset = forms.IntegerField(
+    socialmedia_session_offset = forms.CharField(
         label=_("Minutes before session"),
         help_text=_(
-            "How many minutes before a session starts to schedule the promo post."
+            "Minutes before session starts. Enter a number or "
+            "comma-separated values (e.g., 60, 30, 15)."
         ),
         required=False,
-        initial=30,
-        min_value=0,
+        initial="30",
     )
     socialmedia_session_template = forms.CharField(
         label=_("Session post template (optional)"),
@@ -114,14 +118,14 @@ class SocialMediaSettingsForm(SettingsForm):
         required=False,
         initial=True,
     )
-    socialmedia_ticket_offset = forms.IntegerField(
+    socialmedia_ticket_offset = forms.CharField(
         label=_("Days before event (tickets)"),
         help_text=_(
-            "How many days before the event starts to post ticket availability."
+            "Days before event starts. Enter a number or "
+            "comma-separated values (e.g., 30, 14, 5)."
         ),
         required=False,
-        initial=5,
-        min_value=0,
+        initial="5",
     )
     socialmedia_ticket_template = forms.CharField(
         label=_("Ticket post template (optional)"),
@@ -142,12 +146,14 @@ class SocialMediaSettingsForm(SettingsForm):
         required=False,
         initial=True,
     )
-    socialmedia_schedule_offset = forms.IntegerField(
+    socialmedia_schedule_offset = forms.CharField(
         label=_("Days before event (schedule)"),
-        help_text=_("How many days before the event to announce the schedule release."),
+        help_text=_(
+            "Days before event to announce schedule. Enter a number or "
+            "comma-separated values (e.g., 7, 2)."
+        ),
         required=False,
-        initial=2,
-        min_value=0,
+        initial="2",
     )
     socialmedia_schedule_template = forms.CharField(
         label=_("Schedule post template (optional)"),

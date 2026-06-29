@@ -8,6 +8,7 @@
     return {
       PREVIEW_URL: config.previewUrl,
       EXPORT_URL: config.exportUrl,
+      UPDATE_URL: config.updateUrl,
       CSRF_TOKEN: config.csrfToken,
       TRANS_CLICK_TO_EDIT: config.transClickToEdit || "Click to edit · Ctrl+Enter to save",
       TRANS_SELECT_AT_LEAST_ONE: config.transSelectAtLeastOne || "Please select at least one post to export.",
@@ -147,6 +148,34 @@
         if (!r.ok) throw new Error(`Export failed: ${r.status}`);
         return r.blob();
       });
+    },
+    savePostToDB(post) {
+      if (!Config.UPDATE_URL || !post) return Promise.resolve();
+      return fetch(Config.UPDATE_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": Config.CSRF_TOKEN,
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: JSON.stringify({
+          id: post.id,
+          db_id: post.db_id,
+          post_text: post.post_text,
+          post_date: post.post_date,
+          post_time: post.post_time,
+        }),
+      })
+        .then(r => {
+          if (!r.ok) throw new Error("Save to DB failed");
+          return r.json();
+        })
+        .then(res => {
+          if (res.db_id) post.db_id = res.db_id;
+          if (res.is_pinned) post.is_pinned = true;
+          return res;
+        })
+        .catch(err => console.error("Failed to save post to DB:", err));
     }
   };
 
@@ -533,6 +562,7 @@
         PostState.update(id, { post_text: post.default_text });
         this.updateRow(id);
         AppController.triggerValidation();
+        APIClient.savePostToDB(post);
         this.showToast("Reverted post text to template default.", "success");
       }
     },
@@ -687,6 +717,12 @@
       UI.renderTable(PostState.getAll(), PostState.getFilter());
       this.triggerValidation();
 
+      enabledPosts.forEach(p => {
+        if (preset === "custom" || p.reference_date) {
+          APIClient.savePostToDB(p);
+        }
+      });
+
       let msg = `Applied preset to ${res.updatedCount || 0} post(s).`;
       if (res.skippedCount > 0) {
         msg += ` (${res.skippedCount} post(s) skipped due to missing reference dates).`;
@@ -796,10 +832,12 @@
             PostState.update(postId, { post_date: e.target.value });
             UI.updateRow(postId);
             this.triggerValidation();
+            APIClient.savePostToDB(PostState.get(postId));
           } else if (e.target.classList.contains("sm-time-input")) {
             PostState.update(postId, { post_time: e.target.value });
             UI.updateRow(postId);
             this.triggerValidation();
+            APIClient.savePostToDB(PostState.get(postId));
           }
         });
 
@@ -839,6 +877,7 @@
 
           if (e.target.classList.contains("post-text-edit")) {
             UI.finishEdit(postId, e.target.value);
+            APIClient.savePostToDB(PostState.get(postId));
           }
         });
       }

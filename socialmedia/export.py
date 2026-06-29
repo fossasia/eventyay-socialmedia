@@ -88,25 +88,33 @@ def _get_template(event, key):
 
 
 def _get_offset(event, key, default):
+    return _get_offsets(event, key, default)[0]
+
+
+def _get_offsets(event, key, default):
     raw = event.settings.get(f"socialmedia_{key}_offset")
     if raw is None or raw == "":
-        return default
+        return [default]
     if isinstance(raw, int):
-        return raw
+        return [raw]
     if isinstance(raw, float):
-        return int(raw)
-
+        return [int(raw)]
     val_str = str(raw).strip()
     if not val_str:
-        return default
-
-    # Handle comma-separated values saved by multi-offset forms
-    # (e.g. "14, 7") — take only the first entry for single-offset mode.
-    first = val_str.split(",")[0].strip()
-    try:
-        return int(first)
-    except (ValueError, TypeError):
-        return default
+        return [default]
+    offsets = []
+    for part in val_str.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            if "." in part:
+                offsets.append(int(float(part)))
+            else:
+                offsets.append(int(part))
+        except (ValueError, TypeError):
+            pass
+    return offsets if offsets else [default]
 
 
 # ---------------------------------------------------------------------------
@@ -130,8 +138,7 @@ def build_posts(event, request=None):
     cfp_enabled = event.settings.get("socialmedia_cfp_enabled", True, as_type=bool)
     cfp = getattr(event, "cfp", None)
     if cfp_enabled and cfp and cfp.deadline:
-        offset = _get_offset(event, "cfp", 7)
-        trigger = localize(cfp.deadline - timedelta(days=offset), event)
+        cfp_offsets = _get_offsets(event, "cfp", 7)
         deadline_str = localize(cfp.deadline, event).strftime("%B %-d, %Y")
         cfp_url = event_absolute_url(cfp.urls.public, request)
         text = safe_format(
@@ -142,30 +149,34 @@ def build_posts(event, request=None):
             hashtags=hashtags,
         )
         ref_date = localize(cfp.deadline, event).strftime("%Y-%m-%d")
-        posts.append(
-            {
-                "id": "cfp",
-                "type": "cfp",
-                "type_label": TYPE_LABELS["cfp"],
-                "post_date": trigger.strftime("%Y-%m-%d"),
-                "post_time": trigger.strftime("%H:%M"),
-                "post_text": text,
-                "default_text": text,
-                "reference_date": ref_date,
-                "original_post_date": trigger.strftime("%Y-%m-%d"),
-                "original_post_time": trigger.strftime("%H:%M"),
-                "event_schedule_display": "N/A",
-                "is_schedule_associated": False,
-            }
-        )
+        for cfp_off in cfp_offsets:
+            trigger = localize(cfp.deadline - timedelta(days=cfp_off), event)
+            post_id = "cfp" if len(cfp_offsets) == 1 else f"cfp_off{cfp_off}"
+            posts.append(
+                {
+                    "id": post_id,
+                    "type": "cfp",
+                    "type_label": TYPE_LABELS["cfp"],
+                    "post_date": trigger.strftime("%Y-%m-%d"),
+                    "post_time": trigger.strftime("%H:%M"),
+                    "post_text": text,
+                    "default_text": text,
+                    "reference_date": ref_date,
+                    "original_post_date": trigger.strftime("%Y-%m-%d"),
+                    "original_post_time": trigger.strftime("%H:%M"),
+                    "event_schedule_display": "N/A",
+                    "is_schedule_associated": False,
+                    "offset_days": cfp_off,
+                    "template_context": "announcement",
+                }
+            )
 
     # ---- Schedule release ------------------------------------------------
     schedule_enabled = event.settings.get(
         "socialmedia_schedule_enabled", True, as_type=bool
     )
     if schedule_enabled and getattr(event, "date_from", None):
-        offset = _get_offset(event, "schedule", 2)
-        trigger = localize(event.date_from - timedelta(days=offset), event)
+        sched_offsets = _get_offsets(event, "schedule", 2)
         schedule_url = event_absolute_url(event.urls.schedule, request)
         text = safe_format(
             _get_template(event, "schedule"),
@@ -174,30 +185,36 @@ def build_posts(event, request=None):
             hashtags=hashtags,
         )
         ref_date = localize(event.date_from, event).strftime("%Y-%m-%d")
-        posts.append(
-            {
-                "id": "schedule",
-                "type": "schedule",
-                "type_label": TYPE_LABELS["schedule"],
-                "post_date": trigger.strftime("%Y-%m-%d"),
-                "post_time": trigger.strftime("%H:%M"),
-                "post_text": text,
-                "default_text": text,
-                "reference_date": ref_date,
-                "original_post_date": trigger.strftime("%Y-%m-%d"),
-                "original_post_time": trigger.strftime("%H:%M"),
-                "event_schedule_display": "N/A",
-                "is_schedule_associated": False,
-            }
-        )
+        for sched_off in sched_offsets:
+            trigger = localize(event.date_from - timedelta(days=sched_off), event)
+            post_id = (
+                "schedule" if len(sched_offsets) == 1 else f"schedule_off{sched_off}"
+            )
+            posts.append(
+                {
+                    "id": post_id,
+                    "type": "schedule",
+                    "type_label": TYPE_LABELS["schedule"],
+                    "post_date": trigger.strftime("%Y-%m-%d"),
+                    "post_time": trigger.strftime("%H:%M"),
+                    "post_text": text,
+                    "default_text": text,
+                    "reference_date": ref_date,
+                    "original_post_date": trigger.strftime("%Y-%m-%d"),
+                    "original_post_time": trigger.strftime("%H:%M"),
+                    "event_schedule_display": "N/A",
+                    "is_schedule_associated": False,
+                    "offset_days": sched_off,
+                    "template_context": "announcement",
+                }
+            )
 
     # ---- Ticket announcements --------------------------------------------
     ticket_enabled = event.settings.get(
         "socialmedia_ticket_enabled", True, as_type=bool
     )
     if ticket_enabled and getattr(event, "date_from", None):
-        offset = _get_offset(event, "ticket", 5)
-        trigger = localize(event.date_from - timedelta(days=offset), event)
+        tkt_offsets = _get_offsets(event, "ticket", 5)
         try:
             active_tickets = list(
                 event.products.filter(active=True, category__is_addon=False)[:5]
@@ -219,22 +236,31 @@ def build_posts(event, request=None):
                 hashtags=hashtags,
             )
             ref_date = localize(event.date_from, event).strftime("%Y-%m-%d")
-            posts.append(
-                {
-                    "id": f"ticket_{ticket.pk}",
-                    "type": "ticket",
-                    "type_label": TYPE_LABELS["ticket"],
-                    "post_date": trigger.strftime("%Y-%m-%d"),
-                    "post_time": trigger.strftime("%H:%M"),
-                    "post_text": text,
-                    "default_text": text,
-                    "reference_date": ref_date,
-                    "original_post_date": trigger.strftime("%Y-%m-%d"),
-                    "original_post_time": trigger.strftime("%H:%M"),
-                    "event_schedule_display": "N/A",
-                    "is_schedule_associated": False,
-                }
-            )
+            for tkt_off in tkt_offsets:
+                trigger = localize(event.date_from - timedelta(days=tkt_off), event)
+                post_id = (
+                    f"ticket_{ticket.pk}"
+                    if len(tkt_offsets) == 1
+                    else f"ticket_{ticket.pk}_off{tkt_off}"
+                )
+                posts.append(
+                    {
+                        "id": post_id,
+                        "type": "ticket",
+                        "type_label": TYPE_LABELS["ticket"],
+                        "post_date": trigger.strftime("%Y-%m-%d"),
+                        "post_time": trigger.strftime("%H:%M"),
+                        "post_text": text,
+                        "default_text": text,
+                        "reference_date": ref_date,
+                        "original_post_date": trigger.strftime("%Y-%m-%d"),
+                        "original_post_time": trigger.strftime("%H:%M"),
+                        "event_schedule_display": "N/A",
+                        "is_schedule_associated": False,
+                        "offset_days": tkt_off,
+                        "template_context": "announcement",
+                    }
+                )
 
     # ---- Speaker & Session announcements ---------------------------------
     speaker_enabled = event.settings.get(
@@ -263,10 +289,10 @@ def build_posts(event, request=None):
                 for talk in talk_qs:
                     talks_by_sub[talk.submission_id] = talk
 
-            spk_offset = _get_offset(event, "speaker", 3)
-            sess_offset = _get_offset(event, "session", 30)  # minutes
+            spk_offsets = _get_offsets(event, "speaker", 3)
+            sess_offsets = _get_offsets(event, "session", 30)  # minutes
 
-            seen_speakers = set()
+            seen_speaker_offsets = set()
 
             for sub in confirmed_subs:
                 talk = talks_by_sub.get(sub.pk)
@@ -278,67 +304,70 @@ def build_posts(event, request=None):
                 else:
                     sched_display = "Unscheduled"
 
-                # Speaker post (one per unique speaker)
+                # Speaker post (one per unique speaker per offset)
                 if speaker_enabled:
                     base_time = talk_start or getattr(event, "date_from", None)
                     if base_time:
-                        trigger = localize(
-                            base_time - timedelta(days=spk_offset), event
-                        )
-                        for speaker in sub.speakers.all():
-                            if speaker.pk in seen_speakers:
-                                continue
-                            seen_speakers.add(speaker.pk)
-                            if speaker.code:
-                                spk_url = event_absolute_url(
-                                    f"{event.urls.base}speakers/{speaker.code}/",
-                                    request,
+                        for spk_off in spk_offsets:
+                            trigger = localize(
+                                base_time - timedelta(days=spk_off), event
+                            )
+                            for speaker in sub.speakers.all():
+                                if (speaker.pk, spk_off) in seen_speaker_offsets:
+                                    continue
+                                seen_speaker_offsets.add((speaker.pk, spk_off))
+                                if speaker.code:
+                                    spk_url = event_absolute_url(
+                                        f"{event.urls.base}speakers/{speaker.code}/",
+                                        request,
+                                    )
+                                else:
+                                    spk_url = event_link
+                                text = safe_format(
+                                    _get_template(event, "speaker"),
+                                    event_name=str(event.name),
+                                    speaker_name=speaker.get_display_name(),
+                                    speaker_link=spk_url,
+                                    talk_title=sub.title,
+                                    hashtags=hashtags,
                                 )
-                            else:
-                                spk_url = event_link
-                            text = safe_format(
-                                _get_template(event, "speaker"),
-                                event_name=str(event.name),
-                                speaker_name=speaker.get_display_name(),
-                                speaker_link=spk_url,
-                                talk_title=sub.title,
-                                hashtags=hashtags,
-                            )
-                            ref_date = (
-                                localize(base_time, event).strftime("%Y-%m-%d")
-                                if base_time
-                                else None
-                            )
-                            posts.append(
-                                {
-                                    "id": f"speaker_{speaker.pk}",
-                                    "type": "speaker",
-                                    "type_label": TYPE_LABELS["speaker"],
-                                    "post_date": trigger.strftime("%Y-%m-%d"),
-                                    "post_time": trigger.strftime("%H:%M"),
-                                    "post_text": text,
-                                    "default_text": text,
-                                    "reference_date": ref_date,
-                                    "original_post_date": trigger.strftime("%Y-%m-%d"),
-                                    "original_post_time": trigger.strftime("%H:%M"),
-                                    "event_schedule_display": sched_display,
-                                    "is_schedule_associated": True,
-                                }
-                            )
+                                ref_date = (
+                                    localize(base_time, event).strftime("%Y-%m-%d")
+                                    if base_time
+                                    else None
+                                )
+                                talk_pk = talk.pk if talk else sub.pk
+                                post_id = (
+                                    f"speaker_{speaker.pk}_{talk_pk}"
+                                    if len(spk_offsets) == 1
+                                    else f"speaker_{speaker.pk}_{talk_pk}_off{spk_off}"
+                                )
+                                posts.append(
+                                    {
+                                        "id": post_id,
+                                        "type": "speaker",
+                                        "type_label": TYPE_LABELS["speaker"],
+                                        "post_date": trigger.strftime("%Y-%m-%d"),
+                                        "post_time": trigger.strftime("%H:%M"),
+                                        "post_text": text,
+                                        "default_text": text,
+                                        "reference_date": ref_date,
+                                        "original_post_date": trigger.strftime(
+                                            "%Y-%m-%d"
+                                        ),
+                                        "original_post_time": trigger.strftime("%H:%M"),
+                                        "event_schedule_display": sched_display,
+                                        "is_schedule_associated": True,
+                                        "offset_days": spk_off,
+                                        "template_context": "announcement",
+                                    }
+                                )
+
 
                 # Session post
                 if session_enabled:
                     base_time = talk_start or getattr(event, "date_from", None)
                     if base_time:
-                        if talk_start:
-                            trigger = localize(
-                                talk_start - timedelta(minutes=sess_offset), event
-                            )
-                            local_start = localize(talk_start, event)
-                            talk_time_str = local_start.strftime("%H:%M")
-                        else:
-                            trigger = localize(base_time - timedelta(days=1), event)
-                            talk_time_str = "TBA"
                         names = ", ".join(
                             s.get_display_name() for s in sub.speakers.all()
                         )
@@ -354,7 +383,11 @@ def build_posts(event, request=None):
                             event_name=str(event.name),
                             talk_title=sub.title,
                             talk_room=room,
-                            talk_start_time=talk_time_str,
+                            talk_start_time=(
+                                localize(talk_start, event).strftime("%H:%M")
+                                if talk_start
+                                else "TBA"
+                            ),
                             speaker_names=names,
                             talk_link=talk_url,
                             hashtags=hashtags,
@@ -365,25 +398,82 @@ def build_posts(event, request=None):
                             else None
                         )
                         talk_pk = talk.pk if talk else sub.pk
-                        posts.append(
-                            {
-                                "id": f"session_{talk_pk}",
-                                "type": "session",
-                                "type_label": TYPE_LABELS["session"],
-                                "post_date": trigger.strftime("%Y-%m-%d"),
-                                "post_time": trigger.strftime("%H:%M"),
-                                "post_text": text,
-                                "default_text": text,
-                                "reference_date": ref_date,
-                                "original_post_date": trigger.strftime("%Y-%m-%d"),
-                                "original_post_time": trigger.strftime("%H:%M"),
-                                "event_schedule_display": sched_display,
-                                "is_schedule_associated": True,
-                            }
-                        )
+                        for sess_off in sess_offsets:
+                            if talk_start:
+                                trigger = localize(
+                                    talk_start - timedelta(minutes=sess_off), event
+                                )
+                            else:
+                                trigger = localize(base_time - timedelta(days=1), event)
+                            post_id = (
+                                f"session_{talk_pk}"
+                                if len(sess_offsets) == 1
+                                else f"session_{talk_pk}_off{sess_off}"
+                            )
+                            posts.append(
+                                {
+                                    "id": post_id,
+                                    "type": "session",
+                                    "type_label": TYPE_LABELS["session"],
+                                    "post_date": trigger.strftime("%Y-%m-%d"),
+                                    "post_time": trigger.strftime("%H:%M"),
+                                    "post_text": text,
+                                    "default_text": text,
+                                    "reference_date": ref_date,
+                                    "original_post_date": trigger.strftime("%Y-%m-%d"),
+                                    "original_post_time": trigger.strftime("%H:%M"),
+                                    "event_schedule_display": sched_display,
+                                    "is_schedule_associated": True,
+                                    "offset_days": sess_off,
+                                    "template_context": (
+                                        "reminder"
+                                        if sess_off < 1440
+                                        else "announcement"
+                                    ),
+                                }
+                            )
 
     # Sort chronologically
     posts.sort(key=lambda p: (p["post_date"], p["post_time"]))
+    return posts
+
+
+def sync_posts_to_db(event, request=None):
+    """Sync built posts into SocialMediaPost database records."""
+    from datetime import datetime
+
+    from .models import SocialMediaPost, SocialMediaPostStatus
+
+    posts = build_posts(event, request)
+    tz = pytz.timezone(getattr(event, "timezone", None) or "UTC")
+
+    for p in posts:
+        dt_str = f"{p['post_date']} {p['post_time']}"
+        try:
+            naive_dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
+            scheduled_at = make_aware(naive_dt, tz)
+        except Exception:
+            continue
+
+        db_post, created = SocialMediaPost.objects.get_or_create(
+            event=event,
+            post_type=p["type"],
+            entity_id=str(p["id"]),
+            defaults={
+                "scheduled_at": scheduled_at,
+                "post_text": p["post_text"],
+                "offset_days": p.get("offset_days", 0),
+                "template_context": p.get("template_context", "default"),
+                "status": SocialMediaPostStatus.SCHEDULED,
+            },
+        )
+        if not created and not db_post.is_pinned:
+            db_post.scheduled_at = scheduled_at
+            db_post.post_text = p["post_text"]
+            db_post.offset_days = p.get("offset_days", 0)
+            db_post.template_context = p.get("template_context", "default")
+            db_post.save()
+
     return posts
 
 
