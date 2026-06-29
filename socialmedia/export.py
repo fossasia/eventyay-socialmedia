@@ -16,27 +16,119 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 DEFAULT_TEMPLATES = {
-    "cfp": (
-        "📢 Submit your proposals for {event_name}! "
-        "The deadline is {cfp_deadline}. Apply here: {cfp_link} {hashtags}"
-    ),
-    "speaker": (
-        "🎤 Meet our speaker {speaker_name} at {event_name}! "
-        "They'll be presenting '{talk_title}'. Learn more: {speaker_link} {hashtags}"
-    ),
-    "session": (
-        "🗓 Coming up at {event_name}: '{talk_title}' by {speaker_names} "
-        "in {talk_room} at {talk_start_time}. Don't miss it! {talk_link} {hashtags}"
-    ),
-    "ticket": (
-        "🎟 Get your {ticket_name} tickets for {event_name}! "
-        "Only {ticket_price} — grab yours now: {ticket_link} {hashtags}"
-    ),
-    "schedule": (
-        "📅 The full schedule for {event_name} is now live! "
-        "Plan your days: {schedule_link} {hashtags}"
-    ),
+    "cfp": {
+        "announcement": (
+            "📢 Submit your proposals for {event_name}! "
+            "The deadline is {cfp_deadline}. Apply here: {cfp_link} {hashtags}"
+        ),
+        "reminder": (
+            "⏰ CFP Closing Soon for {event_name}! Only a few days left "
+            "({cfp_deadline}) to submit your proposals: {cfp_link} {hashtags}"
+        ),
+        "final_call": (
+            "🚨 Final Call for Proposals for {event_name}! Submissions close on "
+            "{cfp_deadline}. Submit now: {cfp_link} {hashtags}"
+        ),
+    },
+    "speaker": {
+        "announcement": (
+            "🎤 Meet our speaker {speaker_name} at {event_name}! "
+            "They'll be presenting '{talk_title}'. Learn more: {speaker_link} {hashtags}"
+        ),
+        "reminder": (
+            "🗓 Don't miss {speaker_name} speaking on '{talk_title}' "
+            "at {event_name}! Check session details: {speaker_link} {hashtags}"
+        ),
+        "final_call": (
+            "🔥 Spotlight on {speaker_name} presenting '{talk_title}' at "
+            "{event_name}! Catch them live: {speaker_link} {hashtags}"
+        ),
+    },
+    "session": {
+        "announcement": (
+            "🗓 Coming up at {event_name}: '{talk_title}' by {speaker_names} "
+            "in {talk_room} at {talk_start_time}. Don't miss it! {talk_link} {hashtags}"
+        ),
+        "reminder": (
+            "⏰ Session starting soon! '{talk_title}' by {speaker_names} "
+            "begins at {talk_start_time} in {talk_room}. {talk_link} {hashtags}"
+        ),
+        "final_call": (
+            "🔥 Starting now! '{talk_title}' by {speaker_names} "
+            "in {talk_room}. Join live: {talk_link} {hashtags}"
+        ),
+    },
+    "ticket": {
+        "announcement": (
+            "🎟 Get your {ticket_name} tickets for {event_name}! "
+            "Only {ticket_price} — grab yours now: {ticket_link} {hashtags}"
+        ),
+        "reminder": (
+            "⚡ Ticket Reminder: Don't miss out on {ticket_name} for {event_name}! "
+            "Get tickets now: {ticket_link} {hashtags}"
+        ),
+        "final_call": (
+            "🔥 Last chance! {ticket_name} tickets for {event_name} "
+            "selling fast. Grab yours: {ticket_link} {hashtags}"
+        ),
+    },
+    "schedule": {
+        "announcement": (
+            "📅 The full schedule for {event_name} is now live! "
+            "Plan your days: {schedule_link} {hashtags}"
+        ),
+        "reminder": (
+            "🗓 Check out the schedule for {event_name} and bookmark "
+            "your favorite sessions: {schedule_link} {hashtags}"
+        ),
+    },
 }
+
+# ---------------------------------------------------------------------------
+# Distance-based template context mapping
+# ---------------------------------------------------------------------------
+# Maps offset thresholds to template context keys.  For each post type,
+# offsets are evaluated against these thresholds (in the type's native unit:
+# days for cfp/speaker/ticket/schedule, minutes for session) to pick the
+# right template wave.  The first matching threshold wins.
+# ---------------------------------------------------------------------------
+
+WAVE_THRESHOLDS = {
+    "cfp": [
+        (14, "announcement"),
+        (3, "reminder"),
+        (0, "final_call"),
+    ],
+    "speaker": [
+        (14, "announcement"),
+        (3, "reminder"),
+        (0, "final_call"),
+    ],
+    "session": [
+        (1440, "announcement"),  # 1440 min = 1 day
+        (60, "reminder"),
+        (0, "final_call"),
+    ],
+    "ticket": [
+        (14, "announcement"),
+        (3, "reminder"),
+        (0, "final_call"),
+    ],
+    "schedule": [
+        (7, "announcement"),
+        (0, "reminder"),
+    ],
+}
+
+
+def resolve_template_context(post_type, offset_value):
+    """Return the template context key (announcement/reminder/final_call)
+    based on how far out the offset is."""
+    thresholds = WAVE_THRESHOLDS.get(post_type, [])
+    for threshold, ctx in thresholds:
+        if offset_value >= threshold:
+            return ctx
+    return "announcement"
 
 # Human-readable type labels for the UI
 TYPE_LABELS = {
@@ -82,9 +174,21 @@ def event_absolute_url(path, request=None):
     return f"{base}{path}" if base else path
 
 
-def _get_template(event, key):
-    """Return saved custom template or fall back to baked-in default."""
-    return event.settings.get(f"socialmedia_{key}_template") or DEFAULT_TEMPLATES[key]
+def _get_template(event, key, context="announcement"):
+    """Return saved custom template or fall back to baked-in contextual default."""
+    custom = event.settings.get(f"socialmedia_{key}_template")
+    if custom:
+        return custom
+    tpl = DEFAULT_TEMPLATES.get(key, {})
+    if isinstance(tpl, dict):
+        return tpl.get(context) or tpl.get("announcement") or list(tpl.values())[0]
+    return tpl
+
+
+def _get_template_for_offset(event, key, offset_value):
+    """Return the template matching the distance-based wave for this offset."""
+    context = resolve_template_context(key, offset_value)
+    return _get_template(event, key, context), context
 
 
 def _get_offset(event, key, default):
@@ -114,7 +218,7 @@ def _get_offsets(event, key, default):
                 offsets.append(int(part))
         except (ValueError, TypeError):
             pass
-    return offsets if offsets else [default]
+    return sorted(set(offsets), reverse=True) if offsets else [default]
 
 
 # ---------------------------------------------------------------------------
@@ -141,15 +245,16 @@ def build_posts(event, request=None):
         cfp_offsets = _get_offsets(event, "cfp", 7)
         deadline_str = localize(cfp.deadline, event).strftime("%B %-d, %Y")
         cfp_url = event_absolute_url(cfp.urls.public, request)
-        text = safe_format(
-            _get_template(event, "cfp"),
-            event_name=str(event.name),
-            cfp_deadline=deadline_str,
-            cfp_link=cfp_url,
-            hashtags=hashtags,
-        )
         ref_date = localize(cfp.deadline, event).strftime("%Y-%m-%d")
         for cfp_off in cfp_offsets:
+            text, template_ctx = _get_template_for_offset(event, "cfp", cfp_off)
+            text = safe_format(
+                text,
+                event_name=str(event.name),
+                cfp_deadline=deadline_str,
+                cfp_link=cfp_url,
+                hashtags=hashtags,
+            )
             trigger = localize(cfp.deadline - timedelta(days=cfp_off), event)
             post_id = "cfp" if len(cfp_offsets) == 1 else f"cfp_off{cfp_off}"
             posts.append(
@@ -167,7 +272,7 @@ def build_posts(event, request=None):
                     "event_schedule_display": "N/A",
                     "is_schedule_associated": False,
                     "offset_days": cfp_off,
-                    "template_context": "announcement",
+                    "template_context": template_ctx,
                 }
             )
 
@@ -178,14 +283,15 @@ def build_posts(event, request=None):
     if schedule_enabled and getattr(event, "date_from", None):
         sched_offsets = _get_offsets(event, "schedule", 2)
         schedule_url = event_absolute_url(event.urls.schedule, request)
-        text = safe_format(
-            _get_template(event, "schedule"),
-            event_name=str(event.name),
-            schedule_link=schedule_url,
-            hashtags=hashtags,
-        )
         ref_date = localize(event.date_from, event).strftime("%Y-%m-%d")
         for sched_off in sched_offsets:
+            text, template_ctx = _get_template_for_offset(event, "schedule", sched_off)
+            text = safe_format(
+                text,
+                event_name=str(event.name),
+                schedule_link=schedule_url,
+                hashtags=hashtags,
+            )
             trigger = localize(event.date_from - timedelta(days=sched_off), event)
             post_id = (
                 "schedule" if len(sched_offsets) == 1 else f"schedule_off{sched_off}"
@@ -205,7 +311,7 @@ def build_posts(event, request=None):
                     "event_schedule_display": "N/A",
                     "is_schedule_associated": False,
                     "offset_days": sched_off,
-                    "template_context": "announcement",
+                    "template_context": template_ctx,
                 }
             )
 
@@ -227,16 +333,17 @@ def build_posts(event, request=None):
                 if ticket.default_price
                 else "Free"
             )
-            text = safe_format(
-                _get_template(event, "ticket"),
-                event_name=str(event.name),
-                ticket_name=str(ticket.name),
-                ticket_price=price_str,
-                ticket_link=event_link,
-                hashtags=hashtags,
-            )
             ref_date = localize(event.date_from, event).strftime("%Y-%m-%d")
             for tkt_off in tkt_offsets:
+                text, template_ctx = _get_template_for_offset(event, "ticket", tkt_off)
+                text = safe_format(
+                    text,
+                    event_name=str(event.name),
+                    ticket_name=str(ticket.name),
+                    ticket_price=price_str,
+                    ticket_link=event_link,
+                    hashtags=hashtags,
+                )
                 trigger = localize(event.date_from - timedelta(days=tkt_off), event)
                 post_id = (
                     f"ticket_{ticket.pk}"
@@ -258,7 +365,7 @@ def build_posts(event, request=None):
                         "event_schedule_display": "N/A",
                         "is_schedule_associated": False,
                         "offset_days": tkt_off,
-                        "template_context": "announcement",
+                        "template_context": template_ctx,
                     }
                 )
 
@@ -323,8 +430,11 @@ def build_posts(event, request=None):
                                     )
                                 else:
                                     spk_url = event_link
+                                text, template_ctx = _get_template_for_offset(
+                                    event, "speaker", spk_off
+                                )
                                 text = safe_format(
-                                    _get_template(event, "speaker"),
+                                    text,
                                     event_name=str(event.name),
                                     speaker_name=speaker.get_display_name(),
                                     speaker_link=spk_url,
@@ -359,7 +469,7 @@ def build_posts(event, request=None):
                                         "event_schedule_display": sched_display,
                                         "is_schedule_associated": True,
                                         "offset_days": spk_off,
-                                        "template_context": "announcement",
+                                        "template_context": template_ctx,
                                     }
                                 )
 
@@ -378,20 +488,6 @@ def build_posts(event, request=None):
                             )
                         else:
                             talk_url = event_link
-                        text = safe_format(
-                            _get_template(event, "session"),
-                            event_name=str(event.name),
-                            talk_title=sub.title,
-                            talk_room=room,
-                            talk_start_time=(
-                                localize(talk_start, event).strftime("%H:%M")
-                                if talk_start
-                                else "TBA"
-                            ),
-                            speaker_names=names,
-                            talk_link=talk_url,
-                            hashtags=hashtags,
-                        )
                         ref_date = (
                             localize(base_time, event).strftime("%Y-%m-%d")
                             if base_time
@@ -405,6 +501,23 @@ def build_posts(event, request=None):
                                 )
                             else:
                                 trigger = localize(base_time - timedelta(days=1), event)
+                            text, template_ctx = _get_template_for_offset(
+                                event, "session", sess_off
+                            )
+                            text = safe_format(
+                                text,
+                                event_name=str(event.name),
+                                talk_title=sub.title,
+                                talk_room=room,
+                                talk_start_time=(
+                                    localize(talk_start, event).strftime("%H:%M")
+                                    if talk_start
+                                    else "TBA"
+                                ),
+                                speaker_names=names,
+                                talk_link=talk_url,
+                                hashtags=hashtags,
+                            )
                             post_id = (
                                 f"session_{talk_pk}"
                                 if len(sess_offsets) == 1
@@ -425,11 +538,7 @@ def build_posts(event, request=None):
                                     "event_schedule_display": sched_display,
                                     "is_schedule_associated": True,
                                     "offset_days": sess_off,
-                                    "template_context": (
-                                        "reminder"
-                                        if sess_off < 1440
-                                        else "announcement"
-                                    ),
+                                    "template_context": template_ctx,
                                 }
                             )
 
@@ -463,7 +572,7 @@ def sync_posts_to_db(event, request=None):
                 "scheduled_at": scheduled_at,
                 "post_text": p["post_text"],
                 "offset_days": p.get("offset_days", 0),
-                "template_context": p.get("template_context", "default"),
+                "template_context": p.get("template_context", "announcement"),
                 "status": SocialMediaPostStatus.SCHEDULED,
             },
         )

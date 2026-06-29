@@ -4,6 +4,50 @@ from eventyay.base.forms import SettingsForm
 
 from .export import DEFAULT_TEMPLATES
 
+MAX_OFFSETS = 10
+MAX_OFFSET_VALUE_CFP = 365
+MAX_OFFSET_VALUE_SPEAKER = 365
+MAX_OFFSET_VALUE_SESSION = 1440
+MAX_OFFSET_VALUE_TICKET = 365
+MAX_OFFSET_VALUE_SCHEDULE = 90
+
+
+def _validate_offsets(value, max_value, unit_label="days"):
+    """Validate a comma-separated offset field.  Returns the cleaned string
+    or raises ValidationError."""
+    if not value or not value.strip():
+        return value
+    raw = str(value).strip()
+    parts = [p.strip() for p in raw.split(",") if p.strip()]
+    if len(parts) > MAX_OFFSETS:
+        raise forms.ValidationError(
+            _("Enter at most %(count)s offsets."),
+            params={"count": MAX_OFFSETS},
+        )
+    seen = set()
+    cleaned = []
+    for part in parts:
+        try:
+            val = int(part)
+        except ValueError:
+            raise forms.ValidationError(
+                _('"%(value)s" is not a valid number.'),
+                params={"value": part},
+            )
+        if val < 0:
+            raise forms.ValidationError(
+                _("Offset must be zero or positive."),
+            )
+        if val > max_value:
+            raise forms.ValidationError(
+                _("Offset %(value)s exceeds maximum of %(max)s %(unit)s."),
+                params={"value": val, "max": max_value, "unit": unit_label},
+            )
+        if val not in seen:
+            seen.add(val)
+            cleaned.append(val)
+    return ", ".join(str(v) for v in sorted(cleaned, reverse=True))
+
 
 class SocialMediaSettingsForm(SettingsForm):
     # ------------------------------------------------------------------
@@ -180,3 +224,41 @@ class SocialMediaSettingsForm(SettingsForm):
                     raise AttributeError(item) from e
 
         return _AttrDict(DEFAULT_TEMPLATES)
+
+    # ------------------------------------------------------------------
+    # Offset validation
+    # ------------------------------------------------------------------
+    def clean_socialmedia_cfp_offset(self):
+        return _validate_offsets(
+            self.cleaned_data.get("socialmedia_cfp_offset"),
+            MAX_OFFSET_VALUE_CFP,
+            "days",
+        )
+
+    def clean_socialmedia_speaker_offset(self):
+        return _validate_offsets(
+            self.cleaned_data.get("socialmedia_speaker_offset"),
+            MAX_OFFSET_VALUE_SPEAKER,
+            "days",
+        )
+
+    def clean_socialmedia_session_offset(self):
+        return _validate_offsets(
+            self.cleaned_data.get("socialmedia_session_offset"),
+            MAX_OFFSET_VALUE_SESSION,
+            "minutes",
+        )
+
+    def clean_socialmedia_ticket_offset(self):
+        return _validate_offsets(
+            self.cleaned_data.get("socialmedia_ticket_offset"),
+            MAX_OFFSET_VALUE_TICKET,
+            "days",
+        )
+
+    def clean_socialmedia_schedule_offset(self):
+        return _validate_offsets(
+            self.cleaned_data.get("socialmedia_schedule_offset"),
+            MAX_OFFSET_VALUE_SCHEDULE,
+            "days",
+        )

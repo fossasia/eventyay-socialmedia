@@ -139,8 +139,12 @@
           {% bootstrap_field form.socialmedia_cfp_enabled layout="horizontal" %}
           {% bootstrap_field form.socialmedia_cfp_offset layout="horizontal" %}
           <div class="default-template-preview">
-            <strong>{% trans "Default template:" %}</strong>
-            {{ form.default_template_preview.cfp }}
+            <strong>{% trans "Default templates per wave:" %}</strong>
+            <div class="wave-template-list">
+              <div class="wave-template-item"><span class="wave-label">{% trans "30+ days:" %}</span> {{ form.default_template_preview.cfp.announcement }}</div>
+              <div class="wave-template-item"><span class="wave-label">{% trans "3–13 days:" %}</span> {{ form.default_template_preview.cfp.reminder }}</div>
+              <div class="wave-template-item"><span class="wave-label">{% trans "0–2 days:" %}</span> {{ form.default_template_preview.cfp.final_call }}</div>
+            </div>
           </div>
           {% bootstrap_field form.socialmedia_cfp_template layout="horizontal" %}
         </div>
@@ -151,8 +155,12 @@
           {% bootstrap_field form.socialmedia_speaker_enabled layout="horizontal" %}
           {% bootstrap_field form.socialmedia_speaker_offset layout="horizontal" %}
           <div class="default-template-preview">
-            <strong>{% trans "Default template:" %}</strong>
-            {{ form.default_template_preview.speaker }}
+            <strong>{% trans "Default templates per wave:" %}</strong>
+            <div class="wave-template-list">
+              <div class="wave-template-item"><span class="wave-label">{% trans "14+ days:" %}</span> {{ form.default_template_preview.speaker.announcement }}</div>
+              <div class="wave-template-item"><span class="wave-label">{% trans "3–13 days:" %}</span> {{ form.default_template_preview.speaker.reminder }}</div>
+              <div class="wave-template-item"><span class="wave-label">{% trans "0–2 days:" %}</span> {{ form.default_template_preview.speaker.final_call }}</div>
+            </div>
           </div>
           {% bootstrap_field form.socialmedia_speaker_template layout="horizontal" %}
         </div>
@@ -163,8 +171,12 @@
           {% bootstrap_field form.socialmedia_session_enabled layout="horizontal" %}
           {% bootstrap_field form.socialmedia_session_offset layout="horizontal" %}
           <div class="default-template-preview">
-            <strong>{% trans "Default template:" %}</strong>
-            {{ form.default_template_preview.session }}
+            <strong>{% trans "Default templates per wave:" %}</strong>
+            <div class="wave-template-list">
+              <div class="wave-template-item"><span class="wave-label">{% trans "1440+ min:" %}</span> {{ form.default_template_preview.session.announcement }}</div>
+              <div class="wave-template-item"><span class="wave-label">{% trans "60–1439 min:" %}</span> {{ form.default_template_preview.session.reminder }}</div>
+              <div class="wave-template-item"><span class="wave-label">{% trans "0–59 min:" %}</span> {{ form.default_template_preview.session.final_call }}</div>
+            </div>
           </div>
           {% bootstrap_field form.socialmedia_session_template layout="horizontal" %}
         </div>
@@ -175,8 +187,12 @@
           {% bootstrap_field form.socialmedia_ticket_enabled layout="horizontal" %}
           {% bootstrap_field form.socialmedia_ticket_offset layout="horizontal" %}
           <div class="default-template-preview">
-            <strong>{% trans "Default template:" %}</strong>
-            {{ form.default_template_preview.ticket }}
+            <strong>{% trans "Default templates per wave:" %}</strong>
+            <div class="wave-template-list">
+              <div class="wave-template-item"><span class="wave-label">{% trans "14+ days:" %}</span> {{ form.default_template_preview.ticket.announcement }}</div>
+              <div class="wave-template-item"><span class="wave-label">{% trans "3–13 days:" %}</span> {{ form.default_template_preview.ticket.reminder }}</div>
+              <div class="wave-template-item"><span class="wave-label">{% trans "0–2 days:" %}</span> {{ form.default_template_preview.ticket.final_call }}</div>
+            </div>
           </div>
           {% bootstrap_field form.socialmedia_ticket_template layout="horizontal" %}
         </div>
@@ -187,8 +203,11 @@
           {% bootstrap_field form.socialmedia_schedule_enabled layout="horizontal" %}
           {% bootstrap_field form.socialmedia_schedule_offset layout="horizontal" %}
           <div class="default-template-preview">
-            <strong>{% trans "Default template:" %}</strong>
-            {{ form.default_template_preview.schedule }}
+            <strong>{% trans "Default templates per wave:" %}</strong>
+            <div class="wave-template-list">
+              <div class="wave-template-item"><span class="wave-label">{% trans "7+ days:" %}</span> {{ form.default_template_preview.schedule.announcement }}</div>
+              <div class="wave-template-item"><span class="wave-label">{% trans "0–6 days:" %}</span> {{ form.default_template_preview.schedule.reminder }}</div>
+            </div>
           </div>
           {% bootstrap_field form.socialmedia_schedule_template layout="horizontal" %}
         </div>
