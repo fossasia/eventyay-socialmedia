@@ -88,7 +88,16 @@ def _get_template(event, key):
 
 
 def _get_offset(event, key, default):
-    return event.settings.get(f"socialmedia_{key}_offset", default, as_type=int)
+    raw = event.settings.get(f"socialmedia_{key}_offset", default)
+    if raw is None:
+        return default
+    # Handle comma-separated values saved by multi-offset forms
+    # (e.g. "14, 7") — take only the first entry for single-offset mode.
+    first = str(raw).split(",")[0].strip()
+    try:
+        return int(first)
+    except (ValueError, TypeError):
+        return default
 
 
 # ---------------------------------------------------------------------------
@@ -254,13 +263,14 @@ def build_posts(event, request=None):
 
             for sub in confirmed_subs:
                 talk = talks_by_sub.get(sub.pk)
-                talk_start = talk.start if talk else None
+                if not talk or not talk.start:
+                    # Skip confirmed-but-unscheduled sessions — no valid
+                    # trigger time can be derived yet.
+                    continue
+                talk_start = talk.start
 
-                if talk_start:
-                    local_start = localize(talk_start, event)
-                    sched_display = local_start.strftime("%b %d, %Y %H:%M")
-                else:
-                    sched_display = "Unscheduled"
+                local_start = localize(talk_start, event)
+                sched_display = local_start.strftime("%b %d, %Y %H:%M")
 
                 # Speaker post (one per unique speaker)
                 if speaker_enabled:
@@ -293,10 +303,9 @@ def build_posts(event, request=None):
                                 if base_time
                                 else None
                             )
-                            talk_pk = talk.pk if talk else sub.pk
                             posts.append(
                                 {
-                                    "id": f"speaker_{speaker.pk}_{talk_pk}",
+                                    "id": f"speaker_{speaker.pk}",
                                     "type": "speaker",
                                     "type_label": TYPE_LABELS["speaker"],
                                     "post_date": trigger.strftime("%Y-%m-%d"),

@@ -23,19 +23,17 @@
   // ---- Toast notifications ----
   function showToast(msg, type = "success") {
     const toast = document.createElement("div");
-    toast.className = `alert alert-${type === "success" ? "success" : "warning"}`;
-    toast.style.position = "fixed";
-    toast.style.top = "20px";
-    toast.style.right = "20px";
-    toast.style.zIndex = "9999";
-    toast.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
-    toast.style.padding = "12px 20px";
-    toast.style.margin = "0";
-    toast.innerHTML = `<i class="fa ${type === "success" ? "fa-check-circle" : "fa-warning"}"></i> ${msg}`;
+    toast.className = `sm-toast alert alert-${type === "success" ? "success" : "warning"}`;
+
+    const icon = document.createElement("i");
+    icon.className = `fa ${type === "success" ? "fa-check-circle" : "fa-warning"}`;
+    toast.appendChild(icon);
+    toast.appendChild(document.createTextNode(msg));
+
     document.body.appendChild(toast);
     setTimeout(() => {
-      toast.style.opacity = "0";
       toast.style.transition = "opacity 0.5s ease";
+      toast.style.opacity = "0";
       setTimeout(() => toast.remove(), 500);
     }, 3000);
   }
@@ -107,7 +105,8 @@
       return;
     }
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const _now = new Date();
+    const todayStr = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, "0")}-${String(_now.getDate()).padStart(2, "0")}`;
 
     tbody.innerHTML = visible.map((p, i) => {
       const idx = allPosts.indexOf(p);
@@ -170,7 +169,7 @@
         <td class="post-text-cell">
           <span class="post-text-view ${textClass}" data-idx="${idx}" tabindex="0">${escHtml(p.post_text)}</span>
           <textarea class="post-text-edit ${hasPlaceholder ? 'has-warning' : ''}" data-idx="${idx}">${escHtml(p.post_text)}</textarea>
-          <div class="char-count-wrap" style="font-size: 11px; color: #888; margin-top: 4px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+          <div class="char-count-wrap">
             <span><span class="char-count">${charCount}</span> characters</span>
             ${revertBtn}
           </div>
@@ -282,7 +281,8 @@
   function validateAllPosts() {
     let pastCount = 0;
     let placeholderCount = 0;
-    const todayStr = new Date().toISOString().split('T')[0];
+    const _now = new Date();
+    const todayStr = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, "0")}-${String(_now.getDate()).padStart(2, "0")}`;
 
     allPosts.forEach(p => {
       if (!p.enabled) return;
@@ -298,7 +298,7 @@
     if (!alertContainer) return;
 
     if (pastCount > 0 || placeholderCount > 0) {
-      let html = `<div class="alert alert-warning" style="margin-bottom: 12px;">`;
+      let html = `<div class="alert alert-warning sm-validation-alert">`;
       html += `<strong>Warning:</strong> `;
       const parts = [];
       if (pastCount > 0) {
