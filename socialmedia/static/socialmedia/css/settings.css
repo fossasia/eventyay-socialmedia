@@ -677,3 +677,77 @@
   min-width: 80px;
   font-size: 11px;
 }
+
+/* ---- Configuration Helpers & Interactive Elements ---- */
+.helper-row {
+  margin-top: -10px;
+  margin-bottom: 15px;
+}
+
+.presets-container, .tokens-container {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.presets-label, .tokens-label {
+  font-weight: 600;
+  color: #666;
+  margin-right: 4px;
+}
+
+.preset-btn {
+  padding: 2px 6px;
+  font-size: 10px;
+  border-radius: 4px;
+  background: #f8f9fa;
+  border: 1px solid #ddd;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.preset-btn:hover {
+  background: #e9ecef;
+  border-color: #ccc;
+  color: #111;
+}
+
+.preset-btn.active-preset {
+  background: #007bff;
+  color: #fff;
+  border-color: #007bff;
+}
+
+.live-offsets-preview {
+  margin-left: 8px;
+  font-style: italic;
+  color: #888;
+}
+
+.token-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-family: monospace;
+  background: #eef2f7;
+  color: #2b5797;
+  border: 1px dashed #b8cde6;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.token-chip:hover {
+  background: #d8e4f3;
+  border-color: #719ecf;
+  color: #12386e;
+  transform: translateY(-1px);
+}
+
+.token-chip:active {
+  transform: translateY(0);
+}

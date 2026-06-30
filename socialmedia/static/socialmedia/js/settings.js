@@ -591,6 +591,7 @@
   const AppController = {
     init() {
       this.bindEvents();
+      initHelperUIs();
       this.loadInitialData();
     },
 
@@ -881,9 +882,116 @@
           }
         });
       }
+
+      // Preset buttons clicks
+      document.querySelectorAll(".presets-container .preset-btn").forEach(btn => {
+        btn.addEventListener("click", function () {
+          handlePresetClick(this);
+        });
+      });
+
+      // Token chips clicks
+      document.querySelectorAll(".token-chip").forEach(chip => {
+        chip.addEventListener("click", function () {
+          insertToken(this);
+        });
+      });
     }
   };
 
+  // ---- Token & Preset UI Helpers ----
+  function insertToken(chip) {
+    const targetId = chip.dataset.target;
+    const token = chip.textContent;
+    const input = document.getElementById(targetId);
+    if (!input) return;
+
+    const startPos = input.selectionStart;
+    const endPos = input.selectionEnd;
+    const value = input.value;
+
+    input.value = value.substring(0, startPos) + token + value.substring(endPos);
+    
+    input.focus();
+    input.selectionStart = startPos + token.length;
+    input.selectionEnd = startPos + token.length;
+
+    // Trigger input/change event
+    const evt = document.createEvent("HTMLEvents");
+    evt.initEvent("input", true, true);
+    input.dispatchEvent(evt);
+  }
+
+  function handlePresetClick(btn) {
+    const container = btn.closest(".presets-container");
+    if (!container) return;
+
+    const targetId = container.dataset.target;
+    const val = parseInt(btn.dataset.val);
+    const input = document.getElementById(targetId);
+    if (!input || isNaN(val)) return;
+
+    let offsets = input.value
+      .split(",")
+      .map(x => parseInt(x.trim()))
+      .filter(x => !isNaN(x));
+
+    const idx = offsets.indexOf(val);
+    if (idx > -1) {
+      offsets.splice(idx, 1);
+    } else {
+      offsets.push(val);
+    }
+
+    offsets.sort((a, b) => b - a);
+    input.value = offsets.join(", ");
+
+    const evt = document.createEvent("HTMLEvents");
+    evt.initEvent("change", true, true);
+    input.dispatchEvent(evt);
+  }
+
+  function updatePresetsUI(container, currentOffsets) {
+    container.querySelectorAll(".preset-btn").forEach(btn => {
+      const val = parseInt(btn.dataset.val);
+      if (currentOffsets.includes(val)) {
+        btn.classList.add("btn-primary");
+        btn.classList.remove("btn-default");
+      } else {
+        btn.classList.add("btn-default");
+        btn.classList.remove("btn-primary");
+      }
+    });
+
+    const preview = container.querySelector(".live-offsets-preview");
+    if (preview) {
+      if (currentOffsets.length > 0) {
+        const unit = container.dataset.unit || "days";
+        preview.innerHTML = "Active: " + currentOffsets.map(x => `<span class="label label-info">${x}${unit}</span>`).join(" ");
+      } else {
+        preview.innerHTML = "<em>No offsets set</em>";
+      }
+    }
+  }
+
+  function initHelperUIs() {
+    document.querySelectorAll(".presets-container").forEach(container => {
+      const targetId = container.dataset.target;
+      const input = document.getElementById(targetId);
+      if (input) {
+        const updateFn = () => {
+          const offsets = input.value
+            .split(",")
+            .map(x => parseInt(x.trim()))
+            .filter(x => !isNaN(x));
+          updatePresetsUI(container, offsets);
+        };
+        input.addEventListener("input", updateFn);
+        input.addEventListener("change", updateFn);
+        updateFn();
+      }
+    });
+  }
   // Run on load
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => AppController.init());

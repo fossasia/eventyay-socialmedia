@@ -33,7 +33,8 @@ DEFAULT_TEMPLATES = {
     "speaker": {
         "announcement": (
             "🎤 Meet our speaker {speaker_name} at {event_name}! "
-            "They'll be presenting '{talk_title}'. Learn more: {speaker_link} {hashtags}"
+            "They'll be presenting '{talk_title}'. "
+            "Learn more: {speaker_link} {hashtags}"
         ),
         "reminder": (
             "🗓 Don't miss {speaker_name} speaking on '{talk_title}' "
@@ -129,6 +130,7 @@ def resolve_template_context(post_type, offset_value):
         if offset_value >= threshold:
             return ctx
     return "announcement"
+
 
 # Human-readable type labels for the UI
 TYPE_LABELS = {
@@ -472,7 +474,6 @@ def build_posts(event, request=None):
                                         "template_context": template_ctx,
                                     }
                                 )
-
 
                 # Session post
                 if session_enabled:

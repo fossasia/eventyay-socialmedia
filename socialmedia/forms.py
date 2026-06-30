@@ -29,11 +29,11 @@ def _validate_offsets(value, max_value, unit_label="days"):
     for part in parts:
         try:
             val = int(part)
-        except ValueError:
+        except ValueError as e:
             raise forms.ValidationError(
                 _('"%(value)s" is not a valid number.'),
                 params={"value": part},
-            )
+            ) from e
         if val < 0:
             raise forms.ValidationError(
                 _("Offset must be zero or positive."),
