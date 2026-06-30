@@ -53,6 +53,8 @@
         <option value="0">{% trans "On event / session day" %}</option>
         <option value="-1">{% trans "1 day before" %}</option>
         <option value="-2">{% trans "2 days before" %}</option>
+        <option value="-3">{% trans "3 days before" %}</option>
+        <option value="-5">{% trans "5 days before" %}</option>
         <option value="-7">{% trans "1 week before (7 days)" %}</option>
         <option value="-14">{% trans "2 weeks before (14 days)" %}</option>
         <option value="-30">{% trans "1 month before (30 days)" %}</option>
@@ -80,7 +82,7 @@
           <th>{% trans "Type" %}</th>
           <th><span title="{% trans 'Official date & time of the session on the event agenda schedule.' %}" class="help-tooltip">{% trans "Schedule Date & Time" %}</span></th>
           <th>
-            <span title="{% trans 'The date & time this social media post is scheduled to be published.' %}" class="help-tooltip">{% trans "Post Schedule Date & Time" %}</span>
+            <span title="{% trans 'The date & time this social media post is scheduled to be published.' %}" class="help-tooltip">{% trans "Post Date & Time" %}</span>
             <div class="th-timezone">{{ event.timezone }}</div>
           </th>
           <th>{% trans "Content" %} <span class="th-hint">— {% trans "click to edit" %}</span></th>

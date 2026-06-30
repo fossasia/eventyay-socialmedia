@@ -196,7 +196,7 @@
 
     showToast(msg, type = "success") {
       const toast = document.createElement("div");
-      toast.className = `sm-toast alert alert-${type === "success" ? "success" : "warning"}`;
+      toast.className = `sm-toast sm-toast-${type}`;
 
       const icon = document.createElement("i");
       icon.className = `fa ${type === "success" ? "fa-check-circle" : "fa-warning"}`;
@@ -691,13 +691,13 @@
     applyBulkSchedule() {
       const preset = document.getElementById("bulk-schedule-preset").value;
       if (!preset) {
-        alert("Please select a schedule preset first.");
+        UI.showToast("Please select a schedule preset first.", "warning");
         return;
       }
 
       const enabledPosts = PostState.getAll().filter(p => p.enabled);
       if (!enabledPosts.length) {
-        alert("Please select at least one post row to apply scheduling.");
+        UI.showToast("Please select at least one post row to apply scheduling.", "warning");
         return;
       }
 
@@ -706,7 +706,7 @@
         const customDate = document.getElementById("bulk-schedule-custom-date").value;
         const customTime = document.getElementById("bulk-schedule-custom-time").value;
         if (!customDate || !customTime) {
-          alert("Please select both a custom date and time.");
+          UI.showToast("Please select both a custom date and time.", "warning");
           return;
         }
         res = PostState.applyBulkCustom(customDate, customTime);
@@ -734,7 +734,7 @@
     exportCSV() {
       const enabledPosts = PostState.getAll().filter(p => p.enabled);
       if (!enabledPosts.length) {
-        alert(Config.TRANS_SELECT_AT_LEAST_ONE);
+        UI.showToast(Config.TRANS_SELECT_AT_LEAST_ONE, "warning");
         return;
       }
 
@@ -751,7 +751,7 @@
 
           UI.showToast(`Successfully exported ${enabledPosts.length} post(s).`, "success");
         })
-        .catch(err => alert(`Export error: ${err.message}`));
+        .catch(err => UI.showToast(`Export error: ${err.message}`, "warning"));
     },
 
     bindEvents() {
