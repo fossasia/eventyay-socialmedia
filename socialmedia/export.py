@@ -88,12 +88,12 @@ def _get_template(event, key):
 
 
 def _get_offset(event, key, default):
-    raw = event.settings.get(f"socialmedia_{key}_offset", default)
+    raw = event.settings.get(f"socialmedia_{key}_offset", as_type=str)
     if raw is None:
         return default
     # Handle comma-separated values saved by multi-offset forms
     # (e.g. "14, 7") — take only the first entry for single-offset mode.
-    first = str(raw).split(",")[0].strip()
+    first = raw.split(",")[0].strip()
     try:
         return int(first)
     except (ValueError, TypeError):
@@ -263,14 +263,13 @@ def build_posts(event, request=None):
 
             for sub in confirmed_subs:
                 talk = talks_by_sub.get(sub.pk)
-                if not talk or not talk.start:
-                    # Skip confirmed-but-unscheduled sessions — no valid
-                    # trigger time can be derived yet.
-                    continue
-                talk_start = talk.start
+                talk_start = talk.start if talk else None
 
-                local_start = localize(talk_start, event)
-                sched_display = local_start.strftime("%b %d, %Y %H:%M")
+                if talk_start:
+                    local_start = localize(talk_start, event)
+                    sched_display = local_start.strftime("%b %d, %Y %H:%M")
+                else:
+                    sched_display = "Unscheduled"
 
                 # Speaker post (one per unique speaker)
                 if speaker_enabled:
