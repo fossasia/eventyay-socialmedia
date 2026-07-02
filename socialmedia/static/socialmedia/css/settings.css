@@ -775,3 +775,68 @@
 .token-chip:active {
   transform: translateY(0);
 }
+
+/* ---- Discard & Revert Actions ---- */
+.btn-delete-post {
+  background: none;
+  border: none;
+  color: #c92a2a;
+  padding: 4px 8px;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.btn-delete-post:hover {
+  background: #fff5f5;
+  color: #a61e1e;
+}
+
+.btn-revert-time {
+  background: none;
+  border: none;
+  color: #868e96;
+  padding: 2px 4px;
+  font-size: 11px;
+  cursor: pointer;
+  margin-left: 4px;
+  border-radius: 3px;
+  transition: background 0.15s, color 0.15s;
+  display: inline-flex;
+  align-items: center;
+}
+
+.btn-revert-time:hover {
+  background: #f1f3f5;
+  color: #495057;
+}
+
+.btn-revert-time i {
+  margin: 0 !important;
+  position: static !important;
+}
+
+.row-fade-out {
+  opacity: 0;
+  transform: translateX(-20px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+/* ---- Toast Undo Action ---- */
+.sm-toast-undo {
+  margin-left: auto;
+  color: #1a73e8;
+  background: none;
+  border: none;
+  padding: 0;
+  font-weight: 600;
+  font-size: 13px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.sm-toast-undo:hover {
+  color: #1557b0;
+  text-decoration: none;
+}

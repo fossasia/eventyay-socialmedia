@@ -47,8 +47,8 @@
         return posts;
       },
       getFiltered() {
-        if (activeFilter === "all") return posts;
-        return posts.filter(p => p.type === activeFilter);
+        const list = activeFilter === "all" ? posts : posts.filter(p => p.type === activeFilter);
+        return list.filter(p => p.status !== "excluded");
       },
       getFilter() {
         return activeFilter;
@@ -91,6 +91,16 @@
           if (!p.enabled) return;
           p.post_date = customDate;
           p.post_time = customTime;
+          updatedCount++;
+        });
+        return { updatedCount };
+      },
+      applyBulkDefault() {
+        let updatedCount = 0;
+        posts.forEach(p => {
+          if (!p.enabled) return;
+          p.post_date = p.original_post_date;
+          p.post_time = p.original_post_time;
           updatedCount++;
         });
         return { updatedCount };
@@ -151,6 +161,9 @@
     },
     savePostToDB(post) {
       if (!Config.UPDATE_URL || !post) return Promise.resolve();
+      const isPinned = (post.post_text !== post.default_text) ||
+                       (post.post_date !== post.original_post_date) ||
+                       (post.post_time !== post.original_post_time);
       return fetch(Config.UPDATE_URL, {
         method: "POST",
         headers: {
@@ -164,6 +177,7 @@
           post_text: post.post_text,
           post_date: post.post_date,
           post_time: post.post_time,
+          is_pinned: isPinned
         }),
       })
         .then(r => {
@@ -172,10 +186,36 @@
         })
         .then(res => {
           if (res.db_id) post.db_id = res.db_id;
-          if (res.is_pinned) post.is_pinned = true;
+          post.is_pinned = res.is_pinned;
           return res;
         })
         .catch(err => console.error("Failed to save post to DB:", err));
+    },
+    updatePostStatus(post, status) {
+      if (!Config.UPDATE_URL || !post) return Promise.resolve();
+      return fetch(Config.UPDATE_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": Config.CSRF_TOKEN,
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: JSON.stringify({
+          id: post.id,
+          db_id: post.db_id,
+          status: status
+        }),
+      })
+        .then(r => {
+          if (!r.ok) throw new Error("Status update failed");
+          return r.json();
+        })
+        .then(res => {
+          if (res.db_id) post.db_id = res.db_id;
+          if (res.is_pinned) post.is_pinned = true;
+          return res;
+        })
+        .catch(err => console.error("Failed to update post status:", err));
     }
   };
 
@@ -194,7 +234,7 @@
       }
     },
 
-    showToast(msg, type = "success") {
+    showToast(msg, type = "success", onUndo = null) {
       const toast = document.createElement("div");
       toast.className = `sm-toast sm-toast-${type}`;
 
@@ -203,12 +243,28 @@
       toast.appendChild(icon);
       toast.appendChild(document.createTextNode(msg));
 
+      if (onUndo) {
+        const undoBtn = document.createElement("button");
+        undoBtn.className = "sm-toast-undo";
+        undoBtn.type = "button";
+        undoBtn.textContent = "Undo";
+        undoBtn.addEventListener("click", () => {
+          onUndo();
+          toast.remove();
+        });
+        toast.appendChild(undoBtn);
+      }
+
       document.body.appendChild(toast);
       setTimeout(() => {
-        toast.style.transition = "opacity 0.5s ease";
-        toast.style.opacity = "0";
-        setTimeout(() => toast.remove(), 500);
-      }, 3000);
+        if (toast.parentNode) {
+          toast.style.transition = "opacity 0.5s ease";
+          toast.style.opacity = "0";
+          setTimeout(() => {
+            if (toast.parentNode) toast.remove();
+          }, 500);
+        }
+      }, 5000);
     },
 
     showSkeleton() {
@@ -355,6 +411,14 @@
         mod.className = "is-modified-label";
         mod.textContent = "Modified";
         wrap.appendChild(mod);
+
+        const revTime = document.createElement("button");
+        revTime.className = "btn-revert-time";
+        revTime.dataset.postId = p.id;
+        revTime.type = "button";
+        revTime.title = "Revert to default timing";
+        this.setWithIcon(revTime, "", "fa fa-undo");
+        wrap.appendChild(revTime);
       }
 
       if (isPast) {
@@ -410,6 +474,17 @@
 
       tdContent.appendChild(editArea);
       tr.appendChild(tdContent);
+
+      const tdActions = document.createElement("td");
+      const delBtn = document.createElement("button");
+      delBtn.className = "btn-delete-post";
+      delBtn.dataset.postId = p.id;
+      delBtn.type = "button";
+      delBtn.title = "Remove post from preview";
+      this.setWithIcon(delBtn, "", "fa fa-trash");
+      tdActions.appendChild(delBtn);
+      tr.appendChild(tdActions);
+
       return tr;
     },
 
@@ -418,12 +493,13 @@
       if (!tbody) return;
       tbody.textContent = "";
 
-      const visible = filter === "all" ? posts : posts.filter(p => p.type === filter);
+      let visible = filter === "all" ? posts : posts.filter(p => p.type === filter);
+      visible = visible.filter(p => p.status !== "excluded");
 
       if (!visible.length) {
         const tr = document.createElement("tr");
         const td = document.createElement("td");
-        td.colSpan = 5;
+        td.colSpan = 6;
 
         const emptyDiv = document.createElement("div");
         emptyDiv.className = "sm-empty";
@@ -567,6 +643,20 @@
       }
     },
 
+    revertPostTime(id) {
+      const post = PostState.get(id);
+      if (post) {
+        PostState.update(id, {
+          post_date: post.original_post_date,
+          post_time: post.original_post_time
+        });
+        this.updateRow(id);
+        AppController.triggerValidation();
+        APIClient.savePostToDB(post);
+        this.showToast("Reverted post timing to default.", "success");
+      }
+    },
+
     toggleRow(id, enabled) {
       PostState.toggle(id, enabled);
       const row = document.querySelector(`tr[data-post-id="${id}"]`);
@@ -636,7 +726,7 @@
             tbody.textContent = "";
             const tr = document.createElement("tr");
             const td = document.createElement("td");
-            td.colSpan = 5;
+            td.colSpan = 6;
 
             const emptyDiv = document.createElement("div");
             emptyDiv.className = "sm-empty";
@@ -702,7 +792,9 @@
       }
 
       let res;
-      if (preset === "custom") {
+      if (preset === "default") {
+        res = PostState.applyBulkDefault();
+      } else if (preset === "custom") {
         const customDate = document.getElementById("bulk-schedule-custom-date").value;
         const customTime = document.getElementById("bulk-schedule-custom-time").value;
         if (!customDate || !customTime) {
@@ -719,12 +811,14 @@
       this.triggerValidation();
 
       enabledPosts.forEach(p => {
-        if (preset === "custom" || p.reference_date) {
+        if (preset === "default" || preset === "custom" || p.reference_date) {
           APIClient.savePostToDB(p);
         }
       });
 
-      let msg = `Applied preset to ${res.updatedCount || 0} post(s).`;
+      let msg = preset === "default"
+        ? `Reverted ${res.updatedCount || 0} post(s) to default timing.`
+        : `Applied preset to ${res.updatedCount || 0} post(s).`;
       if (res.skippedCount > 0) {
         msg += ` (${res.skippedCount} post(s) skipped due to missing reference dates).`;
       }
@@ -732,13 +826,14 @@
     },
 
     exportCSV() {
-      const enabledPosts = PostState.getAll().filter(p => p.enabled);
-      if (!enabledPosts.length) {
+      const visiblePosts = PostState.getFiltered();
+      const enabledVisiblePosts = visiblePosts.filter(p => p.enabled);
+      if (!enabledVisiblePosts.length) {
         UI.showToast(Config.TRANS_SELECT_AT_LEAST_ONE, "warning");
         return;
       }
 
-      APIClient.exportCSV(PostState.getAll())
+      APIClient.exportCSV(visiblePosts)
         .then(blob => {
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
@@ -749,7 +844,7 @@
           a.remove();
           URL.revokeObjectURL(url);
 
-          UI.showToast(`Successfully exported ${enabledPosts.length} post(s).`, "success");
+          UI.showToast(`Successfully exported ${enabledVisiblePosts.length} post(s).`, "success");
         })
         .catch(err => UI.showToast(`Export error: ${err.message}`, "warning"));
     },
@@ -820,6 +915,30 @@
             UI.startEdit(postId);
           } else if (e.target.closest(".btn-revert-text")) {
             UI.revertPostText(postId);
+          } else if (e.target.closest(".btn-revert-time")) {
+            UI.revertPostTime(postId);
+          } else if (e.target.closest(".btn-delete-post")) {
+            const post = PostState.get(postId);
+            if (post) {
+              const previousStatus = post.status;
+              PostState.update(postId, { status: "excluded" });
+              
+              tr.classList.add("row-fade-out");
+              setTimeout(() => {
+                tr.remove();
+                UI.updateSelectedCount();
+                UI.updateCounts();
+              }, 400);
+
+              APIClient.updatePostStatus(post, "excluded");
+
+              UI.showToast("Post removed from preview.", "success", () => {
+                PostState.update(postId, { status: previousStatus });
+                APIClient.updatePostStatus(post, previousStatus);
+                UI.renderTable(PostState.getAll(), PostState.getFilter());
+                UI.updateCounts();
+              });
+            }
           }
         });
 

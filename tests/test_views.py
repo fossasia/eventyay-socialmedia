@@ -276,3 +276,61 @@ def test_multi_offset_generation_and_db_sync(organizer, event):
         db_posts = SocialMediaPost.objects.filter(event=event, post_type="speaker")
         assert db_posts.count() == 3
         assert all(p.status == SocialMediaPostStatus.SCHEDULED for p in db_posts)
+
+
+@pytest.mark.django_db
+def test_post_exclusion_from_preview(
+    logged_in_organizer_client, organizer, event, settings
+):
+    settings.SITE_URL = "https://testserver"
+    import json
+
+    from socialmedia.export import sync_posts_to_db
+    from socialmedia.models import SocialMediaPost
+
+    # 1. Sync posts and get one
+    with scope(organizer=organizer, event=event):
+        sync_posts_to_db(event)
+        post = SocialMediaPost.objects.filter(event=event).first()
+        if not post:
+            post = SocialMediaPost.objects.create(
+                event=event,
+                post_type="custom",
+                entity_id="custom_excl_1",
+                scheduled_at=event.date_from or event.created,
+                post_text="Test exclusion post",
+            )
+
+    # 2. Assert it is present in preview
+    url_preview = reverse(
+        "plugins:socialmedia:preview",
+        kwargs={"organizer": organizer.slug, "event": event.slug},
+    )
+    response = logged_in_organizer_client.get(url_preview)
+    assert response.status_code == 200
+    posts = response.json().get("posts", [])
+    assert any(
+        p.get("id") == post.entity_id or p.get("db_id") == post.pk for p in posts
+    )
+
+    # 3. Update status to excluded
+    url_update = reverse(
+        "plugins:socialmedia:update",
+        kwargs={"organizer": organizer.slug, "event": event.slug},
+    )
+    payload = {
+        "db_id": post.pk,
+        "status": "excluded",
+    }
+    response_update = logged_in_organizer_client.post(
+        url_update, data=json.dumps(payload), content_type="application/json"
+    )
+    assert response_update.status_code == 200
+    assert response_update.json()["status"] == "ok"
+
+    # 4. Assert it is now filtered out of the preview
+    response_after = logged_in_organizer_client.get(url_preview)
+    posts_after = response_after.json().get("posts", [])
+    assert not any(
+        p.get("id") == post.entity_id or p.get("db_id") == post.pk for p in posts_after
+    )

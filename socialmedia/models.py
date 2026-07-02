@@ -9,6 +9,7 @@ class SocialMediaPostStatus(models.TextChoices):
     PUBLISHED = "published", _("Published")
     FAILED = "failed", _("Failed")
     EXPORTED = "exported", _("Exported")
+    EXCLUDED = "excluded", _("Excluded")
 
 
 class SocialMediaPost(models.Model):

@@ -50,6 +50,7 @@
     <div class="bulk-schedule-wrap">
       <select id="bulk-schedule-preset" class="form-control input-sm bulk-schedule-select">
         <option value="">{% trans "Schedule preset..." %}</option>
+        <option value="default">{% trans "Revert to default timing" %}</option>
         <option value="0">{% trans "On event / session day" %}</option>
         <option value="-1">{% trans "1 day before" %}</option>
         <option value="-2">{% trans "2 days before" %}</option>
@@ -86,6 +87,7 @@
             <div class="th-timezone">{{ event.timezone }}</div>
           </th>
           <th>{% trans "Content" %} <span class="th-hint">— {% trans "click to edit" %}</span></th>
+          <th>{% trans "Actions" %}</th>
         </tr>
       </thead>
       <tbody id="posts-tbody">
@@ -97,6 +99,7 @@
           <td><div class="skeleton-bar" style="width:110px;"></div></td>
           <td><div class="skeleton-bar" style="width:125px;"></div></td>
           <td><div class="skeleton-bar" style="width:100%;"></div></td>
+          <td><div class="skeleton-bar" style="width:30px;"></div></td>
         </tr>
         {% endfor %}
       </tbody>

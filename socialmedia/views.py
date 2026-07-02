@@ -124,12 +124,18 @@ def preview_posts(request, organizer, event):
             entity_id = str(p["id"])
             db_p = db_posts.get(entity_id)
             if db_p:
+                if db_p.status == "excluded":
+                    continue
                 p["db_id"] = db_p.pk
                 p["status"] = db_p.status
                 p["is_pinned"] = db_p.is_pinned
                 p["post_text"] = db_p.post_text
-                p["post_date"] = db_p.scheduled_at.strftime("%Y-%m-%d")
-                p["post_time"] = db_p.scheduled_at.strftime("%H:%M")
+                import pytz
+
+                tz = pytz.timezone(getattr(request.event, "timezone", None) or "UTC")
+                local_dt = db_p.scheduled_at.astimezone(tz)
+                p["post_date"] = local_dt.strftime("%Y-%m-%d")
+                p["post_time"] = local_dt.strftime("%H:%M")
             posts.append(p)
     except Exception as exc:  # pragma: no cover
         return JsonResponse({"error": str(exc)}, status=500)
@@ -138,7 +144,7 @@ def preview_posts(request, organizer, event):
 
 @require_POST
 def update_post(request, organizer, event):
-    """AJAX POST — update social media post copy or scheduled date/time."""
+    """AJAX POST — update social media post copy or scheduled date/time/status."""
     _check_permission(request)
     _check_plugin_active(request)
     try:
@@ -148,6 +154,9 @@ def update_post(request, organizer, event):
         post_text = data.get("post_text")
         post_date = data.get("post_date")
         post_time = data.get("post_time")
+        status = data.get("status")
+
+        is_pinned = data.get("is_pinned")
 
         db_post = None
         if db_id:
@@ -164,6 +173,8 @@ def update_post(request, organizer, event):
 
         if post_text is not None:
             db_post.post_text = post_text
+        if status is not None:
+            db_post.status = status
         if post_date and post_time:
             from datetime import datetime
 
@@ -176,7 +187,10 @@ def update_post(request, organizer, event):
                 datetime.strptime(dt_str, "%Y-%m-%d %H:%M"), tz
             )
 
-        db_post.is_pinned = True
+        if is_pinned is not None:
+            db_post.is_pinned = is_pinned
+        else:
+            db_post.is_pinned = True
         db_post.save()
         return JsonResponse(
             {"status": "ok", "db_id": db_post.pk, "is_pinned": db_post.is_pinned}
