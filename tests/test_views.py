@@ -340,3 +340,94 @@ def test_post_exclusion_from_preview(
     )
     assert matched_post is not None
     assert matched_post.get("status") == "excluded"
+
+
+# ---------------------------------------------------------------------------
+# Multi-platform tests (Issue #21)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_multi_platform_build_posts(organizer, event):
+    """Enabling 2 platforms should double the number of posts generated, and
+    every post should have a 'platform' field matching one of the enabled ones."""
+    from django_scopes import scope
+
+    from socialmedia.export import build_posts
+
+    with scope(organizer=organizer, event=event):
+        event = event.__class__.objects.get(pk=event.pk)
+        event.settings.set("socialmedia_twitter_enabled", True)
+        event.settings.set("socialmedia_linkedin_enabled", True)
+        # Ensure at least one content type is enabled so posts are generated
+        event.settings.set("socialmedia_schedule_enabled", True)
+        event.settings.flush()
+
+        posts_without_platforms = []
+        # Temporarily collect the count without platforms
+        event.settings.set("socialmedia_twitter_enabled", False)
+        event.settings.set("socialmedia_linkedin_enabled", False)
+        event.settings.flush()
+        posts_without_platforms = build_posts(event)
+
+        event.settings.set("socialmedia_twitter_enabled", True)
+        event.settings.set("socialmedia_linkedin_enabled", True)
+        event.settings.flush()
+        posts_with_platforms = build_posts(event)
+
+    # Posts with 2 platforms should be 2× the generic count (if any generic exist)
+    if posts_without_platforms:
+        assert len(posts_with_platforms) == len(posts_without_platforms) * 2
+
+    # Every post must have a 'platform' key set to one of the enabled platforms
+    for post in posts_with_platforms:
+        assert "platform" in post
+        assert post["platform"] in ("twitter", "linkedin")
+
+
+@pytest.mark.django_db
+def test_platform_uses_correct_template(organizer, event):
+    """A platform-specific saved template should appear in the generated post text."""
+    from django_scopes import scope
+
+    from socialmedia.export import build_posts
+
+    custom_tpl = "CUSTOM_TWITTER_SCHEDULE: {schedule_link}"
+
+    with scope(organizer=organizer, event=event):
+        event = event.__class__.objects.get(pk=event.pk)
+        event.settings.set("socialmedia_twitter_enabled", True)
+        event.settings.set("socialmedia_schedule_enabled", True)
+        event.settings.set("socialmedia_twitter_schedule_template", custom_tpl)
+        event.settings.flush()
+
+        posts = build_posts(event)
+
+    twitter_schedule_posts = [
+        p for p in posts if p["type"] == "schedule" and p.get("platform") == "twitter"
+    ]
+    assert twitter_schedule_posts, "Expected at least one Twitter schedule post"
+    assert all("CUSTOM_TWITTER_SCHEDULE" in p["post_text"] for p in twitter_schedule_posts)
+
+
+@pytest.mark.django_db
+def test_no_platforms_fallback(organizer, event):
+    """When no platforms are enabled, posts should have no platform key (or None)
+    — preserving full backwards compatibility."""
+    from django_scopes import scope
+
+    from socialmedia.export import build_posts
+
+    with scope(organizer=organizer, event=event):
+        event = event.__class__.objects.get(pk=event.pk)
+        for plat in ("twitter", "mastodon", "telegram", "linkedin"):
+            event.settings.set(f"socialmedia_{plat}_enabled", False)
+        event.settings.set("socialmedia_schedule_enabled", True)
+        event.settings.flush()
+
+        posts = build_posts(event)
+
+    for post in posts:
+        assert post.get("platform") is None, (
+            f"Expected no platform on post {post['id']}, got {post['platform']!r}"
+        )

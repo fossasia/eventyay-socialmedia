@@ -187,7 +187,44 @@
   color: #7a6000;
 }
 
-/* Date/time cell */
+/* Platform badge */
+.platform-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.plat-twitter {
+  background: #e8f6ff;
+  color: #1a8cd8;
+}
+
+.plat-mastodon {
+  background: #ede8ff;
+  color: #6364ff;
+}
+
+.plat-telegram {
+  background: #e8f7ff;
+  color: #0088cc;
+}
+
+.plat-linkedin {
+  background: #e8f0fb;
+  color: #0077b5;
+}
+
+.plat-generic {
+  background: #f2f2f2;
+  color: #777;
+}
+
+
 .dt-cell {
   white-space: nowrap;
 }
@@ -355,6 +392,37 @@
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.adv-group-desc {
+  font-size: 12px;
+  color: #777;
+  margin: -6px 0 12px;
+  line-height: 1.5;
+}
+
+.platform-toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.platform-block {
+  border: 1px solid #e8e8e8;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.platform-block-header {
+  padding: 4px 0;
+}
+
+.platform-block-templates {
+  border-top: 1px solid #f0f0f0;
+  padding: 8px 0 0;
+  background: #fafafa;
 }
 
 .default-template-preview {

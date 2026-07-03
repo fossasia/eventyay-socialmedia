@@ -86,6 +86,256 @@ DEFAULT_TEMPLATES = {
 }
 
 # ---------------------------------------------------------------------------
+# Supported social media platforms
+# ---------------------------------------------------------------------------
+
+PLATFORMS = {
+    "twitter": "X / Twitter",
+    "mastodon": "Mastodon",
+    "telegram": "Telegram",
+    "linkedin": "LinkedIn",
+}
+
+# Platform-specific default template overrides.
+# Keys mirror DEFAULT_TEMPLATES; any missing key falls back to DEFAULT_TEMPLATES.
+# Twitter templates are trimmed for the 280-char limit.
+# Telegram/LinkedIn templates allow richer formatting.
+
+PLATFORM_DEFAULT_TEMPLATES = {
+    "twitter": {
+        "cfp": {
+            "announcement": (
+                "📢 Submit your proposals for {event_name}! "
+                "Deadline: {cfp_deadline}. {cfp_link} {hashtags}"
+            ),
+            "reminder": (
+                "⏰ CFP Closing Soon for {event_name}! "
+                "Deadline {cfp_deadline}. {cfp_link} {hashtags}"
+            ),
+            "final_call": (
+                "🚨 Last call! Submit to {event_name} by {cfp_deadline}: {cfp_link} {hashtags}"
+            ),
+        },
+        "speaker": {
+            "announcement": (
+                "🎤 Meet our speaker {speaker_name} at {event_name}! "
+                "'{talk_title}' {speaker_link} {hashtags}"
+            ),
+            "reminder": (
+                "🗓 Don't miss {speaker_name} on '{talk_title}' at {event_name}! "
+                "{speaker_link} {hashtags}"
+            ),
+            "final_call": (
+                "🔥 {speaker_name} presenting '{talk_title}' at {event_name}. "
+                "Live soon! {speaker_link} {hashtags}"
+            ),
+        },
+        "session": {
+            "announcement": (
+                "🗓 Coming up: '{talk_title}' by {speaker_names} at {event_name}. "
+                "{talk_link} {hashtags}"
+            ),
+            "reminder": (
+                "⏰ Starting soon: '{talk_title}' at {talk_start_time}. "
+                "{talk_link} {hashtags}"
+            ),
+            "final_call": (
+                "🔥 Starting now: '{talk_title}' in {talk_room}. {talk_link} {hashtags}"
+            ),
+        },
+        "ticket": {
+            "announcement": (
+                "🎟 {ticket_name} tickets for {event_name} — {ticket_price}. "
+                "Get yours: {ticket_link} {hashtags}"
+            ),
+            "reminder": (
+                "⚡ Don't miss {ticket_name} for {event_name}! {ticket_link} {hashtags}"
+            ),
+            "final_call": (
+                "🔥 Last chance! {ticket_name} for {event_name}. {ticket_link} {hashtags}"
+            ),
+        },
+        "schedule": {
+            "announcement": (
+                "📅 Full schedule for {event_name} is live! {schedule_link} {hashtags}"
+            ),
+            "reminder": (
+                "🗓 Check the {event_name} schedule: {schedule_link} {hashtags}"
+            ),
+        },
+    },
+    "mastodon": {
+        # Mastodon allows 500 chars; templates can be slightly richer than Twitter
+        "cfp": {
+            "announcement": (
+                "📢 Submit your proposals for {event_name}!\n"
+                "Deadline: {cfp_deadline}.\nApply here: {cfp_link} {hashtags}"
+            ),
+            "reminder": (
+                "⏰ CFP Closing Soon for {event_name}!\n"
+                "Only a few days left ({cfp_deadline}): {cfp_link} {hashtags}"
+            ),
+            "final_call": (
+                "🚨 Final Call! Submissions for {event_name} close {cfp_deadline}.\n"
+                "Submit now: {cfp_link} {hashtags}"
+            ),
+        },
+        "speaker": DEFAULT_TEMPLATES["speaker"],
+        "session": DEFAULT_TEMPLATES["session"],
+        "ticket": DEFAULT_TEMPLATES["ticket"],
+        "schedule": DEFAULT_TEMPLATES["schedule"],
+    },
+    "telegram": {
+        # Telegram supports Markdown; use bold via *text*
+        "cfp": {
+            "announcement": (
+                "📢 *CFP Open* for *{event_name}*!\n"
+                "Deadline: *{cfp_deadline}*\nSubmit: {cfp_link}\n{hashtags}"
+            ),
+            "reminder": (
+                "⏰ *CFP Reminder* — {event_name}\n"
+                "Deadline: *{cfp_deadline}*\n{cfp_link}\n{hashtags}"
+            ),
+            "final_call": (
+                "🚨 *Final Call* — {event_name}\n"
+                "Submit by *{cfp_deadline}*: {cfp_link}\n{hashtags}"
+            ),
+        },
+        "speaker": {
+            "announcement": (
+                "🎤 *Speaker Spotlight* — {event_name}\n"
+                "*{speaker_name}* will present *'{talk_title}'*\n"
+                "More info: {speaker_link}\n{hashtags}"
+            ),
+            "reminder": (
+                "🗓 *Don't miss* {speaker_name} presenting *'{talk_title}'* at {event_name}!\n"
+                "{speaker_link}\n{hashtags}"
+            ),
+            "final_call": (
+                "🔥 *Live soon!* {speaker_name} — *'{talk_title}'* at {event_name}\n"
+                "{speaker_link}\n{hashtags}"
+            ),
+        },
+        "session": {
+            "announcement": (
+                "🗓 *Upcoming Session* — {event_name}\n"
+                "*'{talk_title}'* by {speaker_names}\n"
+                "Room: {talk_room} | Time: {talk_start_time}\n"
+                "{talk_link}\n{hashtags}"
+            ),
+            "reminder": (
+                "⏰ *Session Starting Soon* — {event_name}\n"
+                "*'{talk_title}'* by {speaker_names} at {talk_start_time}\n"
+                "{talk_link}\n{hashtags}"
+            ),
+            "final_call": (
+                "🔥 *Starting Now!* *'{talk_title}'* by {speaker_names} in {talk_room}\n"
+                "Join: {talk_link}\n{hashtags}"
+            ),
+        },
+        "ticket": {
+            "announcement": (
+                "🎟 *Tickets Available* — {event_name}\n"
+                "*{ticket_name}* — {ticket_price}\nGet yours: {ticket_link}\n{hashtags}"
+            ),
+            "reminder": (
+                "⚡ *Ticket Reminder* — {event_name}\n"
+                "{ticket_name}: {ticket_link}\n{hashtags}"
+            ),
+            "final_call": (
+                "🔥 *Last Chance!* {ticket_name} for {event_name}\n"
+                "{ticket_link}\n{hashtags}"
+            ),
+        },
+        "schedule": {
+            "announcement": (
+                "📅 *Schedule Live* — {event_name}\n"
+                "Plan your days: {schedule_link}\n{hashtags}"
+            ),
+            "reminder": (
+                "🗓 *Check the Schedule* — {event_name}\n"
+                "{schedule_link}\n{hashtags}"
+            ),
+        },
+    },
+    "linkedin": {
+        # LinkedIn allows long-form; use professional tone
+        "cfp": {
+            "announcement": (
+                "We're excited to open our Call for Proposals for {event_name}! "
+                "Share your expertise with our community. The submission deadline is {cfp_deadline}. "
+                "Submit your proposal here: {cfp_link} {hashtags}"
+            ),
+            "reminder": (
+                "⏰ Reminder: The CFP for {event_name} closes on {cfp_deadline}. "
+                "Don't miss this opportunity to present your ideas. Submit now: {cfp_link} {hashtags}"
+            ),
+            "final_call": (
+                "Final call! Submissions for {event_name} close on {cfp_deadline}. "
+                "This is your last chance to be part of our speaker lineup. "
+                "Submit here: {cfp_link} {hashtags}"
+            ),
+        },
+        "speaker": {
+            "announcement": (
+                "We're thrilled to feature {speaker_name} at {event_name}! "
+                "Join us for their talk: '{talk_title}'. "
+                "Learn more about this session: {speaker_link} {hashtags}"
+            ),
+            "reminder": (
+                "Don't miss {speaker_name} presenting '{talk_title}' at {event_name}. "
+                "A session not to be missed! Details: {speaker_link} {hashtags}"
+            ),
+            "final_call": (
+                "Spotlight: {speaker_name} will be presenting '{talk_title}' at {event_name}. "
+                "Join us live! {speaker_link} {hashtags}"
+            ),
+        },
+        "session": {
+            "announcement": (
+                "Mark your calendars! '{talk_title}' by {speaker_names} is coming up at {event_name}. "
+                "Room: {talk_room} | Time: {talk_start_time}. Full details: {talk_link} {hashtags}"
+            ),
+            "reminder": (
+                "Session starting soon: '{talk_title}' by {speaker_names} "
+                "at {talk_start_time} in {talk_room} during {event_name}. "
+                "Don't miss it: {talk_link} {hashtags}"
+            ),
+            "final_call": (
+                "Starting now: '{talk_title}' by {speaker_names} in {talk_room}. "
+                "Join the session: {talk_link} {hashtags}"
+            ),
+        },
+        "ticket": {
+            "announcement": (
+                "Tickets for {event_name} are now available! "
+                "Secure your {ticket_name} ticket for just {ticket_price}. "
+                "Register now: {ticket_link} {hashtags}"
+            ),
+            "reminder": (
+                "Have you registered for {event_name} yet? "
+                "{ticket_name} tickets ({ticket_price}) are still available: {ticket_link} {hashtags}"
+            ),
+            "final_call": (
+                "Last chance to register for {event_name}! "
+                "Grab your {ticket_name} ticket now: {ticket_link} {hashtags}"
+            ),
+        },
+        "schedule": {
+            "announcement": (
+                "The full schedule for {event_name} is now live! "
+                "Explore all sessions, workshops, and keynotes. "
+                "Plan your experience: {schedule_link} {hashtags}"
+            ),
+            "reminder": (
+                "Have you checked out the {event_name} schedule? "
+                "Browse all sessions and plan your agenda: {schedule_link} {hashtags}"
+            ),
+        },
+    },
+}
+
+# ---------------------------------------------------------------------------
 # Distance-based template context mapping
 # ---------------------------------------------------------------------------
 # Maps offset thresholds to template context keys.  For each post type,
@@ -192,6 +442,29 @@ def _get_template(event, key, context="announcement"):
     return tpl
 
 
+def _get_platform_template(event, key, platform, context="announcement"):
+    """Return a platform-specific template, cascading through:
+    1. Organizer-saved per-platform custom override
+    2. Baked-in platform-specific default
+    3. Existing generic default template
+    """
+    # 1. Check for organizer-saved platform-specific override
+    custom = event.settings.get(f"socialmedia_{platform}_{key}_template")
+    if custom:
+        return custom
+
+    # 2. Baked-in platform-specific default
+    plat_tpls = PLATFORM_DEFAULT_TEMPLATES.get(platform, {})
+    plat_tpl = plat_tpls.get(key, {})
+    if isinstance(plat_tpl, dict):
+        result = plat_tpl.get(context) or plat_tpl.get("announcement")
+        if result:
+            return result
+
+    # 3. Fall back to generic default
+    return _get_template(event, key, context)
+
+
 def _get_template_for_offset(event, key, offset_value):
     """Return the template matching the distance-based wave for this offset."""
     context = resolve_template_context(key, offset_value)
@@ -237,11 +510,24 @@ def build_posts(event, request=None):
     """
     Return a list of post dicts built from the event's live DB data.
     Each dict has: type, type_label, post_date, post_time, post_text.
+    When at least one platform is enabled, each content item generates one
+    draft per enabled platform (with a 'platform' and 'platform_label' key).
+    If no platforms are enabled the function falls back to the original
+    platform-agnostic behaviour (one generic draft per content item).
     The list is sorted chronologically.
     """
     hashtags = event.settings.get("socialmedia_default_hashtags", "")
     event_link_override = event.settings.get("socialmedia_event_link")
     event_link = event_link_override or event_absolute_url(event.urls.base, request)
+
+    # Determine which platforms are enabled
+    enabled_platforms = [
+        p
+        for p in PLATFORMS
+        if event.settings.get(f"socialmedia_{p}_enabled", False, as_type=bool)
+    ]
+    # Fall back to generic (no platform tagging) when none are configured
+    use_platforms = bool(enabled_platforms)
 
     posts = []
 
@@ -255,33 +541,42 @@ def build_posts(event, request=None):
         ref_date = localize(cfp.deadline, event).strftime("%Y-%m-%d")
         for cfp_off in cfp_offsets:
             text, template_ctx = _get_template_for_offset(event, "cfp", cfp_off)
-            text = safe_format(
-                text,
-                event_name=str(event.name),
-                cfp_deadline=deadline_str,
-                cfp_link=cfp_url,
-                hashtags=hashtags,
-            )
             trigger = localize(cfp.deadline - timedelta(days=cfp_off), event)
-            post_id = "cfp"
-            posts.append(
-                {
-                    "id": post_id,
-                    "type": "cfp",
-                    "type_label": TYPE_LABELS["cfp"],
-                    "post_date": trigger.strftime("%Y-%m-%d"),
-                    "post_time": trigger.strftime("%H:%M"),
-                    "post_text": text,
-                    "default_text": text,
-                    "reference_date": ref_date,
-                    "original_post_date": trigger.strftime("%Y-%m-%d"),
-                    "original_post_time": trigger.strftime("%H:%M"),
-                    "event_schedule_display": "N/A",
-                    "is_schedule_associated": False,
-                    "offset_days": cfp_off,
-                    "template_context": template_ctx,
-                }
-            )
+            base_id = "cfp"
+            platform_iter = enabled_platforms if use_platforms else [None]
+            for platform in platform_iter:
+                if platform:
+                    text_formatted = _get_platform_template(event, "cfp", platform, template_ctx)
+                else:
+                    text_formatted = text
+                text_formatted = safe_format(
+                    text_formatted,
+                    event_name=str(event.name),
+                    cfp_deadline=deadline_str,
+                    cfp_link=cfp_url,
+                    hashtags=hashtags,
+                )
+                post_id = f"{base_id}_{platform}" if platform else base_id
+                posts.append(
+                    {
+                        "id": post_id,
+                        "type": "cfp",
+                        "type_label": TYPE_LABELS["cfp"],
+                        "platform": platform,
+                        "platform_label": PLATFORMS.get(platform, "") if platform else "",
+                        "post_date": trigger.strftime("%Y-%m-%d"),
+                        "post_time": trigger.strftime("%H:%M"),
+                        "post_text": text_formatted,
+                        "default_text": text_formatted,
+                        "reference_date": ref_date,
+                        "original_post_date": trigger.strftime("%Y-%m-%d"),
+                        "original_post_time": trigger.strftime("%H:%M"),
+                        "event_schedule_display": "N/A",
+                        "is_schedule_associated": False,
+                        "offset_days": cfp_off,
+                        "template_context": template_ctx,
+                    }
+                )
 
     # ---- Schedule release ------------------------------------------------
     schedule_enabled = event.settings.get(
@@ -293,32 +588,41 @@ def build_posts(event, request=None):
         ref_date = localize(event.date_from, event).strftime("%Y-%m-%d")
         for sched_off in sched_offsets:
             text, template_ctx = _get_template_for_offset(event, "schedule", sched_off)
-            text = safe_format(
-                text,
-                event_name=str(event.name),
-                schedule_link=schedule_url,
-                hashtags=hashtags,
-            )
             trigger = localize(event.date_from - timedelta(days=sched_off), event)
-            post_id = "schedule"
-            posts.append(
-                {
-                    "id": post_id,
-                    "type": "schedule",
-                    "type_label": TYPE_LABELS["schedule"],
-                    "post_date": trigger.strftime("%Y-%m-%d"),
-                    "post_time": trigger.strftime("%H:%M"),
-                    "post_text": text,
-                    "default_text": text,
-                    "reference_date": ref_date,
-                    "original_post_date": trigger.strftime("%Y-%m-%d"),
-                    "original_post_time": trigger.strftime("%H:%M"),
-                    "event_schedule_display": "N/A",
-                    "is_schedule_associated": False,
-                    "offset_days": sched_off,
-                    "template_context": template_ctx,
-                }
-            )
+            base_id = "schedule"
+            platform_iter = enabled_platforms if use_platforms else [None]
+            for platform in platform_iter:
+                if platform:
+                    text_formatted = _get_platform_template(event, "schedule", platform, template_ctx)
+                else:
+                    text_formatted = text
+                text_formatted = safe_format(
+                    text_formatted,
+                    event_name=str(event.name),
+                    schedule_link=schedule_url,
+                    hashtags=hashtags,
+                )
+                post_id = f"{base_id}_{platform}" if platform else base_id
+                posts.append(
+                    {
+                        "id": post_id,
+                        "type": "schedule",
+                        "type_label": TYPE_LABELS["schedule"],
+                        "platform": platform,
+                        "platform_label": PLATFORMS.get(platform, "") if platform else "",
+                        "post_date": trigger.strftime("%Y-%m-%d"),
+                        "post_time": trigger.strftime("%H:%M"),
+                        "post_text": text_formatted,
+                        "default_text": text_formatted,
+                        "reference_date": ref_date,
+                        "original_post_date": trigger.strftime("%Y-%m-%d"),
+                        "original_post_time": trigger.strftime("%H:%M"),
+                        "event_schedule_display": "N/A",
+                        "is_schedule_associated": False,
+                        "offset_days": sched_off,
+                        "template_context": template_ctx,
+                    }
+                )
 
     # ---- Ticket announcements --------------------------------------------
     ticket_enabled = event.settings.get(
@@ -341,34 +645,43 @@ def build_posts(event, request=None):
             ref_date = localize(event.date_from, event).strftime("%Y-%m-%d")
             for tkt_off in tkt_offsets:
                 text, template_ctx = _get_template_for_offset(event, "ticket", tkt_off)
-                text = safe_format(
-                    text,
-                    event_name=str(event.name),
-                    ticket_name=str(ticket.name),
-                    ticket_price=price_str,
-                    ticket_link=event_link,
-                    hashtags=hashtags,
-                )
                 trigger = localize(event.date_from - timedelta(days=tkt_off), event)
-                post_id = f"ticket_{ticket.pk}"
-                posts.append(
-                    {
-                        "id": post_id,
-                        "type": "ticket",
-                        "type_label": TYPE_LABELS["ticket"],
-                        "post_date": trigger.strftime("%Y-%m-%d"),
-                        "post_time": trigger.strftime("%H:%M"),
-                        "post_text": text,
-                        "default_text": text,
-                        "reference_date": ref_date,
-                        "original_post_date": trigger.strftime("%Y-%m-%d"),
-                        "original_post_time": trigger.strftime("%H:%M"),
-                        "event_schedule_display": "N/A",
-                        "is_schedule_associated": False,
-                        "offset_days": tkt_off,
-                        "template_context": template_ctx,
-                    }
-                )
+                base_id = f"ticket_{ticket.pk}"
+                platform_iter = enabled_platforms if use_platforms else [None]
+                for platform in platform_iter:
+                    if platform:
+                        text_formatted = _get_platform_template(event, "ticket", platform, template_ctx)
+                    else:
+                        text_formatted = text
+                    text_formatted = safe_format(
+                        text_formatted,
+                        event_name=str(event.name),
+                        ticket_name=str(ticket.name),
+                        ticket_price=price_str,
+                        ticket_link=event_link,
+                        hashtags=hashtags,
+                    )
+                    post_id = f"{base_id}_{platform}" if platform else base_id
+                    posts.append(
+                        {
+                            "id": post_id,
+                            "type": "ticket",
+                            "type_label": TYPE_LABELS["ticket"],
+                            "platform": platform,
+                            "platform_label": PLATFORMS.get(platform, "") if platform else "",
+                            "post_date": trigger.strftime("%Y-%m-%d"),
+                            "post_time": trigger.strftime("%H:%M"),
+                            "post_text": text_formatted,
+                            "default_text": text_formatted,
+                            "reference_date": ref_date,
+                            "original_post_date": trigger.strftime("%Y-%m-%d"),
+                            "original_post_time": trigger.strftime("%H:%M"),
+                            "event_schedule_display": "N/A",
+                            "is_schedule_associated": False,
+                            "offset_days": tkt_off,
+                            "template_context": template_ctx,
+                        }
+                    )
 
     # ---- Speaker & Session announcements ---------------------------------
     speaker_enabled = event.settings.get(
@@ -407,57 +720,67 @@ def build_posts(event, request=None):
                 talk_start = talk.start if talk else None
 
                 if talk_start:
-                    local_start = localize(talk_start, event)
-                    sched_display = local_start.strftime("%b %d, %Y %H:%M")
+                    base_time = talk_start
+                    sched_display = localize(talk_start, event).strftime("%Y-%m-%d %H:%M")
                 else:
+                    base_time = getattr(event, "date_from", None)
                     sched_display = "Unscheduled"
 
-                # Speaker post (one per unique speaker per offset)
+                # Speaker post
                 if speaker_enabled:
-                    base_time = talk_start or getattr(event, "date_from", None)
-                    if base_time:
-                        for spk_off in spk_offsets:
-                            trigger = localize(
-                                base_time - timedelta(days=spk_off), event
+                    for spk_off in spk_offsets:
+                        trigger = localize(
+                            base_time - timedelta(days=spk_off), event
+                        )
+                        for speaker in sub.speakers.all():
+                            if (speaker.pk, spk_off) in seen_speaker_offsets:
+                                continue
+                            seen_speaker_offsets.add((speaker.pk, spk_off))
+                            if speaker.code:
+                                spk_url = event_absolute_url(
+                                    f"{event.urls.base}speakers/{speaker.code}/",
+                                    request,
+                                )
+                            else:
+                                spk_url = event_link
+                            text, template_ctx = _get_template_for_offset(
+                                event, "speaker", spk_off
                             )
-                            for speaker in sub.speakers.all():
-                                if (speaker.pk, spk_off) in seen_speaker_offsets:
-                                    continue
-                                seen_speaker_offsets.add((speaker.pk, spk_off))
-                                if speaker.code:
-                                    spk_url = event_absolute_url(
-                                        f"{event.urls.base}speakers/{speaker.code}/",
-                                        request,
+                            ref_date = (
+                                localize(base_time, event).strftime("%Y-%m-%d")
+                                if base_time
+                                else None
+                            )
+                            talk_pk = talk.pk if talk else sub.pk
+                            base_id = f"speaker_{speaker.pk}_{talk_pk}"
+                            platform_iter = enabled_platforms if use_platforms else [None]
+                            for platform in platform_iter:
+                                if platform:
+                                    text_formatted = _get_platform_template(
+                                        event, "speaker", platform, template_ctx
                                     )
                                 else:
-                                    spk_url = event_link
-                                text, template_ctx = _get_template_for_offset(
-                                    event, "speaker", spk_off
-                                )
-                                text = safe_format(
-                                    text,
+                                    text_formatted = text
+                                text_formatted = safe_format(
+                                    text_formatted,
                                     event_name=str(event.name),
                                     speaker_name=speaker.get_display_name(),
                                     speaker_link=spk_url,
                                     talk_title=sub.title,
                                     hashtags=hashtags,
                                 )
-                                ref_date = (
-                                    localize(base_time, event).strftime("%Y-%m-%d")
-                                    if base_time
-                                    else None
-                                )
-                                talk_pk = talk.pk if talk else sub.pk
-                                post_id = f"speaker_{speaker.pk}_{talk_pk}"
+                                post_id = f"{base_id}_{platform}" if platform else base_id
                                 posts.append(
                                     {
                                         "id": post_id,
                                         "type": "speaker",
                                         "type_label": TYPE_LABELS["speaker"],
+                                        "platform": platform,
+                                        "platform_label": PLATFORMS.get(platform, "") if platform else "",
                                         "post_date": trigger.strftime("%Y-%m-%d"),
                                         "post_time": trigger.strftime("%H:%M"),
-                                        "post_text": text,
-                                        "default_text": text,
+                                        "post_text": text_formatted,
+                                        "default_text": text_formatted,
                                         "reference_date": ref_date,
                                         "original_post_date": trigger.strftime(
                                             "%Y-%m-%d"
@@ -483,45 +806,59 @@ def build_posts(event, request=None):
                     ref_date = localize(talk_start, event).strftime("%Y-%m-%d")
                     talk_pk = talk.pk if talk else sub.pk
                     for sess_off in sess_offsets:
-                        trigger = localize(
-                            talk_start - timedelta(minutes=sess_off), event
-                        )
+                        if talk_start:
+                            trigger = localize(
+                                talk_start - timedelta(minutes=sess_off), event
+                            )
+                        else:
+                            trigger = localize(base_time - timedelta(days=1), event)
                         text, template_ctx = _get_template_for_offset(
                             event, "session", sess_off
                         )
-                        text = safe_format(
-                            text,
-                            event_name=str(event.name),
-                            talk_title=sub.title,
-                            talk_room=room,
-                            talk_start_time=(
-                                localize(talk_start, event).strftime("%H:%M")
-                                if talk_start
-                                else "TBA"
-                            ),
-                            speaker_names=names,
-                            talk_link=talk_url,
-                            hashtags=hashtags,
-                        )
-                        post_id = f"session_{talk_pk}"
-                        posts.append(
-                            {
-                                "id": post_id,
-                                "type": "session",
-                                "type_label": TYPE_LABELS["session"],
-                                "post_date": trigger.strftime("%Y-%m-%d"),
-                                "post_time": trigger.strftime("%H:%M"),
-                                "post_text": text,
-                                "default_text": text,
-                                "reference_date": ref_date,
-                                "original_post_date": trigger.strftime("%Y-%m-%d"),
-                                "original_post_time": trigger.strftime("%H:%M"),
-                                "event_schedule_display": sched_display,
-                                "is_schedule_associated": True,
-                                "offset_days": sess_off,
-                                "template_context": template_ctx,
-                            }
-                        )
+                        base_id = f"session_{talk_pk}"
+                        platform_iter = enabled_platforms if use_platforms else [None]
+                        for platform in platform_iter:
+                            if platform:
+                                text_formatted = _get_platform_template(
+                                    event, "session", platform, template_ctx
+                                )
+                            else:
+                                text_formatted = text
+                            text_formatted = safe_format(
+                                text_formatted,
+                                event_name=str(event.name),
+                                talk_title=sub.title,
+                                talk_room=room,
+                                talk_start_time=(
+                                    localize(talk_start, event).strftime("%H:%M")
+                                    if talk_start
+                                    else "TBA"
+                                ),
+                                speaker_names=names,
+                                talk_link=talk_url,
+                                hashtags=hashtags,
+                            )
+                            post_id = f"{base_id}_{platform}" if platform else base_id
+                            posts.append(
+                                {
+                                    "id": post_id,
+                                    "type": "session",
+                                    "type_label": TYPE_LABELS["session"],
+                                    "platform": platform,
+                                    "platform_label": PLATFORMS.get(platform, "") if platform else "",
+                                    "post_date": trigger.strftime("%Y-%m-%d"),
+                                    "post_time": trigger.strftime("%H:%M"),
+                                    "post_text": text_formatted,
+                                    "default_text": text_formatted,
+                                    "reference_date": ref_date,
+                                    "original_post_date": trigger.strftime("%Y-%m-%d"),
+                                    "original_post_time": trigger.strftime("%H:%M"),
+                                    "event_schedule_display": sched_display,
+                                    "is_schedule_associated": True,
+                                    "offset_days": sess_off,
+                                    "template_context": template_ctx,
+                                }
+                            )
 
     # Sort chronologically
     posts.sort(key=lambda p: (p["post_date"], p["post_time"]))

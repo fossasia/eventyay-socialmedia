@@ -2,7 +2,7 @@ from django import forms
 from django.utils.translation import gettext_lazy as _
 from eventyay.base.forms import SettingsForm
 
-from .export import DEFAULT_TEMPLATES
+from .export import DEFAULT_TEMPLATES, PLATFORMS
 
 MAX_OFFSETS = 10
 MAX_OFFSET_VALUE_CFP = 365
@@ -69,6 +69,223 @@ class SocialMediaSettingsForm(SettingsForm):
         ),
         required=False,
         max_length=200,
+    )
+
+    # ------------------------------------------------------------------
+    # Platform toggles
+    # ------------------------------------------------------------------
+    socialmedia_twitter_enabled = forms.BooleanField(
+        label=_("Enable X / Twitter"),
+        help_text=_(
+            "Generate separate draft posts optimised for X / Twitter (≤280 chars)."
+        ),
+        required=False,
+        initial=False,
+    )
+    socialmedia_mastodon_enabled = forms.BooleanField(
+        label=_("Enable Mastodon"),
+        help_text=_(
+            "Generate separate draft posts for Mastodon (≤500 chars)."
+        ),
+        required=False,
+        initial=False,
+    )
+    socialmedia_telegram_enabled = forms.BooleanField(
+        label=_("Enable Telegram"),
+        help_text=_(
+            "Generate separate draft posts for Telegram (Markdown formatting)."
+        ),
+        required=False,
+        initial=False,
+    )
+    socialmedia_linkedin_enabled = forms.BooleanField(
+        label=_("Enable LinkedIn"),
+        help_text=_(
+            "Generate separate draft posts for LinkedIn (long-form, professional tone)."
+        ),
+        required=False,
+        initial=False,
+    )
+
+    # Per-platform template overrides for CFP
+    socialmedia_twitter_cfp_template = forms.CharField(
+        label=_("X / Twitter — CFP template"),
+        widget=forms.Textarea(attrs={"rows": 2}),
+        required=False,
+        help_text=_(
+            "Leave blank to use the Twitter-specific default. "
+            "Available: {event_name}, {cfp_deadline}, {cfp_link}, {hashtags}"
+        ),
+    )
+    socialmedia_mastodon_cfp_template = forms.CharField(
+        label=_("Mastodon — CFP template"),
+        widget=forms.Textarea(attrs={"rows": 2}),
+        required=False,
+        help_text=_(
+            "Leave blank to use the Mastodon-specific default. "
+            "Available: {event_name}, {cfp_deadline}, {cfp_link}, {hashtags}"
+        ),
+    )
+    socialmedia_telegram_cfp_template = forms.CharField(
+        label=_("Telegram — CFP template"),
+        widget=forms.Textarea(attrs={"rows": 2}),
+        required=False,
+        help_text=_(
+            "Leave blank to use the Telegram-specific default (Markdown supported). "
+            "Available: {event_name}, {cfp_deadline}, {cfp_link}, {hashtags}"
+        ),
+    )
+    socialmedia_linkedin_cfp_template = forms.CharField(
+        label=_("LinkedIn — CFP template"),
+        widget=forms.Textarea(attrs={"rows": 3}),
+        required=False,
+        help_text=_(
+            "Leave blank to use the LinkedIn-specific default. "
+            "Available: {event_name}, {cfp_deadline}, {cfp_link}, {hashtags}"
+        ),
+    )
+
+    # Per-platform template overrides for Speaker
+    socialmedia_twitter_speaker_template = forms.CharField(
+        label=_("X / Twitter — Speaker template"),
+        widget=forms.Textarea(attrs={"rows": 2}),
+        required=False,
+        help_text=_(
+            "Available: {event_name}, {speaker_name}, {speaker_link}, {talk_title}, {hashtags}"
+        ),
+    )
+    socialmedia_mastodon_speaker_template = forms.CharField(
+        label=_("Mastodon — Speaker template"),
+        widget=forms.Textarea(attrs={"rows": 2}),
+        required=False,
+        help_text=_(
+            "Available: {event_name}, {speaker_name}, {speaker_link}, {talk_title}, {hashtags}"
+        ),
+    )
+    socialmedia_telegram_speaker_template = forms.CharField(
+        label=_("Telegram — Speaker template"),
+        widget=forms.Textarea(attrs={"rows": 2}),
+        required=False,
+        help_text=_(
+            "Markdown supported. "
+            "Available: {event_name}, {speaker_name}, {speaker_link}, {talk_title}, {hashtags}"
+        ),
+    )
+    socialmedia_linkedin_speaker_template = forms.CharField(
+        label=_("LinkedIn — Speaker template"),
+        widget=forms.Textarea(attrs={"rows": 3}),
+        required=False,
+        help_text=_(
+            "Available: {event_name}, {speaker_name}, {speaker_link}, {talk_title}, {hashtags}"
+        ),
+    )
+
+    # Per-platform template overrides for Session
+    socialmedia_twitter_session_template = forms.CharField(
+        label=_("X / Twitter — Session template"),
+        widget=forms.Textarea(attrs={"rows": 2}),
+        required=False,
+        help_text=_(
+            "Available: {event_name}, {talk_title}, {talk_room}, {talk_start_time}, "
+            "{speaker_names}, {talk_link}, {hashtags}"
+        ),
+    )
+    socialmedia_mastodon_session_template = forms.CharField(
+        label=_("Mastodon — Session template"),
+        widget=forms.Textarea(attrs={"rows": 2}),
+        required=False,
+        help_text=_(
+            "Available: {event_name}, {talk_title}, {talk_room}, {talk_start_time}, "
+            "{speaker_names}, {talk_link}, {hashtags}"
+        ),
+    )
+    socialmedia_telegram_session_template = forms.CharField(
+        label=_("Telegram — Session template"),
+        widget=forms.Textarea(attrs={"rows": 2}),
+        required=False,
+        help_text=_(
+            "Markdown supported. "
+            "Available: {event_name}, {talk_title}, {talk_room}, {talk_start_time}, "
+            "{speaker_names}, {talk_link}, {hashtags}"
+        ),
+    )
+    socialmedia_linkedin_session_template = forms.CharField(
+        label=_("LinkedIn — Session template"),
+        widget=forms.Textarea(attrs={"rows": 3}),
+        required=False,
+        help_text=_(
+            "Available: {event_name}, {talk_title}, {talk_room}, {talk_start_time}, "
+            "{speaker_names}, {talk_link}, {hashtags}"
+        ),
+    )
+
+    # Per-platform template overrides for Ticket
+    socialmedia_twitter_ticket_template = forms.CharField(
+        label=_("X / Twitter — Ticket template"),
+        widget=forms.Textarea(attrs={"rows": 2}),
+        required=False,
+        help_text=_(
+            "Available: {event_name}, {ticket_name}, {ticket_price}, {ticket_link}, {hashtags}"
+        ),
+    )
+    socialmedia_mastodon_ticket_template = forms.CharField(
+        label=_("Mastodon — Ticket template"),
+        widget=forms.Textarea(attrs={"rows": 2}),
+        required=False,
+        help_text=_(
+            "Available: {event_name}, {ticket_name}, {ticket_price}, {ticket_link}, {hashtags}"
+        ),
+    )
+    socialmedia_telegram_ticket_template = forms.CharField(
+        label=_("Telegram — Ticket template"),
+        widget=forms.Textarea(attrs={"rows": 2}),
+        required=False,
+        help_text=_(
+            "Markdown supported. "
+            "Available: {event_name}, {ticket_name}, {ticket_price}, {ticket_link}, {hashtags}"
+        ),
+    )
+    socialmedia_linkedin_ticket_template = forms.CharField(
+        label=_("LinkedIn — Ticket template"),
+        widget=forms.Textarea(attrs={"rows": 3}),
+        required=False,
+        help_text=_(
+            "Available: {event_name}, {ticket_name}, {ticket_price}, {ticket_link}, {hashtags}"
+        ),
+    )
+
+    # Per-platform template overrides for Schedule
+    socialmedia_twitter_schedule_template = forms.CharField(
+        label=_("X / Twitter — Schedule template"),
+        widget=forms.Textarea(attrs={"rows": 2}),
+        required=False,
+        help_text=_(
+            "Available: {event_name}, {schedule_link}, {hashtags}"
+        ),
+    )
+    socialmedia_mastodon_schedule_template = forms.CharField(
+        label=_("Mastodon — Schedule template"),
+        widget=forms.Textarea(attrs={"rows": 2}),
+        required=False,
+        help_text=_(
+            "Available: {event_name}, {schedule_link}, {hashtags}"
+        ),
+    )
+    socialmedia_telegram_schedule_template = forms.CharField(
+        label=_("Telegram — Schedule template"),
+        widget=forms.Textarea(attrs={"rows": 2}),
+        required=False,
+        help_text=_(
+            "Markdown supported. Available: {event_name}, {schedule_link}, {hashtags}"
+        ),
+    )
+    socialmedia_linkedin_schedule_template = forms.CharField(
+        label=_("LinkedIn — Schedule template"),
+        widget=forms.Textarea(attrs={"rows": 3}),
+        required=False,
+        help_text=_(
+            "Available: {event_name}, {schedule_link}, {hashtags}"
+        ),
     )
 
     # ------------------------------------------------------------------

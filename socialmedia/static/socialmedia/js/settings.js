@@ -17,6 +17,14 @@
 
   if (!Config) return;
 
+  // ---- Platform metadata ----
+  const PLATFORM_META = {
+    twitter:  { label: "X / Twitter", iconClass: "fa fa-twitter",   colorClass: "plat-twitter" },
+    mastodon: { label: "Mastodon",    iconClass: "fa fa-globe",      colorClass: "plat-mastodon" },
+    telegram: { label: "Telegram",    iconClass: "fa fa-paper-plane", colorClass: "plat-telegram" },
+    linkedin: { label: "LinkedIn",    iconClass: "fa fa-linkedin",   colorClass: "plat-linkedin" },
+  };
+
   // ---- Helper functions ----
   const Helpers = {
     addDays(dateStr, days) {
@@ -279,15 +287,56 @@
 
       for (let i = 0; i < 5; i++) {
         const tr = document.createElement("tr");
-        tr.className = "skeleton-row";
+        const tdChk = document.createElement("td");
+        const bChk = document.createElement("div");
+        bChk.className = "skeleton-bar";
+        bChk.style.width = "16px";
+        bChk.style.height = "16px";
+        bChk.style.borderRadius = "3px";
+        tdChk.appendChild(bChk);
+        tr.appendChild(tdChk);
 
-        for (let j = 0; j < 6; j++) {
-          const td = document.createElement("td");
-          const bar = document.createElement("div");
-          bar.className = "skeleton-bar";
-          td.appendChild(bar);
-          tr.appendChild(td);
-        }
+        const tdType = document.createElement("td");
+        const bType = document.createElement("div");
+        bType.className = "skeleton-bar";
+        bType.style.width = "60px";
+        tdType.appendChild(bType);
+        tr.appendChild(tdType);
+
+        // Platform column skeleton
+        const tdPlat = document.createElement("td");
+        const bPlat = document.createElement("div");
+        bPlat.className = "skeleton-bar";
+        bPlat.style.width = "80px";
+        tdPlat.appendChild(bPlat);
+        tr.appendChild(tdPlat);
+
+        const tdSched = document.createElement("td");
+        const bSched = document.createElement("div");
+        bSched.className = "skeleton-bar";
+        bSched.style.width = "110px";
+        tdSched.appendChild(bSched);
+        tr.appendChild(tdSched);
+
+        const tdInput = document.createElement("td");
+        const bInput = document.createElement("div");
+        bInput.className = "skeleton-bar";
+        bInput.style.width = "125px";
+        tdInput.appendChild(bInput);
+        tr.appendChild(tdInput);
+
+        const tdText = document.createElement("td");
+        const bText = document.createElement("div");
+        bText.className = "skeleton-bar";
+        tdText.appendChild(bText);
+        tr.appendChild(tdText);
+
+        const tdActions = document.createElement("td");
+        const bActions = document.createElement("div");
+        bActions.className = "skeleton-bar";
+        bActions.style.width = "30px";
+        tdActions.appendChild(bActions);
+        tr.appendChild(tdActions);
 
         tbody.appendChild(tr);
       }
@@ -321,6 +370,29 @@
       typeSpan.textContent = p.type_label;
       tdType.appendChild(typeSpan);
       tr.appendChild(tdType);
+
+      // Platform column
+      const tdPlat = document.createElement("td");
+      if (p.platform) {
+        const meta = PLATFORM_META[p.platform];
+        const platSpan = document.createElement("span");
+        platSpan.className = `platform-badge ${meta ? meta.colorClass : ""}`;
+        if (meta && meta.iconClass) {
+          const icon = document.createElement("i");
+          icon.className = meta.iconClass;
+          platSpan.appendChild(icon);
+          platSpan.appendChild(document.createTextNode(" " + (meta.label || p.platform_label || p.platform)));
+        } else {
+          platSpan.textContent = p.platform_label || p.platform;
+        }
+        tdPlat.appendChild(platSpan);
+      } else {
+        const naSpan = document.createElement("span");
+        naSpan.className = "platform-badge plat-generic";
+        naSpan.textContent = "Generic";
+        tdPlat.appendChild(naSpan);
+      }
+      tr.appendChild(tdPlat);
 
       const tdSched = document.createElement("td");
       tdSched.className = "event-schedule-cell";
@@ -491,7 +563,7 @@
       if (!visible.length) {
         const tr = document.createElement("tr");
         const td = document.createElement("td");
-        td.colSpan = 6;
+        td.colSpan = 7;
 
         const emptyDiv = document.createElement("div");
         emptyDiv.className = "sm-empty";
@@ -723,7 +795,7 @@
             tbody.textContent = "";
             const tr = document.createElement("tr");
             const td = document.createElement("td");
-            td.colSpan = 6;
+            td.colSpan = 7;
 
             const emptyDiv = document.createElement("div");
             emptyDiv.className = "sm-empty";
@@ -1125,6 +1197,20 @@
         input.addEventListener("change", updateFn);
         updateFn();
       }
+    });
+
+    // Platform toggle: show/hide per-platform template fields
+    const platformKeys = ["twitter", "mastodon", "telegram", "linkedin"];
+    platformKeys.forEach(platform => {
+      const checkbox = document.getElementById(`id_socialmedia_${platform}_enabled`);
+      const tplBlock = document.getElementById(`plat-tpls-${platform}`);
+      if (!checkbox || !tplBlock) return;
+
+      const syncVisibility = () => {
+        tplBlock.style.display = checkbox.checked ? "block" : "none";
+      };
+      syncVisibility();
+      checkbox.addEventListener("change", syncVisibility);
     });
   }
   // Run on load
