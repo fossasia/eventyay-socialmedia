@@ -849,7 +849,7 @@
     },
 
     exportCSV() {
-      const visiblePosts = PostState.getFiltered();
+      const visiblePosts = PostState.getFiltered().filter(p => p.status !== "excluded");
       const enabledVisiblePosts = visiblePosts.filter(p => p.enabled);
       if (!enabledVisiblePosts.length) {
         UI.showToast(Config.TRANS_SELECT_AT_LEAST_ONE, "warning");
@@ -1114,11 +1114,23 @@
 
     const preview = container.querySelector(".live-offsets-preview");
     if (preview) {
+      preview.textContent = "";
       if (currentOffsets.length > 0) {
         const unit = container.dataset.unit || "days";
-        preview.innerHTML = "Active: " + currentOffsets.map(x => `<span class="label label-info">${x}${unit}</span>`).join(" ");
+        preview.appendChild(document.createTextNode("Active: "));
+        currentOffsets.forEach((x, idx) => {
+          const span = document.createElement("span");
+          span.className = "label label-info";
+          span.textContent = x + unit;
+          preview.appendChild(span);
+          if (idx < currentOffsets.length - 1) {
+            preview.appendChild(document.createTextNode(" "));
+          }
+        });
       } else {
-        preview.innerHTML = "<em>No offsets set</em>";
+        const em = document.createElement("em");
+        em.textContent = "No offsets set";
+        preview.appendChild(em);
       }
     }
   }

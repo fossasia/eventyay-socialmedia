@@ -586,15 +586,16 @@ def sync_posts_to_db(event, request=None):
             db_post.template_context = p.get("template_context", "default")
             db_post.save()
 
-    # Clean up obsolete scheduled/draft/excluded posts that are no longer generated
+    # Clean up obsolete non-pinned, non-custom posts that are no longer generated
     SocialMediaPost.objects.filter(
         event=event,
+        is_pinned=False,
         status__in=[
             SocialMediaPostStatus.DRAFT,
             SocialMediaPostStatus.SCHEDULED,
             SocialMediaPostStatus.EXCLUDED,
         ],
-    ).exclude(entity_id__in=generated_entity_ids).delete()
+    ).exclude(post_type="custom").exclude(entity_id__in=generated_entity_ids).delete()
 
     return posts
 

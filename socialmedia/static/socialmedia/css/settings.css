@@ -440,7 +440,8 @@
 
 /* Modified state styling */
 .sm-table tbody input.is-modified,
-.sm-table tbody textarea.is-modified {
+.sm-table tbody textarea.is-modified,
+.sm-table tbody .post-text-view.is-modified {
   background-color: #fff9e6 !important;
   border-color: #f0a818 !important;
   box-shadow: 0 0 2px rgba(240, 168, 24, 0.4);

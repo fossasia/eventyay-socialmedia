@@ -117,12 +117,13 @@ def preview_posts(request, organizer, event):
     try:
         raw_posts = sync_posts_to_db(request.event, request)
         db_posts = {
-            p.entity_id: p for p in SocialMediaPost.objects.filter(event=request.event)
+            (p.post_type, p.entity_id): p
+            for p in SocialMediaPost.objects.filter(event=request.event)
         }
         posts = []
         for p in raw_posts:
             entity_id = str(p["id"])
-            db_p = db_posts.get(entity_id)
+            db_p = db_posts.get((p["type"], entity_id))
             if db_p:
                 p["db_id"] = db_p.pk
                 p["status"] = db_p.status
@@ -172,6 +173,10 @@ def update_post(request, organizer, event):
         if post_text is not None:
             db_post.post_text = post_text
         if status is not None:
+            from .models import SocialMediaPostStatus
+
+            if status not in SocialMediaPostStatus.values:
+                return JsonResponse({"error": "Invalid status"}, status=400)
             db_post.status = status
         if post_date and post_time:
             from datetime import datetime
