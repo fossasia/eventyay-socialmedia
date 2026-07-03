@@ -47,6 +47,9 @@
         return posts;
       },
       getFiltered() {
+        if (activeFilter === "excluded") {
+          return posts.filter(p => p.status === "excluded");
+        }
         const list = activeFilter === "all" ? posts : posts.filter(p => p.type === activeFilter);
         return list.filter(p => p.status !== "excluded");
       },
@@ -476,13 +479,23 @@
       tr.appendChild(tdContent);
 
       const tdActions = document.createElement("td");
-      const delBtn = document.createElement("button");
-      delBtn.className = "btn-delete-post";
-      delBtn.dataset.postId = p.id;
-      delBtn.type = "button";
-      delBtn.title = "Remove post from preview";
-      this.setWithIcon(delBtn, "", "fa fa-trash");
-      tdActions.appendChild(delBtn);
+      if (p.status === "excluded") {
+        const restoreBtn = document.createElement("button");
+        restoreBtn.className = "btn-restore-post";
+        restoreBtn.dataset.postId = p.id;
+        restoreBtn.type = "button";
+        restoreBtn.title = "Restore post to preview";
+        this.setWithIcon(restoreBtn, "", "fa fa-undo");
+        tdActions.appendChild(restoreBtn);
+      } else {
+        const delBtn = document.createElement("button");
+        delBtn.className = "btn-delete-post";
+        delBtn.dataset.postId = p.id;
+        delBtn.type = "button";
+        delBtn.title = "Remove post from preview";
+        this.setWithIcon(delBtn, "", "fa fa-trash");
+        tdActions.appendChild(delBtn);
+      }
       tr.appendChild(tdActions);
 
       return tr;
@@ -493,8 +506,13 @@
       if (!tbody) return;
       tbody.textContent = "";
 
-      let visible = filter === "all" ? posts : posts.filter(p => p.type === filter);
-      visible = visible.filter(p => p.status !== "excluded");
+      let visible;
+      if (filter === "excluded") {
+        visible = posts.filter(p => p.status === "excluded");
+      } else {
+        visible = filter === "all" ? posts : posts.filter(p => p.type === filter);
+        visible = visible.filter(p => p.status !== "excluded");
+      }
 
       if (!visible.length) {
         const tr = document.createElement("tr");
@@ -534,17 +552,22 @@
       this.updateSelectedCount();
     },
 
-    updateCounts() {
-      const posts = PostState.getAll();
-      const types = ["cfp", "speaker", "session", "ticket", "schedule"];
+     updateCounts() {
+      const allPosts = PostState.getAll();
+      const activePosts = allPosts.filter(p => p.status !== "excluded");
+      const excludedPosts = allPosts.filter(p => p.status === "excluded");
 
       const cntAll = document.getElementById("cnt-all");
-      if (cntAll) cntAll.textContent = posts.length;
+      if (cntAll) cntAll.textContent = activePosts.length;
 
+      const types = ["cfp", "speaker", "session", "ticket", "schedule"];
       types.forEach(t => {
         const el = document.getElementById(`cnt-${t}`);
-        if (el) el.textContent = posts.filter(p => p.type === t).length;
+        if (el) el.textContent = activePosts.filter(p => p.type === t).length;
       });
+
+      const cntExcluded = document.getElementById("cnt-excluded");
+      if (cntExcluded) cntExcluded.textContent = excludedPosts.length;
 
       this.updateSelectedCount();
     },
@@ -922,13 +945,9 @@
             if (post) {
               const previousStatus = post.status;
               PostState.update(postId, { status: "excluded" });
-              
-              tr.classList.add("row-fade-out");
-              setTimeout(() => {
-                tr.remove();
-                UI.updateSelectedCount();
-                UI.updateCounts();
-              }, 400);
+              tr.remove();
+              UI.updateSelectedCount();
+              UI.updateCounts();
 
               APIClient.updatePostStatus(post, "excluded");
 
@@ -938,6 +957,17 @@
                 UI.renderTable(PostState.getAll(), PostState.getFilter());
                 UI.updateCounts();
               });
+            }
+          } else if (e.target.closest(".btn-restore-post")) {
+            const post = PostState.get(postId);
+            if (post) {
+              PostState.update(postId, { status: "scheduled" });
+              tr.remove();
+              UI.updateSelectedCount();
+              UI.updateCounts();
+
+              APIClient.updatePostStatus(post, "scheduled");
+              UI.showToast("Post restored to preview.", "success");
             }
           }
         });

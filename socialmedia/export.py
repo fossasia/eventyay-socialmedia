@@ -557,11 +557,13 @@ def sync_posts_to_db(event, request=None):
     posts = build_posts(event, request)
     tz = pytz.timezone(getattr(event, "timezone", None) or "UTC")
 
+    generated_entity_ids = set()
     for p in posts:
+        generated_entity_ids.add(str(p["id"]))
         dt_str = f"{p['post_date']} {p['post_time']}"
         try:
             naive_dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
-            scheduled_at = make_aware(naive_dt, tz)
+            scheduled_at = tz.localize(naive_dt)
         except Exception:
             continue
 
@@ -583,6 +585,16 @@ def sync_posts_to_db(event, request=None):
             db_post.offset_days = p.get("offset_days", 0)
             db_post.template_context = p.get("template_context", "default")
             db_post.save()
+
+    # Clean up obsolete scheduled/draft/excluded posts that are no longer generated
+    SocialMediaPost.objects.filter(
+        event=event,
+        status__in=[
+            SocialMediaPostStatus.DRAFT,
+            SocialMediaPostStatus.SCHEDULED,
+            SocialMediaPostStatus.EXCLUDED,
+        ],
+    ).exclude(entity_id__in=generated_entity_ids).delete()
 
     return posts
 

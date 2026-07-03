@@ -124,8 +124,6 @@ def preview_posts(request, organizer, event):
             entity_id = str(p["id"])
             db_p = db_posts.get(entity_id)
             if db_p:
-                if db_p.status == "excluded":
-                    continue
                 p["db_id"] = db_p.pk
                 p["status"] = db_p.status
                 p["is_pinned"] = db_p.is_pinned
@@ -179,13 +177,11 @@ def update_post(request, organizer, event):
             from datetime import datetime
 
             import pytz
-            from django.utils.timezone import make_aware
 
             tz = pytz.timezone(getattr(request.event, "timezone", None) or "UTC")
             dt_str = f"{post_date} {post_time}"
-            db_post.scheduled_at = make_aware(
-                datetime.strptime(dt_str, "%Y-%m-%d %H:%M"), tz
-            )
+            naive_dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
+            db_post.scheduled_at = tz.localize(naive_dt)
 
         if is_pinned is not None:
             db_post.is_pinned = is_pinned

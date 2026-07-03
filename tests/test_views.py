@@ -328,9 +328,16 @@ def test_post_exclusion_from_preview(
     assert response_update.status_code == 200
     assert response_update.json()["status"] == "ok"
 
-    # 4. Assert it is now filtered out of the preview
+    # 4. Assert it is returned with status "excluded"
     response_after = logged_in_organizer_client.get(url_preview)
     posts_after = response_after.json().get("posts", [])
-    assert not any(
-        p.get("id") == post.entity_id or p.get("db_id") == post.pk for p in posts_after
+    matched_post = next(
+        (
+            p
+            for p in posts_after
+            if p.get("id") == post.entity_id or p.get("db_id") == post.pk
+        ),
+        None,
     )
+    assert matched_post is not None
+    assert matched_post.get("status") == "excluded"
