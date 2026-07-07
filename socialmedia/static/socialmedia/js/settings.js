@@ -25,6 +25,14 @@
     linkedin: { label: "LinkedIn",    iconClass: "fa fa-linkedin",   colorClass: "plat-linkedin" },
   };
 
+  const PLATFORM_LIMITS = {
+    twitter: 280,
+    mastodon: 500,
+    telegram: 4096,
+    linkedin: 3000
+  };
+
+
   // ---- Helper functions ----
   const Helpers = {
     addDays(dateStr, days) {
@@ -119,15 +127,19 @@
       validate() {
         let pastCount = 0;
         let placeholderCount = 0;
+        let limitExceededCount = 0;
         const todayStr = Helpers.getLocalTodayStr();
 
         posts.forEach(p => {
           if (!p.enabled) return;
           if (p.post_date < todayStr) pastCount++;
           if (p.post_text.includes("{") || p.post_text.includes("}")) placeholderCount++;
+
+          const limit = PLATFORM_LIMITS[p.platform] || null;
+          if (limit && p.post_text.length > limit) limitExceededCount++;
         });
 
-        return { pastCount, placeholderCount };
+        return { pastCount, placeholderCount, limitExceededCount };
       }
     };
   })();
@@ -156,7 +168,7 @@
         return r.text();
       });
     },
-    exportCSV(posts) {
+    exportCSV(posts, format) {
       return fetch(Config.EXPORT_URL, {
         method: "POST",
         headers: {
@@ -164,7 +176,7 @@
           "X-CSRFToken": Config.CSRF_TOKEN,
           "X-Requested-With": "XMLHttpRequest",
         },
-        body: JSON.stringify({ posts })
+        body: JSON.stringify({ posts, format })
       }).then(r => {
         if (!r.ok) throw new Error(`Export failed: ${r.status}`);
         return r.blob();
@@ -489,8 +501,11 @@
       viewSpan.textContent = p.post_text;
       tdContent.appendChild(viewSpan);
 
+      const limit = PLATFORM_LIMITS[p.platform] || null;
+      const exceedsLimit = limit && p.post_text.length > limit;
+
       const editArea = document.createElement("textarea");
-      editArea.className = `post-text-edit${hasPlaceholder ? ' has-warning' : ''}`;
+      editArea.className = `post-text-edit${hasPlaceholder ? ' has-warning' : ''}${exceedsLimit ? ' has-error' : ''}`;
       editArea.dataset.postId = p.id;
       editArea.value = p.post_text;
       
@@ -498,8 +513,12 @@
       cWrap.className = "char-count-wrap";
       const charSpan = document.createElement("span");
       const numSpan = document.createElement("span");
-      numSpan.className = "char-count";
-      numSpan.textContent = p.post_text.length;
+      numSpan.className = `char-count${exceedsLimit ? ' has-warning' : ''}`;
+      if (limit) {
+        numSpan.textContent = `${p.post_text.length} / ${limit}`;
+      } else {
+        numSpan.textContent = p.post_text.length;
+      }
       charSpan.appendChild(numSpan);
       charSpan.appendChild(document.createTextNode(" characters"));
       cWrap.appendChild(charSpan);
@@ -650,11 +669,11 @@
       this.updateSelectedCount();
     },
 
-    renderValidationAlert(pastCount, placeholderCount) {
+    renderValidationAlert(pastCount, placeholderCount, limitExceededCount) {
       const alertContainer = document.getElementById("validation-alert-container");
       if (!alertContainer) return;
 
-      if (pastCount > 0 || placeholderCount > 0) {
+      if (pastCount > 0 || placeholderCount > 0 || limitExceededCount > 0) {
         const alertDiv = document.createElement("div");
         alertDiv.className = "alert alert-warning sm-validation-alert";
 
@@ -669,8 +688,11 @@
         if (placeholderCount > 0) {
           parts.push(`${placeholderCount} post(s) with unresolved placeholders (e.g. {tag})`);
         }
+        if (limitExceededCount > 0) {
+          parts.push(`${limitExceededCount} post(s) exceeding platform character limits`);
+        }
 
-        alertDiv.appendChild(document.createTextNode(parts.join(" and ") + ". Review highlighted rows before exporting."));
+        alertDiv.appendChild(document.createTextNode(parts.join(", ") + ". Review highlighted rows before exporting."));
         alertContainer.textContent = "";
         alertContainer.appendChild(alertDiv);
         alertContainer.style.display = "block";
@@ -819,8 +841,8 @@
     },
 
     triggerValidation() {
-      const { pastCount, placeholderCount } = PostState.validate();
-      UI.renderValidationAlert(pastCount, placeholderCount);
+      const { pastCount, placeholderCount, limitExceededCount } = PostState.validate();
+      UI.renderValidationAlert(pastCount, placeholderCount, limitExceededCount);
     },
 
     saveAndRegenerate(e) {
@@ -902,12 +924,15 @@
         return;
       }
 
-      APIClient.exportCSV(visiblePosts)
+      const presetSelect = document.getElementById("export-preset-select");
+      const exportFormat = presetSelect ? presetSelect.value : "generic";
+
+      APIClient.exportCSV(visiblePosts, exportFormat)
         .then(blob => {
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
           a.href = url;
-          a.download = "socialmedia_posts.csv";
+          a.download = `socialmedia_posts_${exportFormat}.csv`;
           document.body.appendChild(a);
           a.click();
           a.remove();
@@ -1046,7 +1071,22 @@
             const row = e.target.closest("tr");
             if (row) {
               const countSpan = row.querySelector(".char-count");
-              if (countSpan) countSpan.textContent = e.target.value.length;
+              if (countSpan) {
+                const post = PostState.get(postId);
+                const limit = PLATFORM_LIMITS[post.platform] || null;
+                if (limit) {
+                  countSpan.textContent = `${e.target.value.length} / ${limit}`;
+                  if (e.target.value.length > limit) {
+                    countSpan.classList.add("has-warning");
+                    e.target.classList.add("has-error");
+                  } else {
+                    countSpan.classList.remove("has-warning");
+                    e.target.classList.remove("has-error");
+                  }
+                } else {
+                  countSpan.textContent = e.target.value.length;
+                }
+              }
             }
           }
         });

@@ -926,23 +926,68 @@ def sync_posts_to_db(event, request=None):
 # ---------------------------------------------------------------------------
 
 
-def generate_csv_from_posts(posts):
+def generate_csv_from_posts(posts, format="generic"):
     """
     Accept a list of post dicts (already edited/filtered by the user in the UI)
-    and return a CSV string ready for import into social media scheduling tools.
+    and return a CSV string ready for import into social media scheduling tools,
+    formatted according to the selected format preset.
     Only rows where enabled=True are included.
     """
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["post_date", "post_time", "post_text", "media_url"])
-    for post in posts:
-        if post.get("enabled", True):
-            writer.writerow(
-                [
-                    post.get("post_date", ""),
-                    post.get("post_time", ""),
-                    post.get("post_text", ""),
-                    post.get("media_url", ""),
-                ]
-            )
+
+    if format == "postiz":
+        writer.writerow(["content", "date", "time", "media"])
+        for post in posts:
+            if post.get("enabled", True):
+                writer.writerow(
+                    [
+                        post.get("post_text", ""),
+                        post.get("post_date", ""),
+                        post.get("post_time", ""),
+                        post.get("media_url", ""),
+                    ]
+                )
+    elif format == "buffer":
+        writer.writerow(["text", "scheduled_at", "link", "image"])
+        for post in posts:
+            if post.get("enabled", True):
+                # Buffer expects date and time combined (e.g., "YYYY-MM-DD HH:MM")
+                date = post.get("post_date", "")
+                time = post.get("post_time", "")
+                scheduled_at = f"{date} {time}".strip() if date and time else (date or time)
+                writer.writerow(
+                    [
+                        post.get("post_text", ""),
+                        scheduled_at,
+                        "",  # link placeholder
+                        post.get("media_url", ""),
+                    ]
+                )
+    elif format == "hootsuite":
+        writer.writerow(["date", "time", "text", "link"])
+        for post in posts:
+            if post.get("enabled", True):
+                writer.writerow(
+                    [
+                        post.get("post_date", ""),
+                        post.get("post_time", ""),
+                        post.get("post_text", ""),
+                        post.get("media_url", ""),  # link maps to media_url
+                    ]
+                )
+    else:  # generic
+        writer.writerow(["post_date", "post_time", "post_text", "media_url"])
+        for post in posts:
+            if post.get("enabled", True):
+                writer.writerow(
+                    [
+                        post.get("post_date", ""),
+                        post.get("post_time", ""),
+                        post.get("post_text", ""),
+                        post.get("media_url", ""),
+                    ]
+                )
+
     return output.getvalue()
+

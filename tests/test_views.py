@@ -431,3 +431,57 @@ def test_no_platforms_fallback(organizer, event):
         assert post.get("platform") is None, (
             f"Expected no platform on post {post['id']}, got {post['platform']!r}"
         )
+
+
+@pytest.mark.django_db
+def test_export_csv_presets(logged_in_organizer_client, organizer, event, settings):
+    settings.SITE_URL = "https://testserver"
+    url = reverse(
+        "plugins:socialmedia:export",
+        kwargs={"organizer": organizer.slug, "event": event.slug},
+    )
+    payload_base = {
+        "posts": [
+            {
+                "enabled": True,
+                "post_date": "2026-06-20",
+                "post_time": "12:00",
+                "post_text": "Hello world!",
+                "media_url": "https://testserver/img.png",
+            }
+        ]
+    }
+
+    # Test Postiz preset
+    payload = payload_base.copy()
+    payload["format"] = "postiz"
+    response = logged_in_organizer_client.post(
+        url, data=json.dumps(payload), content_type="application/json"
+    )
+    assert response.status_code == 200
+    content = response.content.decode("utf-8")
+    assert "content,date,time,media" in content
+    assert "Hello world!,2026-06-20,12:00,https://testserver/img.png" in content
+
+    # Test Buffer preset
+    payload = payload_base.copy()
+    payload["format"] = "buffer"
+    response = logged_in_organizer_client.post(
+        url, data=json.dumps(payload), content_type="application/json"
+    )
+    assert response.status_code == 200
+    content = response.content.decode("utf-8")
+    assert "text,scheduled_at,link,image" in content
+    assert "Hello world!,2026-06-20 12:00,,https://testserver/img.png" in content
+
+    # Test Hootsuite preset
+    payload = payload_base.copy()
+    payload["format"] = "hootsuite"
+    response = logged_in_organizer_client.post(
+        url, data=json.dumps(payload), content_type="application/json"
+    )
+    assert response.status_code == 200
+    content = response.content.decode("utf-8")
+    assert "date,time,text,link" in content
+    assert "2026-06-20,12:00,Hello world!,https://testserver/img.png" in content
+

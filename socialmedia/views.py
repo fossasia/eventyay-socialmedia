@@ -218,11 +218,13 @@ def export_csv(request, organizer, event):
     try:
         body = json.loads(request.body)
         posts = body.get("posts", [])
+        export_format = body.get("format", "generic")
     except (json.JSONDecodeError, KeyError):
         return HttpResponse("Invalid request body.", status=400)
 
-    csv_data = generate_csv_from_posts(posts)
+    csv_data = generate_csv_from_posts(posts, export_format)
     filename = f"{request.event.slug}_socialmedia_posts.csv"
     response = HttpResponse(csv_data, content_type="text/csv; charset=utf-8")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
+

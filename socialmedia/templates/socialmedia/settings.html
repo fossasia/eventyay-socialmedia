@@ -114,10 +114,19 @@
   <!-- Sticky export bar -->
   <div class="export-bar">
     <span class="selected-count" id="export-count">0 {% trans "posts selected" %}</span>
-    <button id="btn-export" class="btn btn-primary btn-export">
-      <i class="fa fa-download"></i> {% trans "Export CSV" %}
-    </button>
+    <div style="display: inline-flex; align-items: center; gap: 8px;">
+      <select id="export-preset-select" class="form-control input-sm" style="width: 150px; display: inline-block;">
+        <option value="generic">{% trans "Generic CSV" %}</option>
+        <option value="postiz">{% trans "Postiz Preset" %}</option>
+        <option value="buffer">{% trans "Buffer Preset" %}</option>
+        <option value="hootsuite">{% trans "Hootsuite Preset" %}</option>
+      </select>
+      <button id="btn-export" class="btn btn-primary btn-export">
+        <i class="fa fa-download"></i> {% trans "Export CSV" %}
+      </button>
+    </div>
   </div>
+
 
   <!-- ================================================================
        Advanced Settings (collapsible)
