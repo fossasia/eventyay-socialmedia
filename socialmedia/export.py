@@ -88,12 +88,21 @@ def _get_template(event, key):
 
 
 def _get_offset(event, key, default):
-    raw = event.settings.get(f"socialmedia_{key}_offset", as_type=str)
-    if raw is None:
+    raw = event.settings.get(f"socialmedia_{key}_offset")
+    if raw is None or raw == "":
         return default
+    if isinstance(raw, int):
+        return raw
+    if isinstance(raw, float):
+        return int(raw)
+
+    val_str = str(raw).strip()
+    if not val_str:
+        return default
+
     # Handle comma-separated values saved by multi-offset forms
     # (e.g. "14, 7") — take only the first entry for single-offset mode.
-    first = raw.split(",")[0].strip()
+    first = val_str.split(",")[0].strip()
     try:
         return int(first)
     except (ValueError, TypeError):
@@ -245,9 +254,7 @@ def build_posts(event, request=None):
                 submissions_mgr.filter(**filters).prefetch_related("speakers")
             )
 
-            schedule = getattr(event, "current_schedule", None) or getattr(
-                event, "wip_schedule", None
-            )
+            schedule = getattr(event, "current_schedule", None)
             talks_by_sub = {}
             if schedule:
                 talk_qs = schedule.talks.filter(
