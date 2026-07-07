@@ -45,14 +45,31 @@
 
   <!-- Action bar -->
   <div class="sm-actions">
-    <button id="btn-select-all" class="btn btn-default btn-sm">
-      <i class="fa fa-check-square-o"></i> {% trans "Select All" %}
-    </button>
-    <button id="btn-deselect-all" class="btn btn-default btn-sm">
-      <i class="fa fa-square-o"></i> {% trans "Deselect All" %}
-    </button>
+
+    <!-- Bulk schedule preset dropdown -->
+    <div class="bulk-schedule-wrap">
+      <select id="bulk-schedule-preset" class="form-control input-sm bulk-schedule-select">
+        <option value="">{% trans "Schedule preset..." %}</option>
+        <option value="0">{% trans "On event / session day" %}</option>
+        <option value="-1">{% trans "1 day before" %}</option>
+        <option value="-2">{% trans "2 days before" %}</option>
+        <option value="-7">{% trans "1 week before (7 days)" %}</option>
+        <option value="-14">{% trans "2 weeks before (14 days)" %}</option>
+        <option value="-30">{% trans "1 month before (30 days)" %}</option>
+        <option value="custom">{% trans "Custom..." %}</option>
+      </select>
+      <div id="bulk-schedule-custom-inputs" class="bulk-schedule-custom-inputs" style="display: none; align-items: center; gap: 4px;">
+        <input type="date" id="bulk-schedule-custom-date" class="form-control input-sm" style="width: 130px; display: inline-block;">
+        <input type="time" id="bulk-schedule-custom-time" class="form-control input-sm" style="width: 100px; display: inline-block;" value="09:00">
+      </div>
+      <button id="btn-apply-schedule" class="btn btn-default btn-sm" type="button">
+        {% trans "Apply" %}
+      </button>
+    </div>
     <span class="sm-count" id="selected-count">–</span>
   </div>
+
+  <div id="validation-alert-container" style="display: none; margin-bottom: 12px;"></div>
 
   <!-- Post table -->
   <div class="sm-table-wrap">
@@ -61,9 +78,12 @@
         <tr>
           <th><input type="checkbox" id="chk-all" title="{% trans 'Toggle all' %}"></th>
           <th>{% trans "Type" %}</th>
-          <th>{% trans "Date" %}</th>
-          <th>{% trans "Time" %}</th>
-          <th>{% trans "Post Text" %} <span style="font-weight:400;color:#aaa;font-size:11px;">— {% trans "click to edit" %}</span></th>
+          <th><span title="{% trans 'Official date & time of the session on the event agenda schedule.' %}" class="help-tooltip">{% trans "Schedule Date & Time" %}</span></th>
+          <th>
+            <span title="{% trans 'The date & time this social media post is scheduled to be published.' %}" class="help-tooltip">{% trans "Post Schedule Date & Time" %}</span>
+            <div class="th-timezone">{{ event.timezone }}</div>
+          </th>
+          <th>{% trans "Content" %} <span class="th-hint">— {% trans "click to edit" %}</span></th>
         </tr>
       </thead>
       <tbody id="posts-tbody">
@@ -72,8 +92,8 @@
         <tr class="skeleton-row">
           <td><div class="skeleton-bar" style="width:16px;height:16px;border-radius:3px;"></div></td>
           <td><div class="skeleton-bar" style="width:60px;"></div></td>
-          <td><div class="skeleton-bar" style="width:80px;"></div></td>
-          <td><div class="skeleton-bar" style="width:50px;"></div></td>
+          <td><div class="skeleton-bar" style="width:110px;"></div></td>
+          <td><div class="skeleton-bar" style="width:125px;"></div></td>
           <td><div class="skeleton-bar" style="width:100%;"></div></td>
         </tr>
         {% endfor %}

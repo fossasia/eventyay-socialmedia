@@ -77,7 +77,8 @@ def test_socialmedia_settings_view_post(
 
     assert response.status_code == 302
 
-    with scope(organizer=organizer):
+    with scope(organizer=organizer, event=event):
+        event.refresh_from_db()
         event.settings.flush()
         assert event.settings.get("socialmedia_default_hashtags") == "#pytest #testing"
         assert event.settings.get("socialmedia_cfp_offset") == "5"
@@ -135,3 +136,62 @@ def test_export_csv_view(logged_in_organizer_client, organizer, event, settings)
     content = response.content.decode("utf-8")
     assert "Hello world!" in content
     assert "Skipped post" not in content
+
+
+@pytest.mark.django_db
+def test_confirmed_submissions_and_schedule_metadata(
+    logged_in_organizer_client, organizer, event, settings
+):
+    settings.SITE_URL = "https://testserver"
+    try:
+        from eventyay.base.models.submission import Submission, SubmissionStates
+    except ImportError:
+        pytest.skip("Submission model not available")
+
+    with scope(organizer=organizer, event=event):
+        try:
+            from eventyay.base.models.type import SubmissionType
+        except ImportError:
+            from eventyay.base.models import SubmissionType
+
+        sub_type = event.submission_types.first() or SubmissionType.objects.create(
+            event=event, name="Talk"
+        )
+        _sub_confirmed = Submission.objects.create(
+            event=event,
+            submission_type=sub_type,
+            title="Confirmed Session",
+            state=SubmissionStates.CONFIRMED,
+            code="CONF1",
+        )
+        _sub_accepted = Submission.objects.create(
+            event=event,
+            submission_type=sub_type,
+            title="Accepted Only Session",
+            state=SubmissionStates.ACCEPTED,
+            code="ACCP1",
+        )
+
+    url = reverse(
+        "plugins:socialmedia:preview",
+        kwargs={"organizer": organizer.slug, "event": event.slug},
+    )
+    response = logged_in_organizer_client.get(url)
+    assert response.status_code == 200
+    posts = response.json().get("posts", [])
+
+    # Check fields in posts
+    for post in posts:
+        assert "event_schedule_display" in post
+        assert "is_schedule_associated" in post
+
+    session_posts = [p for p in posts if p["type"] == "session"]
+    # Should include confirmed session but not accepted session
+    titles = [p["post_text"] for p in session_posts]
+    assert any("Confirmed Session" in t for t in titles)
+    assert not any("Accepted Only Session" in t for t in titles)
+
+    # Check unscheduled status
+    conf_post = next(p for p in session_posts if "Confirmed Session" in p["post_text"])
+    assert conf_post["event_schedule_display"] == "Unscheduled"
+    assert conf_post["is_schedule_associated"] is True

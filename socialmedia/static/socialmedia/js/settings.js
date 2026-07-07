@@ -1,341 +1,854 @@
 (function () {
-  const configEl = document.getElementById("socialmedia-config");
-  if (!configEl) return;
-  const config = JSON.parse(configEl.textContent);
+  // ---- Config module ----
+  const Config = (function () {
+    const configEl = document.getElementById("socialmedia-config");
+    if (!configEl) return null;
+    const config = JSON.parse(configEl.textContent);
 
-  const PREVIEW_URL = config.previewUrl;
-  const EXPORT_URL  = config.exportUrl;
-  const CSRF_TOKEN  = config.csrfToken;
-  const TRANS_CLICK_TO_EDIT = config.transClickToEdit || "Click to edit · Ctrl+Enter to save";
-  const TRANS_SELECT_AT_LEAST_ONE = config.transSelectAtLeastOne || "Please select at least one post to export.";
+    return {
+      PREVIEW_URL: config.previewUrl,
+      EXPORT_URL: config.exportUrl,
+      CSRF_TOKEN: config.csrfToken,
+      TRANS_CLICK_TO_EDIT: config.transClickToEdit || "Click to edit · Ctrl+Enter to save",
+      TRANS_SELECT_AT_LEAST_ONE: config.transSelectAtLeastOne || "Please select at least one post to export.",
+    };
+  })();
 
-  let allPosts = [];   // full data from server
-  let activeFilter = "all";
+  if (!Config) return;
 
-  // ---- Load posts from server ----
-  function loadPosts() {
-    const btn = document.getElementById("btn-regenerate");
-    if (!btn) return;
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa fa-refresh"></i> Loading…';
-    showSkeleton();
-
-    fetch(PREVIEW_URL, { headers: { "X-Requested-With": "XMLHttpRequest" } })
-      .then(r => r.json())
-      .then(data => {
-        allPosts = (data.posts || []).map(p => ({ ...p, enabled: true }));
-        renderTable(allPosts, activeFilter);
-        updateCounts();
-      })
-      .catch(err => {
-        const tbody = document.getElementById("posts-tbody");
-        if (tbody) {
-          tbody.innerHTML =
-            `<tr><td colspan="5"><div class="sm-empty"><i class="fa fa-exclamation-triangle"></i>
-            Failed to load posts. ${err.message}</div></td></tr>`;
-        }
-      })
-      .finally(() => {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa fa-refresh"></i> Regenerate';
-      });
-  }
-
-  // ---- Render table rows ----
-  function renderTable(posts, filter) {
-    const tbody = document.getElementById("posts-tbody");
-    if (!tbody) return;
-    const visible = filter === "all" ? posts : posts.filter(p => p.type === filter);
-
-    if (!visible.length) {
-      tbody.innerHTML = `<tr><td colspan="5"><div class="sm-empty">
-        <i class="fa fa-share-alt"></i>
-        <div>No posts found for this filter.</div>
-        <small>Check that your event has the relevant data (CFP deadline, sessions, tickets).</small>
-      </div></td></tr>`;
-      updateSelectedCount();
-      return;
+  // ---- Helper functions ----
+  const Helpers = {
+    addDays(dateStr, days) {
+      const parts = dateStr.split('-');
+      const date = new Date(Date.UTC(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])));
+      date.setUTCDate(date.getUTCDate() + days);
+      return date.toISOString().split('T')[0];
+    },
+    getLocalTodayStr() {
+      const now = new Date();
+      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     }
+  };
 
-    tbody.innerHTML = visible.map((p, i) => {
-      const idx = allPosts.indexOf(p);
-      const safeType = escHtml(p.type);
-      return `
-      <tr data-idx="${idx}" data-type="${safeType}" class="${p.enabled ? "" : "row-disabled"}">
-        <td>
-          <input type="checkbox" class="row-chk" data-idx="${idx}"
-            ${p.enabled ? "checked" : ""}>
-        </td>
-        <td><span class="type-badge type-${safeType}">${escHtml(p.type_label)}</span></td>
-        <td class="dt-cell">
-          <div class="dt-date">${escHtml(p.post_date)}</div>
-          <div class="dt-time">${escHtml(p.post_time)}</div>
-        </td>
-        <td class="dt-cell">
-          <input type="time" class="form-control input-sm sm-time-input" value="${escHtml(p.post_time)}">
-        </td>
-        <td class="post-text-cell">
-          <span class="post-text-view" data-idx="${idx}">${escHtml(p.post_text)}</span>
-          <textarea class="post-text-edit" data-idx="${idx}">${escHtml(p.post_text)}</textarea>
-          <span class="edit-hint">${escHtml(TRANS_CLICK_TO_EDIT)}</span>
-        </td>
-      </tr>`;
-    }).join("");
+  // ---- State Store module ----
+  const PostState = (function () {
+    let posts = [];
+    let activeFilter = "all";
 
-    updateSelectedCount();
-  }
-
-  function syncTimeDisplay(idx, val) {
-    const view = document.querySelector(`.post-text-view[data-idx="${idx}"]`);
-    if (view) {
-      const row = view.closest("tr");
-      const dtDate = row.querySelector(".dt-date");
-      if (dtDate) {
-        row.querySelector(".dt-time").textContent = val;
-      }
-    }
-  }
-
-  // ---- Inline editing ----
-  function startEdit(idx, span) {
-    const ta = span.nextElementSibling;
-    span.classList.add("editing");
-    ta.classList.add("editing");
-    ta.style.display = "block";
-    ta.focus();
-    ta.setSelectionRange(ta.value.length, ta.value.length);
-  }
-
-  // Focusout / blur
-  function finishEdit(idx, ta) {
-    allPosts[idx].post_text = ta.value;
-    const span = ta.previousElementSibling;
-    span.textContent = ta.value;
-    span.classList.remove("editing");
-    ta.classList.remove("editing");
-    ta.style.display = "none";
-  }
-
-  // ---- Toggle row ----
-  function toggleRow(idx, enabled) {
-    allPosts[idx].enabled = enabled;
-    const row = document.querySelector(`tr[data-idx="${idx}"]`);
-    if (row) row.classList.toggle("row-disabled", !enabled);
-    updateSelectedCount();
-  }
-
-  // ---- Select all / none ----
-  function selectAll(val) {
-    allPosts.forEach((p, i) => { p.enabled = val; });
-    document.querySelectorAll(".row-chk").forEach(chk => {
-      const idx = parseInt(chk.dataset.idx);
-      chk.checked = val;
-      const row = chk.closest("tr");
-      if (row) row.classList.toggle("row-disabled", !val);
-    });
-    const chkAll = document.getElementById("chk-all");
-    if (chkAll) {
-      chkAll.checked = val;
-      chkAll.indeterminate = false;
-    }
-    updateSelectedCount();
-  }
-
-  // ---- Filter ----
-  function filterPosts(type, btn) {
-    activeFilter = type;
-    document.querySelectorAll(".sm-filter-btn").forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-    renderTable(allPosts, type);
-  }
-
-  // ---- Update counters ----
-  function updateCounts() {
-    const types = ["cfp", "speaker", "session", "ticket", "schedule"];
-    const cntAll = document.getElementById("cnt-all");
-    if (cntAll) cntAll.textContent = allPosts.length;
-    types.forEach(t => {
-      const el = document.getElementById(`cnt-${t}`);
-      if (el) el.textContent = allPosts.filter(p => p.type === t).length;
-    });
-    updateSelectedCount();
-  }
-
-  function updateSelectedCount() {
-    const n = allPosts.filter(p => p.enabled).length;
-    const total = allPosts.length;
-    const selCount = document.getElementById("selected-count");
-    if (selCount) selCount.textContent = `${n} / ${total} selected`;
-    
-    const expCount = document.getElementById("export-count");
-    if (expCount) expCount.textContent = `${n} post${n !== 1 ? "s" : ""} selected`;
-
-    const allChk = document.getElementById("chk-all");
-    if (allChk) {
-      allChk.checked = n === total && total > 0;
-      allChk.indeterminate = n > 0 && n < total;
-    }
-  }
-
-  // ---- Export CSV ----
-  function exportCSV() {
-    const selected = allPosts.filter(p => p.enabled);
-    if (!selected.length) {
-      alert(TRANS_SELECT_AT_LEAST_ONE);
-      return;
-    }
-
-    fetch(EXPORT_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRFToken": CSRF_TOKEN,
-        "X-Requested-With": "XMLHttpRequest",
+    return {
+      init(incomingPosts) {
+        posts = incomingPosts;
       },
-      body: JSON.stringify({ posts: allPosts }),
-    })
-      .then(r => {
-        if (!r.ok) throw new Error("Export failed: " + r.status);
+      get(id) {
+        return posts.find(p => p.id == id) || null;
+      },
+      getAll() {
+        return posts;
+      },
+      getFiltered() {
+        if (activeFilter === "all") return posts;
+        return posts.filter(p => p.type === activeFilter);
+      },
+      getFilter() {
+        return activeFilter;
+      },
+      setFilter(filter) {
+        activeFilter = filter;
+      },
+      update(id, updates) {
+        const post = this.get(id);
+        if (post) {
+          Object.assign(post, updates);
+        }
+        return post;
+      },
+      toggle(id, enabled) {
+        return this.update(id, { enabled });
+      },
+      selectAll(enabled) {
+        posts.forEach(p => { p.enabled = enabled; });
+      },
+      applyBulkPreset(offsetDays) {
+        let updatedCount = 0;
+        let skippedCount = 0;
+
+        posts.forEach(p => {
+          if (!p.enabled) return;
+          if (p.reference_date) {
+            p.post_date = Helpers.addDays(p.reference_date, offsetDays);
+            updatedCount++;
+          } else {
+            skippedCount++;
+          }
+        });
+
+        return { updatedCount, skippedCount };
+      },
+      applyBulkCustom(customDate, customTime) {
+        let updatedCount = 0;
+        posts.forEach(p => {
+          if (!p.enabled) return;
+          p.post_date = customDate;
+          p.post_time = customTime;
+          updatedCount++;
+        });
+        return { updatedCount };
+      },
+      validate() {
+        let pastCount = 0;
+        let placeholderCount = 0;
+        const todayStr = Helpers.getLocalTodayStr();
+
+        posts.forEach(p => {
+          if (!p.enabled) return;
+          if (p.post_date < todayStr) pastCount++;
+          if (p.post_text.includes("{") || p.post_text.includes("}")) placeholderCount++;
+        });
+
+        return { pastCount, placeholderCount };
+      }
+    };
+  })();
+
+  // ---- API Client module ----
+  const APIClient = {
+    fetchPreview() {
+      return fetch(Config.PREVIEW_URL, {
+        headers: { "X-Requested-With": "XMLHttpRequest" }
+      }).then(r => {
+        if (!r.ok) throw new Error(`HTTP error ${r.status}`);
+        return r.json();
+      });
+    },
+    saveSettings(formData) {
+      return fetch("", {
+        method: "POST",
+        headers: {
+          "X-CSRFToken": Config.CSRF_TOKEN,
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: formData
+      }).then(r => {
+        if (!r.ok) throw new Error("Save failed");
+        if (!r.redirected) throw new Error("Form validation failed");
+        return r.text();
+      });
+    },
+    exportCSV(posts) {
+      return fetch(Config.EXPORT_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": Config.CSRF_TOKEN,
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: JSON.stringify({ posts })
+      }).then(r => {
+        if (!r.ok) throw new Error(`Export failed: ${r.status}`);
         return r.blob();
-      })
-      .then(blob => {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "socialmedia_posts.csv";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-      })
-      .catch(err => alert("Export error: " + err.message));
-  }
-
-  // ---- Advanced settings toggle ----
-  function toggleAdv() {
-    const body = document.getElementById("adv-body");
-    const hdr  = document.getElementById("adv-toggle");
-    if (body && hdr) {
-      const open = body.classList.toggle("open");
-      hdr.classList.toggle("open", open);
-    }
-  }
-
-  // ---- Skeleton helper ----
-  function showSkeleton() {
-    const tbody = document.getElementById("posts-tbody");
-    if (tbody) {
-      tbody.innerHTML = `
-        ${[...Array(5)].map(() => `<tr class="skeleton-row">
-          <td><div class="skeleton-bar" style="width:16px;height:16px;border-radius:3px;"></div></td>
-          <td><div class="skeleton-bar" style="width:60px;"></div></td>
-          <td><div class="skeleton-bar" style="width:80px;"></div></td>
-          <td><div class="skeleton-bar" style="width:50px;"></div></td>
-          <td><div class="skeleton-bar"></div></td>
-        </tr>`).join("")}`;
-    }
-  }
-
-  function escHtml(str) {
-    return String(str)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-  }
-
-  // ---- Event Bindings ----
-  function bindEvents() {
-    const btnRegen = document.getElementById("btn-regenerate");
-    if (btnRegen) btnRegen.addEventListener("click", loadPosts);
-
-    const btnSaveRegen = document.getElementById("btn-save-regenerate");
-    if (btnSaveRegen) btnSaveRegen.addEventListener("click", loadPosts);
-
-    const filterPills = document.getElementById("filter-pills");
-    if (filterPills) {
-      filterPills.addEventListener("click", function (e) {
-        const btn = e.target.closest(".sm-filter-btn");
-        if (btn) {
-          filterPosts(btn.dataset.type, btn);
-        }
       });
     }
+  };
 
-    const btnSelectAll = document.getElementById("btn-select-all");
-    if (btnSelectAll) {
-      btnSelectAll.addEventListener("click", () => selectAll(true));
-    }
+  // ---- UI module ----
+  const UI = {
+    setWithIcon(el, text, iconClass) {
+      if (!el) return;
+      el.textContent = "";
+      if (iconClass) {
+        const icon = document.createElement("i");
+        icon.className = iconClass;
+        el.appendChild(icon);
+        el.appendChild(document.createTextNode(" " + text));
+      } else {
+        el.appendChild(document.createTextNode(text));
+      }
+    },
 
-    const btnDeselectAll = document.getElementById("btn-deselect-all");
-    if (btnDeselectAll) {
-      btnDeselectAll.addEventListener("click", () => selectAll(false));
-    }
+    showToast(msg, type = "success") {
+      const toast = document.createElement("div");
+      toast.className = `sm-toast alert alert-${type === "success" ? "success" : "warning"}`;
 
-    const chkAll = document.getElementById("chk-all");
-    if (chkAll) {
-      chkAll.addEventListener("change", function () {
-        selectAll(this.checked);
-      });
-    }
+      const icon = document.createElement("i");
+      icon.className = `fa ${type === "success" ? "fa-check-circle" : "fa-warning"}`;
+      toast.appendChild(icon);
+      toast.appendChild(document.createTextNode(msg));
 
-    const btnExport = document.getElementById("btn-export");
-    if (btnExport) {
-      btnExport.addEventListener("click", exportCSV);
-    }
+      document.body.appendChild(toast);
+      setTimeout(() => {
+        toast.style.transition = "opacity 0.5s ease";
+        toast.style.opacity = "0";
+        setTimeout(() => toast.remove(), 500);
+      }, 3000);
+    },
 
-    const advToggle = document.getElementById("adv-toggle");
-    if (advToggle) {
-      advToggle.addEventListener("click", toggleAdv);
-    }
+    showSkeleton() {
+      const tbody = document.getElementById("posts-tbody");
+      if (!tbody) return;
+      tbody.textContent = "";
 
-    // Attach tbody event delegation
-    const tbody = document.getElementById("posts-tbody");
-    if (tbody) {
-      tbody.addEventListener("click", function (e) {
-        if (e.target.classList.contains("post-text-view")) {
-          const idx = parseInt(e.target.dataset.idx);
-          startEdit(idx, e.target);
-        }
-      });
+      for (let i = 0; i < 5; i++) {
+        const tr = document.createElement("tr");
+        tr.className = "skeleton-row";
 
-      tbody.addEventListener("change", function (e) {
-        if (e.target.classList.contains("row-chk")) {
-          const idx = parseInt(e.target.dataset.idx);
-          toggleRow(idx, e.target.checked);
-        } else if (e.target.classList.contains("sm-time-input")) {
-          const row = e.target.closest("tr");
-          const idx = parseInt(row.dataset.idx);
-          allPosts[idx].post_time = e.target.value;
-          syncTimeDisplay(idx, e.target.value);
-        }
-      });
+        const tdChk = document.createElement("td");
+        const bChk = document.createElement("div");
+        bChk.className = "skeleton-bar";
+        bChk.style.width = "16px";
+        bChk.style.height = "16px";
+        bChk.style.borderRadius = "3px";
+        tdChk.appendChild(bChk);
+        tr.appendChild(tdChk);
 
-      tbody.addEventListener("keydown", function (e) {
-        if (e.target.classList.contains("post-text-edit")) {
-          if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-            e.target.blur();
+        const tdType = document.createElement("td");
+        const bType = document.createElement("div");
+        bType.className = "skeleton-bar";
+        bType.style.width = "60px";
+        tdType.appendChild(bType);
+        tr.appendChild(tdType);
+
+        const tdSched = document.createElement("td");
+        const bSched = document.createElement("div");
+        bSched.className = "skeleton-bar";
+        bSched.style.width = "110px";
+        tdSched.appendChild(bSched);
+        tr.appendChild(tdSched);
+
+        const tdInput = document.createElement("td");
+        const bInput = document.createElement("div");
+        bInput.className = "skeleton-bar";
+        bInput.style.width = "125px";
+        tdInput.appendChild(bInput);
+        tr.appendChild(tdInput);
+
+        const tdText = document.createElement("td");
+        const bText = document.createElement("div");
+        bText.className = "skeleton-bar";
+        tdText.appendChild(bText);
+        tr.appendChild(tdText);
+
+        tbody.appendChild(tr);
+      }
+    },
+
+    createPostRow(p, todayStr) {
+      const isDateModified = p.post_date !== p.original_post_date;
+      const isTimeModified = p.post_time !== p.original_post_time;
+      const isTextModified = p.post_text !== p.default_text;
+
+      const hasPlaceholder = p.post_text.includes("{") || p.post_text.includes("}");
+      const isPast = p.post_date < todayStr;
+
+      const tr = document.createElement("tr");
+      tr.dataset.postId = p.id;
+      tr.dataset.type = p.type;
+      tr.className = p.enabled ? "" : "row-disabled";
+
+      const tdChk = document.createElement("td");
+      const chk = document.createElement("input");
+      chk.type = "checkbox";
+      chk.className = "row-chk";
+      chk.dataset.postId = p.id;
+      chk.checked = p.enabled;
+      tdChk.appendChild(chk);
+      tr.appendChild(tdChk);
+
+      const tdType = document.createElement("td");
+      const typeSpan = document.createElement("span");
+      typeSpan.className = `type-badge type-${p.type}`;
+      typeSpan.textContent = p.type_label;
+      tdType.appendChild(typeSpan);
+      tr.appendChild(tdType);
+
+      const tdSched = document.createElement("td");
+      tdSched.className = "event-schedule-cell";
+      if (p.is_schedule_associated) {
+        if (p.event_schedule_display === "Unscheduled") {
+          const spanUn = document.createElement("span");
+          spanUn.className = "sched-badge sched-unscheduled";
+          this.setWithIcon(spanUn, "Unscheduled", "fa fa-clock-o");
+          tdSched.appendChild(spanUn);
+        } else if (p.event_schedule_display) {
+          const parts = p.event_schedule_display.split(" ");
+          if (parts.length >= 3) {
+            const dateStr = parts.slice(0, 3).join(" ");
+            const timeStr = parts.slice(3).join(" ");
+
+            const box = document.createElement("div");
+            box.className = "sched-box sched-active";
+
+            const dRow = document.createElement("div");
+            dRow.className = "sched-date-row";
+            this.setWithIcon(dRow, dateStr, "fa fa-calendar");
+
+            const tRow = document.createElement("div");
+            tRow.className = "sched-time-row";
+            this.setWithIcon(tRow, timeStr, "fa fa-clock-o");
+
+            box.appendChild(dRow);
+            box.appendChild(tRow);
+            tdSched.appendChild(box);
+          } else {
+            const spanAct = document.createElement("span");
+            spanAct.className = "sched-badge sched-active";
+            this.setWithIcon(spanAct, p.event_schedule_display, "fa fa-calendar");
+            tdSched.appendChild(spanAct);
           }
         }
+      } else {
+        const spanNa = document.createElement("span");
+        spanNa.className = "sched-badge sched-na";
+        spanNa.textContent = "N/A";
+        tdSched.appendChild(spanNa);
+      }
+      tr.appendChild(tdSched);
+
+      const tdPostSched = document.createElement("td");
+      const wrap = document.createElement("div");
+      wrap.className = "post-schedule-cell-wrap";
+
+      const dateIn = document.createElement("input");
+      dateIn.type = "date";
+      dateIn.className = `form-control input-sm sm-date-input${isDateModified ? ' is-modified' : ''}`;
+      dateIn.dataset.postId = p.id;
+      dateIn.value = p.post_date;
+      wrap.appendChild(dateIn);
+
+      const timeIn = document.createElement("input");
+      timeIn.type = "time";
+      timeIn.className = `form-control input-sm sm-time-input${isTimeModified ? ' is-modified' : ''}`;
+      timeIn.dataset.postId = p.id;
+      timeIn.value = p.post_time;
+      wrap.appendChild(timeIn);
+
+      if (isDateModified || isTimeModified) {
+        const mod = document.createElement("div");
+        mod.className = "is-modified-label";
+        mod.textContent = "Modified";
+        wrap.appendChild(mod);
+      }
+
+      if (isPast) {
+        const warn = document.createElement("div");
+        warn.className = "validation-warning-badge";
+        this.setWithIcon(warn, "Scheduled in past", "fa fa-exclamation-triangle");
+        wrap.appendChild(warn);
+      }
+      tdPostSched.appendChild(wrap);
+      tr.appendChild(tdPostSched);
+
+      const tdContent = document.createElement("td");
+      tdContent.className = "post-text-cell";
+
+      const viewSpan = document.createElement("span");
+      viewSpan.className = `post-text-view${isTextModified ? ' is-modified' : ''}`;
+      viewSpan.dataset.postId = p.id;
+      viewSpan.tabIndex = 0;
+      viewSpan.textContent = p.post_text;
+      tdContent.appendChild(viewSpan);
+
+      const editArea = document.createElement("textarea");
+      editArea.className = `post-text-edit${hasPlaceholder ? ' has-warning' : ''}`;
+      editArea.dataset.postId = p.id;
+      editArea.value = p.post_text;
+      
+      const cWrap = document.createElement("div");
+      cWrap.className = "char-count-wrap";
+      const charSpan = document.createElement("span");
+      const numSpan = document.createElement("span");
+      numSpan.className = "char-count";
+      numSpan.textContent = p.post_text.length;
+      charSpan.appendChild(numSpan);
+      charSpan.appendChild(document.createTextNode(" characters"));
+      cWrap.appendChild(charSpan);
+
+      if (isTextModified) {
+        const revertBtn = document.createElement("button");
+        revertBtn.className = "btn-revert-text";
+        revertBtn.dataset.postId = p.id;
+        revertBtn.type = "button";
+        this.setWithIcon(revertBtn, "Revert to default", "fa fa-undo");
+        cWrap.appendChild(revertBtn);
+      }
+      tdContent.appendChild(cWrap);
+
+      if (hasPlaceholder) {
+        const warn = document.createElement("div");
+        warn.className = "validation-warning-badge";
+        this.setWithIcon(warn, "Unresolved placeholders", "fa fa-exclamation-triangle");
+        tdContent.appendChild(warn);
+      }
+
+      tdContent.appendChild(editArea);
+      tr.appendChild(tdContent);
+      return tr;
+    },
+
+    renderTable(posts, filter) {
+      const tbody = document.getElementById("posts-tbody");
+      if (!tbody) return;
+      tbody.textContent = "";
+
+      const visible = filter === "all" ? posts : posts.filter(p => p.type === filter);
+
+      if (!visible.length) {
+        const tr = document.createElement("tr");
+        const td = document.createElement("td");
+        td.colSpan = 5;
+
+        const emptyDiv = document.createElement("div");
+        emptyDiv.className = "sm-empty";
+        
+        const icon = document.createElement("i");
+        icon.className = "fa fa-share-alt";
+        emptyDiv.appendChild(icon);
+
+        const heading = document.createElement("div");
+        heading.textContent = "No posts found for this filter.";
+        emptyDiv.appendChild(heading);
+
+        const desc = document.createElement("small");
+        desc.textContent = "Check that your event has the relevant data (CFP deadline, sessions, tickets).";
+        emptyDiv.appendChild(desc);
+
+        td.appendChild(emptyDiv);
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+
+        this.updateSelectedCount();
+        return;
+      }
+
+      const todayStr = Helpers.getLocalTodayStr();
+      const fragment = document.createDocumentFragment();
+      visible.forEach(p => {
+        fragment.appendChild(this.createPostRow(p, todayStr));
+      });
+      tbody.appendChild(fragment);
+
+      this.updateSelectedCount();
+    },
+
+    updateCounts() {
+      const posts = PostState.getAll();
+      const types = ["cfp", "speaker", "session", "ticket", "schedule"];
+
+      const cntAll = document.getElementById("cnt-all");
+      if (cntAll) cntAll.textContent = posts.length;
+
+      types.forEach(t => {
+        const el = document.getElementById(`cnt-${t}`);
+        if (el) el.textContent = posts.filter(p => p.type === t).length;
       });
 
-      tbody.addEventListener("focusout", function (e) {
-        if (e.target.classList.contains("post-text-edit")) {
-          const idx = parseInt(e.target.dataset.idx);
-          finishEdit(idx, e.target);
+      this.updateSelectedCount();
+    },
+
+    updateSelectedCount() {
+      const posts = PostState.getAll();
+      const n = posts.filter(p => p.enabled).length;
+      const total = posts.length;
+
+      const selCount = document.getElementById("selected-count");
+      if (selCount) selCount.textContent = `${n} / ${total} selected`;
+
+      const expCount = document.getElementById("export-count");
+      if (expCount) expCount.textContent = `${n} post${n !== 1 ? "s" : ""} selected`;
+
+      const allChk = document.getElementById("chk-all");
+      if (allChk) {
+        allChk.checked = n === total && total > 0;
+        allChk.indeterminate = n > 0 && n < total;
+      }
+    },
+
+    updateRow(id) {
+      const post = PostState.get(id);
+      if (!post) return;
+
+      const row = document.querySelector(`tr[data-post-id="${id}"]`);
+      if (!row) return;
+
+      const todayStr = Helpers.getLocalTodayStr();
+      const newRow = this.createPostRow(post, todayStr);
+      row.replaceWith(newRow);
+
+      this.updateSelectedCount();
+    },
+
+    renderValidationAlert(pastCount, placeholderCount) {
+      const alertContainer = document.getElementById("validation-alert-container");
+      if (!alertContainer) return;
+
+      if (pastCount > 0 || placeholderCount > 0) {
+        const alertDiv = document.createElement("div");
+        alertDiv.className = "alert alert-warning sm-validation-alert";
+
+        const strong = document.createElement("strong");
+        strong.textContent = "Warning: ";
+        alertDiv.appendChild(strong);
+
+        const parts = [];
+        if (pastCount > 0) {
+          parts.push(`${pastCount} active post(s) scheduled in the past`);
         }
-      });
-    }
-  }
+        if (placeholderCount > 0) {
+          parts.push(`${placeholderCount} post(s) with unresolved placeholders (e.g. {tag})`);
+        }
 
-  // Auto-load and bind on page ready
+        alertDiv.appendChild(document.createTextNode(parts.join(" and ") + ". Review highlighted rows before exporting."));
+        alertContainer.textContent = "";
+        alertContainer.appendChild(alertDiv);
+        alertContainer.style.display = "block";
+      } else {
+        alertContainer.style.display = "none";
+        alertContainer.textContent = "";
+      }
+    },
+
+    startEdit(id) {
+      const row = document.querySelector(`tr[data-post-id="${id}"]`);
+      if (!row) return;
+
+      const viewSpan = row.querySelector(".post-text-view");
+      const editArea = row.querySelector(".post-text-edit");
+      if (viewSpan && editArea) {
+        viewSpan.classList.add("editing");
+        editArea.classList.add("editing");
+        editArea.style.display = "block";
+        editArea.focus();
+        editArea.setSelectionRange(editArea.value.length, editArea.value.length);
+      }
+    },
+
+    finishEdit(id, value) {
+      PostState.update(id, { post_text: value });
+      this.updateRow(id);
+      AppController.triggerValidation();
+    },
+
+    revertPostText(id) {
+      const post = PostState.get(id);
+      if (post && post.default_text !== undefined) {
+        PostState.update(id, { post_text: post.default_text });
+        this.updateRow(id);
+        AppController.triggerValidation();
+        this.showToast("Reverted post text to template default.", "success");
+      }
+    },
+
+    toggleRow(id, enabled) {
+      PostState.toggle(id, enabled);
+      const row = document.querySelector(`tr[data-post-id="${id}"]`);
+      if (row) {
+        row.classList.toggle("row-disabled", !enabled);
+      }
+      this.updateSelectedCount();
+      AppController.triggerValidation();
+    },
+
+    toggleAdv() {
+      const body = document.getElementById("adv-body");
+      const hdr = document.getElementById("adv-toggle");
+      if (body && hdr) {
+        const open = body.classList.toggle("open");
+        hdr.classList.toggle("open", open);
+      }
+    }
+  };
+
+  // ---- App Controller module (Orchestration) ----
+  const AppController = {
+    init() {
+      this.bindEvents();
+      this.loadInitialData();
+    },
+
+    loadInitialData() {
+      const btn = document.getElementById("btn-regenerate");
+      if (btn) {
+        btn.disabled = true;
+        UI.setWithIcon(btn, "Loading…", "fa fa-refresh");
+      }
+      UI.showSkeleton();
+
+      APIClient.fetchPreview()
+        .then(data => {
+          const incoming = data.posts || [];
+          const oldMap = {};
+          PostState.getAll().forEach(p => {
+            if (p.id) oldMap[p.id] = p;
+          });
+
+          const posts = incoming.map(p => {
+            const old = oldMap[p.id];
+            if (old) {
+              return {
+                ...p,
+                post_text: old.post_text !== old.default_text ? old.post_text : p.post_text,
+                post_date: old.post_date !== old.original_post_date ? old.post_date : p.post_date,
+                post_time: old.post_time !== old.original_post_time ? old.post_time : p.post_time,
+                enabled: old.enabled
+              };
+            }
+            return { ...p, enabled: true };
+          });
+
+          PostState.init(posts);
+          UI.renderTable(PostState.getAll(), PostState.getFilter());
+          UI.updateCounts();
+          this.triggerValidation();
+        })
+        .catch(err => {
+          const tbody = document.getElementById("posts-tbody");
+          if (tbody) {
+            tbody.textContent = "";
+            const tr = document.createElement("tr");
+            const td = document.createElement("td");
+            td.colSpan = 5;
+
+            const emptyDiv = document.createElement("div");
+            emptyDiv.className = "sm-empty";
+            
+            const icon = document.createElement("i");
+            icon.className = "fa fa-exclamation-triangle";
+            emptyDiv.appendChild(icon);
+            emptyDiv.appendChild(document.createTextNode(" Failed to load posts. " + err.message));
+
+            td.appendChild(emptyDiv);
+            tr.appendChild(td);
+            tbody.appendChild(tr);
+          }
+        })
+        .finally(() => {
+          if (btn) {
+            btn.disabled = false;
+            UI.setWithIcon(btn, "Regenerate", "fa fa-refresh");
+          }
+        });
+    },
+
+    triggerValidation() {
+      const { pastCount, placeholderCount } = PostState.validate();
+      UI.renderValidationAlert(pastCount, placeholderCount);
+    },
+
+    saveAndRegenerate(e) {
+      e.preventDefault();
+      const btn = document.getElementById("btn-save-regenerate");
+      if (!btn) return;
+      btn.disabled = true;
+      UI.setWithIcon(btn, "Saving…", "fa fa-refresh");
+
+      const form = btn.closest("form");
+      const formData = new FormData(form);
+
+      APIClient.saveSettings(formData)
+        .then(() => {
+          UI.showToast("Settings saved successfully.", "success");
+          this.loadInitialData();
+        })
+        .catch(() => {
+          form.submit();
+        })
+        .finally(() => {
+          btn.disabled = false;
+          UI.setWithIcon(btn, "Save & Regenerate Preview", "fa fa-refresh");
+        });
+    },
+
+    applyBulkSchedule() {
+      const preset = document.getElementById("bulk-schedule-preset").value;
+      if (!preset) {
+        alert("Please select a schedule preset first.");
+        return;
+      }
+
+      const enabledPosts = PostState.getAll().filter(p => p.enabled);
+      if (!enabledPosts.length) {
+        alert("Please select at least one post row to apply scheduling.");
+        return;
+      }
+
+      let res;
+      if (preset === "custom") {
+        const customDate = document.getElementById("bulk-schedule-custom-date").value;
+        const customTime = document.getElementById("bulk-schedule-custom-time").value;
+        if (!customDate || !customTime) {
+          alert("Please select both a custom date and time.");
+          return;
+        }
+        res = PostState.applyBulkCustom(customDate, customTime);
+      } else {
+        const offsetDays = parseInt(preset);
+        res = PostState.applyBulkPreset(offsetDays);
+      }
+
+      UI.renderTable(PostState.getAll(), PostState.getFilter());
+      this.triggerValidation();
+
+      let msg = `Applied preset to ${res.updatedCount || 0} post(s).`;
+      if (res.skippedCount > 0) {
+        msg += ` (${res.skippedCount} post(s) skipped due to missing reference dates).`;
+      }
+      UI.showToast(msg, "success");
+    },
+
+    exportCSV() {
+      const enabledPosts = PostState.getAll().filter(p => p.enabled);
+      if (!enabledPosts.length) {
+        alert(Config.TRANS_SELECT_AT_LEAST_ONE);
+        return;
+      }
+
+      APIClient.exportCSV(PostState.getAll())
+        .then(blob => {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "socialmedia_posts.csv";
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+
+          UI.showToast(`Successfully exported ${enabledPosts.length} post(s).`, "success");
+        })
+        .catch(err => alert(`Export error: ${err.message}`));
+    },
+
+    bindEvents() {
+      const btnRegen = document.getElementById("btn-regenerate");
+      if (btnRegen) btnRegen.addEventListener("click", () => this.loadInitialData());
+
+      const btnSaveRegen = document.getElementById("btn-save-regenerate");
+      if (btnSaveRegen) btnSaveRegen.addEventListener("click", (e) => this.saveAndRegenerate(e));
+
+      const filterPills = document.getElementById("filter-pills");
+      if (filterPills) {
+        filterPills.addEventListener("click", (e) => {
+          const btn = e.target.closest(".sm-filter-btn");
+          if (btn) {
+            PostState.setFilter(btn.dataset.type);
+            document.querySelectorAll(".sm-filter-btn").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            UI.renderTable(PostState.getAll(), PostState.getFilter());
+            this.triggerValidation();
+          }
+        });
+      }
+
+      const chkAll = document.getElementById("chk-all");
+      if (chkAll) {
+        chkAll.addEventListener("change", (e) => {
+          const checked = e.target.checked;
+          PostState.selectAll(checked);
+
+          document.querySelectorAll(".row-chk").forEach(chk => {
+            chk.checked = checked;
+            const row = chk.closest("tr");
+            if (row) row.classList.toggle("row-disabled", !checked);
+          });
+
+          UI.updateSelectedCount();
+          this.triggerValidation();
+        });
+      }
+
+      const btnExport = document.getElementById("btn-export");
+      if (btnExport) btnExport.addEventListener("click", () => this.exportCSV());
+
+      const advToggle = document.getElementById("adv-toggle");
+      if (advToggle) advToggle.addEventListener("click", () => UI.toggleAdv());
+
+      const presetSel = document.getElementById("bulk-schedule-preset");
+      const customInputs = document.getElementById("bulk-schedule-custom-inputs");
+      if (presetSel && customInputs) {
+        presetSel.addEventListener("change", function () {
+          customInputs.style.display = this.value === "custom" ? "flex" : "none";
+        });
+      }
+
+      const btnApplySchedule = document.getElementById("btn-apply-schedule");
+      if (btnApplySchedule) btnApplySchedule.addEventListener("click", () => this.applyBulkSchedule());
+
+      const tbody = document.getElementById("posts-tbody");
+      if (tbody) {
+        tbody.addEventListener("click", (e) => {
+          const tr = e.target.closest("[data-post-id]");
+          if (!tr) return;
+          const postId = tr.dataset.postId;
+
+          if (e.target.classList.contains("post-text-view")) {
+            UI.startEdit(postId);
+          } else if (e.target.closest(".btn-revert-text")) {
+            UI.revertPostText(postId);
+          }
+        });
+
+        tbody.addEventListener("change", (e) => {
+          const postId = e.target.dataset.postId;
+          if (!postId) return;
+
+          if (e.target.classList.contains("row-chk")) {
+            UI.toggleRow(postId, e.target.checked);
+          } else if (e.target.classList.contains("sm-date-input")) {
+            PostState.update(postId, { post_date: e.target.value });
+            UI.updateRow(postId);
+            this.triggerValidation();
+          } else if (e.target.classList.contains("sm-time-input")) {
+            PostState.update(postId, { post_time: e.target.value });
+            UI.updateRow(postId);
+            this.triggerValidation();
+          }
+        });
+
+        tbody.addEventListener("input", (e) => {
+          const postId = e.target.dataset.postId;
+          if (!postId) return;
+
+          if (e.target.classList.contains("post-text-edit")) {
+            PostState.update(postId, { post_text: e.target.value });
+            const row = e.target.closest("tr");
+            if (row) {
+              const countSpan = row.querySelector(".char-count");
+              if (countSpan) countSpan.textContent = e.target.value.length;
+            }
+          }
+        });
+
+        tbody.addEventListener("keydown", (e) => {
+          const postId = e.target.dataset.postId;
+          if (!postId) return;
+
+          if (e.target.classList.contains("post-text-view")) {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              UI.startEdit(postId);
+            }
+          } else if (e.target.classList.contains("post-text-edit")) {
+            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+              e.target.blur();
+            }
+          }
+        });
+
+        tbody.addEventListener("focusout", (e) => {
+          const postId = e.target.dataset.postId;
+          if (!postId) return;
+
+          if (e.target.classList.contains("post-text-edit")) {
+            UI.finishEdit(postId, e.target.value);
+          }
+        });
+      }
+    }
+  };
+
+  // Run on load
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => {
-      bindEvents();
-      loadPosts();
-    });
+    document.addEventListener("DOMContentLoaded", () => AppController.init());
   } else {
-    bindEvents();
-    loadPosts();
+    AppController.init();
   }
 })();

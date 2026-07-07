@@ -90,6 +90,9 @@
   border: 1px solid #e4e4e4;
   border-radius: 8px;
   overflow-x: auto;
+  overflow-y: auto;
+  max-height: 500px;
+  position: relative;
   box-shadow: 0 1px 4px rgba(0, 0, 0, .06);
 }
 
@@ -99,6 +102,9 @@
 }
 
 .sm-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   background: #f5f6f8;
   font-size: 12px;
   font-weight: 600;
@@ -106,7 +112,7 @@
   letter-spacing: .04em;
   color: #777;
   padding: 10px 12px;
-  border-bottom: 1px solid #e4e4e4;
+  border-bottom: 1.5px solid #e4e4e4;
   text-align: left;
   white-space: nowrap;
 }
@@ -402,29 +408,247 @@
   display: inline-block;
 }
 
+.bulk-schedule-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bulk-schedule-select {
+  width: auto;
+  min-width: 150px;
+}
+
+.bulk-schedule-custom-inputs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Date input styling */
+.form-control.sm-date-input {
+  width: 135px;
+  display: inline-block;
+}
+
+/* Reference date */
+.dt-ref-date {
+  font-size: 11px;
+  color: #888;
+  margin-top: 3px;
+}
+
+/* Modified state styling */
+.sm-table tbody input.is-modified,
+.sm-table tbody textarea.is-modified {
+  background-color: #fff9e6 !important;
+  border-color: #f0a818 !important;
+  box-shadow: 0 0 2px rgba(240, 168, 24, 0.4);
+}
+
+.is-modified-label {
+  font-size: 10px;
+  color: #c08000;
+  margin-top: 2px;
+  font-weight: bold;
+}
+
+/* Validation warning styles */
+.sm-table tbody input.has-warning,
+.sm-table tbody textarea.has-warning {
+  border-color: #d9534f !important;
+}
+
+.validation-warning-badge {
+  color: #d9534f;
+  font-size: 11px;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+}
+
+/* Revert text link */
+.btn-revert-text {
+  color: #0077cc;
+  font-size: 11px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  display: inline-block;
+  margin-top: 4px;
+}
+
+.btn-revert-text:hover {
+  text-decoration: underline;
+  color: #005599;
+}
+
 /* ---- Responsive Layout ---- */
 @media (max-width: 768px) {
   .sm-toolbar {
     flex-direction: column;
     align-items: stretch;
   }
+
   .sm-toolbar h1 {
     margin-bottom: 10px;
   }
+
   .sm-filters {
     gap: 4px;
   }
+
   .sm-filter-btn {
     padding: 4px 10px;
     font-size: 12px;
   }
+
   .export-bar {
     flex-direction: column;
     align-items: stretch;
     gap: 10px;
   }
+
   .export-bar .btn-export {
     width: 100%;
     margin-left: 0;
   }
+}
+
+/* ---- Post Schedule Cell Styling ---- */
+.post-schedule-cell-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 130px;
+}
+
+.post-schedule-cell-wrap .form-control.sm-date-input,
+.post-schedule-cell-wrap .form-control.sm-time-input {
+  width: 100%;
+  height: 28px;
+  font-size: 12px;
+  border-radius: 4px;
+  padding: 2px 6px;
+  box-shadow: none;
+  border: 1px solid #ccc;
+  transition: border-color .15s ease-in-out;
+}
+
+.post-schedule-cell-wrap .form-control:focus {
+  border-color: #0077cc;
+}
+
+/* ---- Event Schedule Badges & Stacked Box ---- */
+.event-schedule-cell {
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.sched-box {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  width: max-content;
+}
+
+.sched-date-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+}
+
+.sched-time-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  opacity: 0.9;
+}
+
+.sched-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sched-active {
+  background: #e6f4ea;
+  color: #137333;
+  border: 1px solid #ceead6;
+}
+
+.sched-unscheduled {
+  background: #fef7e0;
+  color: #b06000;
+  border: 1px solid #feefc3;
+}
+
+.sched-na {
+  background: #f1f3f4;
+  color: #70757a;
+  border: 1px solid #dadce0;
+}
+
+/* ---- Table header tooltip helpers ---- */
+.help-tooltip {
+  cursor: help;
+  border-bottom: 1px dotted #ccc;
+}
+
+.th-timezone {
+  font-size: 10px;
+  font-weight: normal;
+  color: #888;
+  text-transform: none;
+  margin-top: 2px;
+}
+
+.th-hint {
+  font-weight: 400;
+  color: #aaa;
+  font-size: 11px;
+}
+
+/* ---- Toast notifications ---- */
+.sm-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 12px 20px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 220px;
+}
+
+/* ---- Char count row below post text editor ---- */
+.char-count-wrap {
+  font-size: 11px;
+  color: #888;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+/* ---- Validation alert banner ---- */
+.sm-validation-alert {
+  margin-bottom: 12px;
 }
