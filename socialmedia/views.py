@@ -1,5 +1,7 @@
 import json
+from datetime import datetime
 
+import pytz
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
@@ -12,7 +14,7 @@ from eventyay.control.views.event import DecoupleMixin
 
 from .export import generate_csv_from_posts, sync_posts_to_db
 from .forms import SocialMediaSettingsForm
-from .models import SocialMediaPost
+from .models import SocialMediaPost, SocialMediaPostStatus
 
 
 def _check_plugin_active(request):
@@ -129,7 +131,6 @@ def preview_posts(request, organizer, event):
                 p["status"] = db_p.status
                 p["is_pinned"] = db_p.is_pinned
                 p["post_text"] = db_p.post_text
-                import pytz
 
                 tz = pytz.timezone(getattr(request.event, "timezone", None) or "UTC")
                 local_dt = db_p.scheduled_at.astimezone(tz)
@@ -173,16 +174,10 @@ def update_post(request, organizer, event):
         if post_text is not None:
             db_post.post_text = post_text
         if status is not None:
-            from .models import SocialMediaPostStatus
-
             if status not in SocialMediaPostStatus.values:
                 return JsonResponse({"error": "Invalid status"}, status=400)
             db_post.status = status
         if post_date and post_time:
-            from datetime import datetime
-
-            import pytz
-
             tz = pytz.timezone(getattr(request.event, "timezone", None) or "UTC")
             dt_str = f"{post_date} {post_time}"
             naive_dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")

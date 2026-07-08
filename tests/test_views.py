@@ -77,6 +77,10 @@ def test_socialmedia_settings_view_post(
 
     assert response.status_code == 302
 
+    from django.core.cache import cache
+
+    cache.clear()
+
     with scope(organizer=organizer, event=event):
         event = event.__class__.objects.get(pk=event.pk)
         event.settings.flush()

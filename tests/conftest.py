@@ -46,10 +46,3 @@ def logged_in_organizer_client(client, user, organizer, event):
     team.members.add(user)
     client.force_login(user)
     return client
-
-
-@pytest.fixture(autouse=True)
-def clear_cache():
-    from django.core.cache import cache
-
-    cache.clear()

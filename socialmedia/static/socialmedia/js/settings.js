@@ -279,41 +279,13 @@
         const tr = document.createElement("tr");
         tr.className = "skeleton-row";
 
-        const tdChk = document.createElement("td");
-        const bChk = document.createElement("div");
-        bChk.className = "skeleton-bar";
-        bChk.style.width = "16px";
-        bChk.style.height = "16px";
-        bChk.style.borderRadius = "3px";
-        tdChk.appendChild(bChk);
-        tr.appendChild(tdChk);
-
-        const tdType = document.createElement("td");
-        const bType = document.createElement("div");
-        bType.className = "skeleton-bar";
-        bType.style.width = "60px";
-        tdType.appendChild(bType);
-        tr.appendChild(tdType);
-
-        const tdSched = document.createElement("td");
-        const bSched = document.createElement("div");
-        bSched.className = "skeleton-bar";
-        bSched.style.width = "110px";
-        tdSched.appendChild(bSched);
-        tr.appendChild(tdSched);
-
-        const tdInput = document.createElement("td");
-        const bInput = document.createElement("div");
-        bInput.className = "skeleton-bar";
-        bInput.style.width = "125px";
-        tdInput.appendChild(bInput);
-        tr.appendChild(tdInput);
-
-        const tdText = document.createElement("td");
-        const bText = document.createElement("div");
-        bText.className = "skeleton-bar";
-        tdText.appendChild(bText);
-        tr.appendChild(tdText);
+        for (let j = 0; j < 6; j++) {
+          const td = document.createElement("td");
+          const bar = document.createElement("div");
+          bar.className = "skeleton-bar";
+          td.appendChild(bar);
+          tr.appendChild(td);
+        }
 
         tbody.appendChild(tr);
       }

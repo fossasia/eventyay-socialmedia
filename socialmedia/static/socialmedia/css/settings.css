@@ -655,9 +655,9 @@
   border-color: #feefc3;
 }
 
-.sm-toast i {
-  position: static !important;
-  margin: 0 !important;
+body .sm-toast i {
+  position: static;
+  margin: 0;
   font-size: 16px;
   flex-shrink: 0;
 }
@@ -840,4 +840,26 @@
 .sm-toast-undo:hover {
   color: #1557b0;
   text-decoration: none;
+}
+
+/* ---- Skeleton Loader Layout ---- */
+.skeleton-row td:nth-child(1) .skeleton-bar {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+}
+.skeleton-row td:nth-child(2) .skeleton-bar {
+  width: 60px;
+}
+.skeleton-row td:nth-child(3) .skeleton-bar {
+  width: 110px;
+}
+.skeleton-row td:nth-child(4) .skeleton-bar {
+  width: 125px;
+}
+.skeleton-row td:nth-child(5) .skeleton-bar {
+  width: 100%;
+}
+.skeleton-row td:nth-child(6) .skeleton-bar {
+  width: 30px;
 }
