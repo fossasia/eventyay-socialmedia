@@ -472,9 +472,7 @@ def build_posts(event, request=None):
 
                 # Session post
                 if session_enabled and talk_start:
-                    names = ", ".join(
-                        s.get_display_name() for s in sub.speakers.all()
-                    )
+                    names = ", ".join(s.get_display_name() for s in sub.speakers.all())
                     room = talk.room.name if (talk and talk.room) else "TBA"
                     if sub.code:
                         talk_url = event_absolute_url(
