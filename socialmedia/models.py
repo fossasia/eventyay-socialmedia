@@ -59,7 +59,7 @@ class SocialMediaPost(models.Model):
         ordering = ["scheduled_at"]
         verbose_name = _("Social Media Post")
         verbose_name_plural = _("Social Media Posts")
-        unique_together = [("event", "post_type", "entity_id")]
+        unique_together = [("event", "post_type", "entity_id", "offset_days")]
 
     def __str__(self):
         return f"[{self.post_type}] {self.event.slug} - {self.scheduled_at}"

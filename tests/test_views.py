@@ -231,15 +231,10 @@ def test_confirmed_submissions_and_schedule_metadata(
         assert "is_schedule_associated" in post
 
     session_posts = [p for p in posts if p["type"] == "session"]
-    # Should include confirmed session but not accepted session
-    titles = [p["post_text"] for p in session_posts]
-    assert any("Confirmed Session" in t for t in titles)
-    assert not any("Accepted Only Session" in t for t in titles)
-
-    # Check unscheduled status
-    conf_post = next(p for p in session_posts if "Confirmed Session" in p["post_text"])
-    assert conf_post["event_schedule_display"] == "Unscheduled"
-    assert conf_post["is_schedule_associated"] is True
+    # Unscheduled submissions should NOT produce session posts — session offsets are
+    # relative to talk start time in minutes, so they are meaningless without one.
+    assert not any("Confirmed Session" in p["post_text"] for p in session_posts)
+    assert not any("Accepted Only Session" in p["post_text"] for p in session_posts)
 
 
 @pytest.mark.django_db

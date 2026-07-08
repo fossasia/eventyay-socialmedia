@@ -96,7 +96,7 @@ DEFAULT_TEMPLATES = {
 
 WAVE_THRESHOLDS = {
     "cfp": [
-        (14, "announcement"),
+        (30, "announcement"),
         (3, "reminder"),
         (0, "final_call"),
     ],
@@ -177,7 +177,12 @@ def event_absolute_url(path, request=None):
 
 
 def _get_template(event, key, context="announcement"):
-    """Return saved custom template or fall back to baked-in contextual default."""
+    """Return saved custom template or fall back to baked-in contextual default.
+
+    NOTE: If a custom template is set by the organizer, it overrides all contextual
+    waves (announcement, reminder, final_call) with the exact same text, resulting in
+    identical copy across different offsets.
+    """
     custom = event.settings.get(f"socialmedia_{key}_template")
     if custom:
         return custom
@@ -258,7 +263,7 @@ def build_posts(event, request=None):
                 hashtags=hashtags,
             )
             trigger = localize(cfp.deadline - timedelta(days=cfp_off), event)
-            post_id = "cfp" if len(cfp_offsets) == 1 else f"cfp_off{cfp_off}"
+            post_id = "cfp"
             posts.append(
                 {
                     "id": post_id,
@@ -295,9 +300,7 @@ def build_posts(event, request=None):
                 hashtags=hashtags,
             )
             trigger = localize(event.date_from - timedelta(days=sched_off), event)
-            post_id = (
-                "schedule" if len(sched_offsets) == 1 else f"schedule_off{sched_off}"
-            )
+            post_id = "schedule"
             posts.append(
                 {
                     "id": post_id,
@@ -347,11 +350,7 @@ def build_posts(event, request=None):
                     hashtags=hashtags,
                 )
                 trigger = localize(event.date_from - timedelta(days=tkt_off), event)
-                post_id = (
-                    f"ticket_{ticket.pk}"
-                    if len(tkt_offsets) == 1
-                    else f"ticket_{ticket.pk}_off{tkt_off}"
-                )
+                post_id = f"ticket_{ticket.pk}"
                 posts.append(
                     {
                         "id": post_id,
@@ -449,11 +448,7 @@ def build_posts(event, request=None):
                                     else None
                                 )
                                 talk_pk = talk.pk if talk else sub.pk
-                                post_id = (
-                                    f"speaker_{speaker.pk}_{talk_pk}"
-                                    if len(spk_offsets) == 1
-                                    else f"speaker_{speaker.pk}_{talk_pk}_off{spk_off}"
-                                )
+                                post_id = f"speaker_{speaker.pk}_{talk_pk}"
                                 posts.append(
                                     {
                                         "id": post_id,
@@ -476,72 +471,59 @@ def build_posts(event, request=None):
                                 )
 
                 # Session post
-                if session_enabled:
-                    base_time = talk_start or getattr(event, "date_from", None)
-                    if base_time:
-                        names = ", ".join(
-                            s.get_display_name() for s in sub.speakers.all()
+                if session_enabled and talk_start:
+                    names = ", ".join(
+                        s.get_display_name() for s in sub.speakers.all()
+                    )
+                    room = talk.room.name if (talk and talk.room) else "TBA"
+                    if sub.code:
+                        talk_url = event_absolute_url(
+                            f"{event.urls.base}talk/{sub.code}/", request
                         )
-                        room = talk.room.name if (talk and talk.room) else "TBA"
-                        if sub.code:
-                            talk_url = event_absolute_url(
-                                f"{event.urls.base}talk/{sub.code}/", request
-                            )
-                        else:
-                            talk_url = event_link
-                        ref_date = (
-                            localize(base_time, event).strftime("%Y-%m-%d")
-                            if base_time
-                            else None
+                    else:
+                        talk_url = event_link
+                    ref_date = localize(talk_start, event).strftime("%Y-%m-%d")
+                    talk_pk = talk.pk if talk else sub.pk
+                    for sess_off in sess_offsets:
+                        trigger = localize(
+                            talk_start - timedelta(minutes=sess_off), event
                         )
-                        talk_pk = talk.pk if talk else sub.pk
-                        for sess_off in sess_offsets:
-                            if talk_start:
-                                trigger = localize(
-                                    talk_start - timedelta(minutes=sess_off), event
-                                )
-                            else:
-                                trigger = localize(base_time - timedelta(days=1), event)
-                            text, template_ctx = _get_template_for_offset(
-                                event, "session", sess_off
-                            )
-                            text = safe_format(
-                                text,
-                                event_name=str(event.name),
-                                talk_title=sub.title,
-                                talk_room=room,
-                                talk_start_time=(
-                                    localize(talk_start, event).strftime("%H:%M")
-                                    if talk_start
-                                    else "TBA"
-                                ),
-                                speaker_names=names,
-                                talk_link=talk_url,
-                                hashtags=hashtags,
-                            )
-                            post_id = (
-                                f"session_{talk_pk}"
-                                if len(sess_offsets) == 1
-                                else f"session_{talk_pk}_off{sess_off}"
-                            )
-                            posts.append(
-                                {
-                                    "id": post_id,
-                                    "type": "session",
-                                    "type_label": TYPE_LABELS["session"],
-                                    "post_date": trigger.strftime("%Y-%m-%d"),
-                                    "post_time": trigger.strftime("%H:%M"),
-                                    "post_text": text,
-                                    "default_text": text,
-                                    "reference_date": ref_date,
-                                    "original_post_date": trigger.strftime("%Y-%m-%d"),
-                                    "original_post_time": trigger.strftime("%H:%M"),
-                                    "event_schedule_display": sched_display,
-                                    "is_schedule_associated": True,
-                                    "offset_days": sess_off,
-                                    "template_context": template_ctx,
-                                }
-                            )
+                        text, template_ctx = _get_template_for_offset(
+                            event, "session", sess_off
+                        )
+                        text = safe_format(
+                            text,
+                            event_name=str(event.name),
+                            talk_title=sub.title,
+                            talk_room=room,
+                            talk_start_time=(
+                                localize(talk_start, event).strftime("%H:%M")
+                                if talk_start
+                                else "TBA"
+                            ),
+                            speaker_names=names,
+                            talk_link=talk_url,
+                            hashtags=hashtags,
+                        )
+                        post_id = f"session_{talk_pk}"
+                        posts.append(
+                            {
+                                "id": post_id,
+                                "type": "session",
+                                "type_label": TYPE_LABELS["session"],
+                                "post_date": trigger.strftime("%Y-%m-%d"),
+                                "post_time": trigger.strftime("%H:%M"),
+                                "post_text": text,
+                                "default_text": text,
+                                "reference_date": ref_date,
+                                "original_post_date": trigger.strftime("%Y-%m-%d"),
+                                "original_post_time": trigger.strftime("%H:%M"),
+                                "event_schedule_display": sched_display,
+                                "is_schedule_associated": True,
+                                "offset_days": sess_off,
+                                "template_context": template_ctx,
+                            }
+                        )
 
     # Sort chronologically
     posts.sort(key=lambda p: (p["post_date"], p["post_time"]))
@@ -557,9 +539,9 @@ def sync_posts_to_db(event, request=None):
     posts = build_posts(event, request)
     tz = pytz.timezone(getattr(event, "timezone", None) or "UTC")
 
-    generated_entity_ids = set()
+    generated_keys = set()
     for p in posts:
-        generated_entity_ids.add(str(p["id"]))
+        generated_keys.add((str(p["id"]), p.get("offset_days", 0)))
         dt_str = f"{p['post_date']} {p['post_time']}"
         try:
             naive_dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
@@ -567,14 +549,15 @@ def sync_posts_to_db(event, request=None):
         except Exception:
             continue
 
+        offset_val = p.get("offset_days", 0)
         db_post, created = SocialMediaPost.objects.get_or_create(
             event=event,
             post_type=p["type"],
             entity_id=str(p["id"]),
+            offset_days=offset_val,
             defaults={
                 "scheduled_at": scheduled_at,
                 "post_text": p["post_text"],
-                "offset_days": p.get("offset_days", 0),
                 "template_context": p.get("template_context", "announcement"),
                 "status": SocialMediaPostStatus.SCHEDULED,
             },
@@ -582,12 +565,13 @@ def sync_posts_to_db(event, request=None):
         if not created and not db_post.is_pinned:
             db_post.scheduled_at = scheduled_at
             db_post.post_text = p["post_text"]
-            db_post.offset_days = p.get("offset_days", 0)
-            db_post.template_context = p.get("template_context", "default")
+            db_post.template_context = p.get("template_context", "announcement")
             db_post.save()
 
-    # Clean up obsolete non-pinned, non-custom posts that are no longer generated
-    SocialMediaPost.objects.filter(
+    # Clean up obsolete non-pinned, non-custom posts that are no longer generated.
+    # A post is obsolete when its (entity_id, offset_days) pair is no longer in the
+    # generated set (e.g. an offset was removed from settings, or a talk was removed).
+    for db_post in SocialMediaPost.objects.filter(
         event=event,
         is_pinned=False,
         status__in=[
@@ -595,7 +579,9 @@ def sync_posts_to_db(event, request=None):
             SocialMediaPostStatus.SCHEDULED,
             SocialMediaPostStatus.EXCLUDED,
         ],
-    ).exclude(post_type="custom").exclude(entity_id__in=generated_entity_ids).delete()
+    ).exclude(post_type="custom"):
+        if (db_post.entity_id, db_post.offset_days) not in generated_keys:
+            db_post.delete()
 
     return posts
 

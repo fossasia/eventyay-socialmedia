@@ -83,7 +83,8 @@ class SocialMediaSettingsForm(SettingsForm):
         label=_("Days before CFP deadline"),
         help_text=_(
             "Days before deadline to schedule. Enter a number or "
-            "comma-separated values (e.g., 14, 7, 1)."
+            "comma-separated values (e.g., 14, 7, 1). "
+            "Leave blank to use the default of 7."
         ),
         required=False,
         initial="7",
@@ -94,7 +95,9 @@ class SocialMediaSettingsForm(SettingsForm):
         required=False,
         help_text=_(
             "Leave blank to use the default template. "
-            "Available: {event_name}, {cfp_deadline}, {cfp_link}, {hashtags}"
+            "Available: {event_name}, {cfp_deadline}, {cfp_link}, {hashtags}. "
+            "Note: A custom template here overrides all schedule waves "
+            "(announcement, reminder, final call) with identical text."
         ),
     )
 
@@ -110,7 +113,8 @@ class SocialMediaSettingsForm(SettingsForm):
         label=_("Days before session (speakers)"),
         help_text=_(
             "Days before speaker's session. Enter a number or "
-            "comma-separated values (e.g., 30, 7, 1)."
+            "comma-separated values (e.g., 30, 7, 1). "
+            "Leave blank to use the default of 3."
         ),
         required=False,
         initial="3",
@@ -122,7 +126,9 @@ class SocialMediaSettingsForm(SettingsForm):
         help_text=_(
             "Leave blank to use the default template. "
             "Available: {event_name}, {speaker_name}, {speaker_link}, "
-            "{talk_title}, {hashtags}"
+            "{talk_title}, {hashtags}. "
+            "Note: A custom template here overrides all schedule waves "
+            "(announcement, reminder, final call) with identical text."
         ),
     )
 
@@ -138,7 +144,8 @@ class SocialMediaSettingsForm(SettingsForm):
         label=_("Minutes before session"),
         help_text=_(
             "Minutes before session starts. Enter a number or "
-            "comma-separated values (e.g., 60, 30, 15)."
+            "comma-separated values (e.g., 60, 30, 15). "
+            "Leave blank to use the default of 30."
         ),
         required=False,
         initial="30",
@@ -150,7 +157,9 @@ class SocialMediaSettingsForm(SettingsForm):
         help_text=_(
             "Leave blank to use the default template. "
             "Available: {event_name}, {talk_title}, {talk_room}, {talk_start_time}, "
-            "{speaker_names}, {talk_link}, {hashtags}"
+            "{speaker_names}, {talk_link}, {hashtags}. "
+            "Note: A custom template here overrides all schedule waves "
+            "(announcement, reminder, final call) with identical text."
         ),
     )
 
@@ -166,7 +175,8 @@ class SocialMediaSettingsForm(SettingsForm):
         label=_("Days before event (tickets)"),
         help_text=_(
             "Days before event starts. Enter a number or "
-            "comma-separated values (e.g., 30, 14, 5)."
+            "comma-separated values (e.g., 30, 14, 5). "
+            "Leave blank to use the default of 5."
         ),
         required=False,
         initial="5",
@@ -178,7 +188,9 @@ class SocialMediaSettingsForm(SettingsForm):
         help_text=_(
             "Leave blank to use the default template. "
             "Available: {event_name}, {ticket_name}, {ticket_price}, "
-            "{ticket_link}, {hashtags}"
+            "{ticket_link}, {hashtags}. "
+            "Note: A custom template here overrides all schedule waves "
+            "(announcement, reminder, final call) with identical text."
         ),
     )
 
@@ -194,7 +206,8 @@ class SocialMediaSettingsForm(SettingsForm):
         label=_("Days before event (schedule)"),
         help_text=_(
             "Days before event to announce schedule. Enter a number or "
-            "comma-separated values (e.g., 7, 2)."
+            "comma-separated values (e.g., 7, 2). "
+            "Leave blank to use the default of 2."
         ),
         required=False,
         initial="2",
@@ -205,7 +218,9 @@ class SocialMediaSettingsForm(SettingsForm):
         required=False,
         help_text=_(
             "Leave blank to use the default template. "
-            "Available: {event_name}, {schedule_link}, {hashtags}"
+            "Available: {event_name}, {schedule_link}, {hashtags}. "
+            "Note: A custom template here overrides all schedule waves "
+            "(announcement, reminder, final call) with identical text."
         ),
     )
 

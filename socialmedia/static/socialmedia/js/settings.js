@@ -161,8 +161,7 @@
         if (!r.ok) throw new Error(`Export failed: ${r.status}`);
         return r.blob();
       });
-    },
-    savePostToDB(post) {
+    },    savePostToDB(post) {
       if (!Config.UPDATE_URL || !post) return Promise.resolve();
       const isPinned = (post.post_text !== post.default_text) ||
                        (post.post_date !== post.original_post_date) ||
@@ -177,6 +176,7 @@
         body: JSON.stringify({
           id: post.id,
           db_id: post.db_id,
+          post_type: post.type,
           post_text: post.post_text,
           post_date: post.post_date,
           post_time: post.post_time,
@@ -194,6 +194,7 @@
         })
         .catch(err => console.error("Failed to save post to DB:", err));
     },
+
     updatePostStatus(post, status) {
       if (!Config.UPDATE_URL || !post) return Promise.resolve();
       return fetch(Config.UPDATE_URL, {
@@ -206,6 +207,7 @@
         body: JSON.stringify({
           id: post.id,
           db_id: post.db_id,
+          post_type: post.type,
           status: status
         }),
       })
