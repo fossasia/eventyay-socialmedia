@@ -111,15 +111,15 @@
     </table>
   </div>
 
-  <!-- Sticky export bar -->
+  <!-- Export bar (below table, right-aligned) -->
   <div class="export-bar">
     <span class="selected-count" id="export-count">0 {% trans "posts selected" %}</span>
     <div style="display: inline-flex; align-items: center; gap: 8px;">
       <select id="export-preset-select" class="form-control input-sm" style="width: 150px; display: inline-block;">
         <option value="generic">{% trans "Generic CSV" %}</option>
-        <option value="postiz">{% trans "Postiz Preset" %}</option>
-        <option value="buffer">{% trans "Buffer Preset" %}</option>
-        <option value="hootsuite">{% trans "Hootsuite Preset" %}</option>
+        <option value="postiz">{% trans "Postiz CSV" %}</option>
+        <option value="buffer">{% trans "Buffer CSV" %}</option>
+        <option value="hootsuite">{% trans "Hootsuite CSV" %}</option>
       </select>
       <button id="btn-export" class="btn btn-primary btn-export">
         <i class="fa fa-download"></i> {% trans "Export CSV" %}

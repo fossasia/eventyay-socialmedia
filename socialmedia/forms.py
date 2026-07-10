@@ -2,7 +2,7 @@ from django import forms
 from django.utils.translation import gettext_lazy as _
 from eventyay.base.forms import SettingsForm
 
-from .export import DEFAULT_TEMPLATES, PLATFORMS
+from .export import DEFAULT_TEMPLATES
 
 MAX_OFFSETS = 10
 MAX_OFFSET_VALUE_CFP = 365
@@ -84,9 +84,7 @@ class SocialMediaSettingsForm(SettingsForm):
     )
     socialmedia_mastodon_enabled = forms.BooleanField(
         label=_("Enable Mastodon"),
-        help_text=_(
-            "Generate separate draft posts for Mastodon (≤500 chars)."
-        ),
+        help_text=_("Generate separate draft posts for Mastodon (≤500 chars)."),
         required=False,
         initial=False,
     )
@@ -151,7 +149,8 @@ class SocialMediaSettingsForm(SettingsForm):
         widget=forms.Textarea(attrs={"rows": 2}),
         required=False,
         help_text=_(
-            "Available: {event_name}, {speaker_name}, {speaker_link}, {talk_title}, {hashtags}"
+            "Available: {event_name}, {speaker_name}, {speaker_link}, "
+            "{talk_title}, {hashtags}"
         ),
     )
     socialmedia_mastodon_speaker_template = forms.CharField(
@@ -159,7 +158,8 @@ class SocialMediaSettingsForm(SettingsForm):
         widget=forms.Textarea(attrs={"rows": 2}),
         required=False,
         help_text=_(
-            "Available: {event_name}, {speaker_name}, {speaker_link}, {talk_title}, {hashtags}"
+            "Available: {event_name}, {speaker_name}, {speaker_link}, "
+            "{talk_title}, {hashtags}"
         ),
     )
     socialmedia_telegram_speaker_template = forms.CharField(
@@ -168,7 +168,8 @@ class SocialMediaSettingsForm(SettingsForm):
         required=False,
         help_text=_(
             "Markdown supported. "
-            "Available: {event_name}, {speaker_name}, {speaker_link}, {talk_title}, {hashtags}"
+            "Available: {event_name}, {speaker_name}, {speaker_link}, "
+            "{talk_title}, {hashtags}"
         ),
     )
     socialmedia_linkedin_speaker_template = forms.CharField(
@@ -176,7 +177,8 @@ class SocialMediaSettingsForm(SettingsForm):
         widget=forms.Textarea(attrs={"rows": 3}),
         required=False,
         help_text=_(
-            "Available: {event_name}, {speaker_name}, {speaker_link}, {talk_title}, {hashtags}"
+            "Available: {event_name}, {speaker_name}, {speaker_link}, "
+            "{talk_title}, {hashtags}"
         ),
     )
 
@@ -225,7 +227,8 @@ class SocialMediaSettingsForm(SettingsForm):
         widget=forms.Textarea(attrs={"rows": 2}),
         required=False,
         help_text=_(
-            "Available: {event_name}, {ticket_name}, {ticket_price}, {ticket_link}, {hashtags}"
+            "Available: {event_name}, {ticket_name}, {ticket_price}, "
+            "{ticket_link}, {hashtags}"
         ),
     )
     socialmedia_mastodon_ticket_template = forms.CharField(
@@ -233,7 +236,8 @@ class SocialMediaSettingsForm(SettingsForm):
         widget=forms.Textarea(attrs={"rows": 2}),
         required=False,
         help_text=_(
-            "Available: {event_name}, {ticket_name}, {ticket_price}, {ticket_link}, {hashtags}"
+            "Available: {event_name}, {ticket_name}, {ticket_price}, "
+            "{ticket_link}, {hashtags}"
         ),
     )
     socialmedia_telegram_ticket_template = forms.CharField(
@@ -242,7 +246,8 @@ class SocialMediaSettingsForm(SettingsForm):
         required=False,
         help_text=_(
             "Markdown supported. "
-            "Available: {event_name}, {ticket_name}, {ticket_price}, {ticket_link}, {hashtags}"
+            "Available: {event_name}, {ticket_name}, {ticket_price}, "
+            "{ticket_link}, {hashtags}"
         ),
     )
     socialmedia_linkedin_ticket_template = forms.CharField(
@@ -250,7 +255,8 @@ class SocialMediaSettingsForm(SettingsForm):
         widget=forms.Textarea(attrs={"rows": 3}),
         required=False,
         help_text=_(
-            "Available: {event_name}, {ticket_name}, {ticket_price}, {ticket_link}, {hashtags}"
+            "Available: {event_name}, {ticket_name}, {ticket_price}, "
+            "{ticket_link}, {hashtags}"
         ),
     )
 
@@ -259,17 +265,13 @@ class SocialMediaSettingsForm(SettingsForm):
         label=_("X / Twitter — Schedule template"),
         widget=forms.Textarea(attrs={"rows": 2}),
         required=False,
-        help_text=_(
-            "Available: {event_name}, {schedule_link}, {hashtags}"
-        ),
+        help_text=_("Available: {event_name}, {schedule_link}, {hashtags}"),
     )
     socialmedia_mastodon_schedule_template = forms.CharField(
         label=_("Mastodon — Schedule template"),
         widget=forms.Textarea(attrs={"rows": 2}),
         required=False,
-        help_text=_(
-            "Available: {event_name}, {schedule_link}, {hashtags}"
-        ),
+        help_text=_("Available: {event_name}, {schedule_link}, {hashtags}"),
     )
     socialmedia_telegram_schedule_template = forms.CharField(
         label=_("Telegram — Schedule template"),
@@ -283,9 +285,7 @@ class SocialMediaSettingsForm(SettingsForm):
         label=_("LinkedIn — Schedule template"),
         widget=forms.Textarea(attrs={"rows": 3}),
         required=False,
-        help_text=_(
-            "Available: {event_name}, {schedule_link}, {hashtags}"
-        ),
+        help_text=_("Available: {event_name}, {schedule_link}, {hashtags}"),
     )
 
     # ------------------------------------------------------------------

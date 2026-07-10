@@ -227,4 +227,3 @@ def export_csv(request, organizer, event):
     response = HttpResponse(csv_data, content_type="text/csv; charset=utf-8")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
-

@@ -407,7 +407,9 @@ def test_platform_uses_correct_template(organizer, event):
         p for p in posts if p["type"] == "schedule" and p.get("platform") == "twitter"
     ]
     assert twitter_schedule_posts, "Expected at least one Twitter schedule post"
-    assert all("CUSTOM_TWITTER_SCHEDULE" in p["post_text"] for p in twitter_schedule_posts)
+    assert all(
+        "CUSTOM_TWITTER_SCHEDULE" in p["post_text"] for p in twitter_schedule_posts
+    )
 
 
 @pytest.mark.django_db
@@ -428,9 +430,9 @@ def test_no_platforms_fallback(organizer, event):
         posts = build_posts(event)
 
     for post in posts:
-        assert post.get("platform") is None, (
-            f"Expected no platform on post {post['id']}, got {post['platform']!r}"
-        )
+        assert (
+            post.get("platform") is None
+        ), f"Expected no platform on post {post['id']}, got {post['platform']!r}"
 
 
 @pytest.mark.django_db
@@ -484,4 +486,3 @@ def test_export_csv_presets(logged_in_organizer_client, organizer, event, settin
     content = response.content.decode("utf-8")
     assert "date,time,text,link" in content
     assert "2026-06-20,12:00,Hello world!,https://testserver/img.png" in content
-

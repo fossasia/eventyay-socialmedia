@@ -113,7 +113,8 @@ PLATFORM_DEFAULT_TEMPLATES = {
                 "Deadline {cfp_deadline}. {cfp_link} {hashtags}"
             ),
             "final_call": (
-                "🚨 Last call! Submit to {event_name} by {cfp_deadline}: {cfp_link} {hashtags}"
+                "🚨 Last call! Submit to {event_name} by {cfp_deadline}: "
+                "{cfp_link} {hashtags}"
             ),
         },
         "speaker": {
@@ -152,7 +153,8 @@ PLATFORM_DEFAULT_TEMPLATES = {
                 "⚡ Don't miss {ticket_name} for {event_name}! {ticket_link} {hashtags}"
             ),
             "final_call": (
-                "🔥 Last chance! {ticket_name} for {event_name}. {ticket_link} {hashtags}"
+                "🔥 Last chance! {ticket_name} for {event_name}. "
+                "{ticket_link} {hashtags}"
             ),
         },
         "schedule": {
@@ -208,7 +210,8 @@ PLATFORM_DEFAULT_TEMPLATES = {
                 "More info: {speaker_link}\n{hashtags}"
             ),
             "reminder": (
-                "🗓 *Don't miss* {speaker_name} presenting *'{talk_title}'* at {event_name}!\n"
+                "🗓 *Don't miss* {speaker_name} presenting "
+                "*'{talk_title}'* at {event_name}!\n"
                 "{speaker_link}\n{hashtags}"
             ),
             "final_call": (
@@ -229,7 +232,8 @@ PLATFORM_DEFAULT_TEMPLATES = {
                 "{talk_link}\n{hashtags}"
             ),
             "final_call": (
-                "🔥 *Starting Now!* *'{talk_title}'* by {speaker_names} in {talk_room}\n"
+                "🔥 *Starting Now!* *'{talk_title}'* by {speaker_names} "
+                "in {talk_room}\n"
                 "Join: {talk_link}\n{hashtags}"
             ),
         },
@@ -253,8 +257,7 @@ PLATFORM_DEFAULT_TEMPLATES = {
                 "Plan your days: {schedule_link}\n{hashtags}"
             ),
             "reminder": (
-                "🗓 *Check the Schedule* — {event_name}\n"
-                "{schedule_link}\n{hashtags}"
+                "🗓 *Check the Schedule* — {event_name}\n{schedule_link}\n{hashtags}"
             ),
         },
     },
@@ -263,12 +266,14 @@ PLATFORM_DEFAULT_TEMPLATES = {
         "cfp": {
             "announcement": (
                 "We're excited to open our Call for Proposals for {event_name}! "
-                "Share your expertise with our community. The submission deadline is {cfp_deadline}. "
+                "Share your expertise with our community. "
+                "The submission deadline is {cfp_deadline}. "
                 "Submit your proposal here: {cfp_link} {hashtags}"
             ),
             "reminder": (
                 "⏰ Reminder: The CFP for {event_name} closes on {cfp_deadline}. "
-                "Don't miss this opportunity to present your ideas. Submit now: {cfp_link} {hashtags}"
+                "Don't miss this opportunity to present your ideas. "
+                "Submit now: {cfp_link} {hashtags}"
             ),
             "final_call": (
                 "Final call! Submissions for {event_name} close on {cfp_deadline}. "
@@ -287,14 +292,17 @@ PLATFORM_DEFAULT_TEMPLATES = {
                 "A session not to be missed! Details: {speaker_link} {hashtags}"
             ),
             "final_call": (
-                "Spotlight: {speaker_name} will be presenting '{talk_title}' at {event_name}. "
+                "Spotlight: {speaker_name} will be presenting '{talk_title}' "
+                "at {event_name}. "
                 "Join us live! {speaker_link} {hashtags}"
             ),
         },
         "session": {
             "announcement": (
-                "Mark your calendars! '{talk_title}' by {speaker_names} is coming up at {event_name}. "
-                "Room: {talk_room} | Time: {talk_start_time}. Full details: {talk_link} {hashtags}"
+                "Mark your calendars! '{talk_title}' by {speaker_names} is "
+                "coming up at {event_name}. "
+                "Room: {talk_room} | Time: {talk_start_time}. "
+                "Full details: {talk_link} {hashtags}"
             ),
             "reminder": (
                 "Session starting soon: '{talk_title}' by {speaker_names} "
@@ -314,7 +322,8 @@ PLATFORM_DEFAULT_TEMPLATES = {
             ),
             "reminder": (
                 "Have you registered for {event_name} yet? "
-                "{ticket_name} tickets ({ticket_price}) are still available: {ticket_link} {hashtags}"
+                "{ticket_name} tickets ({ticket_price}) are still available: "
+                "{ticket_link} {hashtags}"
             ),
             "final_call": (
                 "Last chance to register for {event_name}! "
@@ -546,7 +555,9 @@ def build_posts(event, request=None):
             platform_iter = enabled_platforms if use_platforms else [None]
             for platform in platform_iter:
                 if platform:
-                    text_formatted = _get_platform_template(event, "cfp", platform, template_ctx)
+                    text_formatted = _get_platform_template(
+                        event, "cfp", platform, template_ctx
+                    )
                 else:
                     text_formatted = text
                 text_formatted = safe_format(
@@ -563,7 +574,9 @@ def build_posts(event, request=None):
                         "type": "cfp",
                         "type_label": TYPE_LABELS["cfp"],
                         "platform": platform,
-                        "platform_label": PLATFORMS.get(platform, "") if platform else "",
+                        "platform_label": PLATFORMS.get(platform, "")
+                        if platform
+                        else "",
                         "post_date": trigger.strftime("%Y-%m-%d"),
                         "post_time": trigger.strftime("%H:%M"),
                         "post_text": text_formatted,
@@ -593,7 +606,9 @@ def build_posts(event, request=None):
             platform_iter = enabled_platforms if use_platforms else [None]
             for platform in platform_iter:
                 if platform:
-                    text_formatted = _get_platform_template(event, "schedule", platform, template_ctx)
+                    text_formatted = _get_platform_template(
+                        event, "schedule", platform, template_ctx
+                    )
                 else:
                     text_formatted = text
                 text_formatted = safe_format(
@@ -609,7 +624,9 @@ def build_posts(event, request=None):
                         "type": "schedule",
                         "type_label": TYPE_LABELS["schedule"],
                         "platform": platform,
-                        "platform_label": PLATFORMS.get(platform, "") if platform else "",
+                        "platform_label": PLATFORMS.get(platform, "")
+                        if platform
+                        else "",
                         "post_date": trigger.strftime("%Y-%m-%d"),
                         "post_time": trigger.strftime("%H:%M"),
                         "post_text": text_formatted,
@@ -650,7 +667,9 @@ def build_posts(event, request=None):
                 platform_iter = enabled_platforms if use_platforms else [None]
                 for platform in platform_iter:
                     if platform:
-                        text_formatted = _get_platform_template(event, "ticket", platform, template_ctx)
+                        text_formatted = _get_platform_template(
+                            event, "ticket", platform, template_ctx
+                        )
                     else:
                         text_formatted = text
                     text_formatted = safe_format(
@@ -668,7 +687,9 @@ def build_posts(event, request=None):
                             "type": "ticket",
                             "type_label": TYPE_LABELS["ticket"],
                             "platform": platform,
-                            "platform_label": PLATFORMS.get(platform, "") if platform else "",
+                            "platform_label": PLATFORMS.get(platform, "")
+                            if platform
+                            else "",
                             "post_date": trigger.strftime("%Y-%m-%d"),
                             "post_time": trigger.strftime("%H:%M"),
                             "post_text": text_formatted,
@@ -721,7 +742,9 @@ def build_posts(event, request=None):
 
                 if talk_start:
                     base_time = talk_start
-                    sched_display = localize(talk_start, event).strftime("%Y-%m-%d %H:%M")
+                    sched_display = localize(talk_start, event).strftime(
+                        "%Y-%m-%d %H:%M"
+                    )
                 else:
                     base_time = getattr(event, "date_from", None)
                     sched_display = "Unscheduled"
@@ -729,9 +752,7 @@ def build_posts(event, request=None):
                 # Speaker post
                 if speaker_enabled:
                     for spk_off in spk_offsets:
-                        trigger = localize(
-                            base_time - timedelta(days=spk_off), event
-                        )
+                        trigger = localize(base_time - timedelta(days=spk_off), event)
                         for speaker in sub.speakers.all():
                             if (speaker.pk, spk_off) in seen_speaker_offsets:
                                 continue
@@ -753,7 +774,9 @@ def build_posts(event, request=None):
                             )
                             talk_pk = talk.pk if talk else sub.pk
                             base_id = f"speaker_{speaker.pk}_{talk_pk}"
-                            platform_iter = enabled_platforms if use_platforms else [None]
+                            platform_iter = (
+                                enabled_platforms if use_platforms else [None]
+                            )
                             for platform in platform_iter:
                                 if platform:
                                     text_formatted = _get_platform_template(
@@ -769,14 +792,18 @@ def build_posts(event, request=None):
                                     talk_title=sub.title,
                                     hashtags=hashtags,
                                 )
-                                post_id = f"{base_id}_{platform}" if platform else base_id
+                                post_id = (
+                                    f"{base_id}_{platform}" if platform else base_id
+                                )
                                 posts.append(
                                     {
                                         "id": post_id,
                                         "type": "speaker",
                                         "type_label": TYPE_LABELS["speaker"],
                                         "platform": platform,
-                                        "platform_label": PLATFORMS.get(platform, "") if platform else "",
+                                        "platform_label": PLATFORMS.get(platform, "")
+                                        if platform
+                                        else "",
                                         "post_date": trigger.strftime("%Y-%m-%d"),
                                         "post_time": trigger.strftime("%H:%M"),
                                         "post_text": text_formatted,
@@ -845,7 +872,9 @@ def build_posts(event, request=None):
                                     "type": "session",
                                     "type_label": TYPE_LABELS["session"],
                                     "platform": platform,
-                                    "platform_label": PLATFORMS.get(platform, "") if platform else "",
+                                    "platform_label": PLATFORMS.get(platform, "")
+                                    if platform
+                                    else "",
                                     "post_date": trigger.strftime("%Y-%m-%d"),
                                     "post_time": trigger.strftime("%H:%M"),
                                     "post_text": text_formatted,
@@ -955,7 +984,9 @@ def generate_csv_from_posts(posts, format="generic"):
                 # Buffer expects date and time combined (e.g., "YYYY-MM-DD HH:MM")
                 date = post.get("post_date", "")
                 time = post.get("post_time", "")
-                scheduled_at = f"{date} {time}".strip() if date and time else (date or time)
+                scheduled_at = (
+                    f"{date} {time}".strip() if date and time else (date or time)
+                )
                 writer.writerow(
                     [
                         post.get("post_text", ""),
@@ -990,4 +1021,3 @@ def generate_csv_from_posts(posts, format="generic"):
                 )
 
     return output.getvalue()
-
