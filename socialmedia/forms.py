@@ -3,6 +3,7 @@ from django.utils.translation import gettext_lazy as _
 from eventyay.base.forms import SettingsForm
 
 from .export import DEFAULT_TEMPLATES, PLATFORMS
+from .models import SocialMediaAccount
 
 MAX_OFFSETS = 10
 MAX_OFFSET_VALUE_CFP = 365
@@ -441,3 +442,200 @@ def _add_platform_clean_methods():
 
 
 _add_platform_clean_methods()
+
+
+class TelegramAccountForm(forms.ModelForm):
+    bot_token = forms.CharField(
+        label=_("Bot API Token"),
+        widget=forms.PasswordInput(render_value=True),
+        help_text=_("The API token for your Telegram Bot (e.g. from @BotFather)"),
+        required=True,
+    )
+
+    class Meta:
+        model = SocialMediaAccount
+        fields = ["platform_username", "is_active"]
+        labels = {
+            "platform_username": _("Channel/Chat ID"),
+        }
+        help_texts = {
+            "platform_username": _("e.g. @mychannel or -100123456789"),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            creds = self.instance.credentials
+            if creds.get("bot_token"):
+                self.fields["bot_token"].initial = "••••••••"
+                self.fields["bot_token"].required = False
+
+    def clean_bot_token(self):
+        token = self.cleaned_data.get("bot_token")
+        if not token and self.instance and self.instance.pk:
+            creds = self.instance.credentials
+            return creds.get("bot_token")
+        return token
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.provider = "telegram"
+        instance.credentials = {
+            "bot_token": self.cleaned_data.get("bot_token"),
+        }
+        if commit:
+            instance.save()
+        return instance
+
+
+class MastodonAccountForm(forms.ModelForm):
+    api_base_url = forms.URLField(
+        label=_("Instance URL"),
+        help_text=_("e.g. https://mastodon.social"),
+        required=True,
+    )
+    access_token = forms.CharField(
+        label=_("Access Token"),
+        widget=forms.PasswordInput(render_value=True),
+        required=True,
+    )
+
+    class Meta:
+        model = SocialMediaAccount
+        fields = ["platform_username", "is_active"]
+        labels = {
+            "platform_username": _("Mastodon Username Handle"),
+        }
+        help_texts = {
+            "platform_username": _("e.g. @myuser@mastodon.social"),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            creds = self.instance.credentials
+            if creds.get("api_base_url"):
+                self.fields["api_base_url"].initial = creds.get("api_base_url")
+            if creds.get("access_token"):
+                self.fields["access_token"].initial = "••••••••"
+                self.fields["access_token"].required = False
+
+    def clean_access_token(self):
+        token = self.cleaned_data.get("access_token")
+        if not token and self.instance and self.instance.pk:
+            creds = self.instance.credentials
+            return creds.get("access_token")
+        return token
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.provider = "mastodon"
+        instance.credentials = {
+            "api_base_url": self.cleaned_data.get("api_base_url"),
+            "access_token": self.cleaned_data.get("access_token"),
+        }
+        if commit:
+            instance.save()
+        return instance
+
+
+class PostizAccountForm(forms.ModelForm):
+    api_url = forms.URLField(
+        label=_("API Instance URL"),
+        help_text=_("e.g. https://api.postiz.com or self-hosted endpoint"),
+        required=True,
+    )
+    api_key = forms.CharField(
+        label=_("API Key"),
+        widget=forms.PasswordInput(render_value=True),
+        required=True,
+    )
+
+    class Meta:
+        model = SocialMediaAccount
+        fields = ["platform_username", "is_active"]
+        labels = {
+            "platform_username": _("Configuration Name"),
+        }
+        help_texts = {
+            "platform_username": _("e.g. My Organization Postiz Link"),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            creds = self.instance.credentials
+            if creds.get("api_url"):
+                self.fields["api_url"].initial = creds.get("api_url")
+            if creds.get("api_key"):
+                self.fields["api_key"].initial = "••••••••"
+                self.fields["api_key"].required = False
+
+    def clean_api_key(self):
+        key = self.cleaned_data.get("api_key")
+        if not key and self.instance and self.instance.pk:
+            creds = self.instance.credentials
+            return creds.get("api_key")
+        return key
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.provider = "postiz"
+        instance.credentials = {
+            "api_url": self.cleaned_data.get("api_url"),
+            "api_key": self.cleaned_data.get("api_key"),
+        }
+        if commit:
+            instance.save()
+        return instance
+
+
+class BufferAccountForm(forms.ModelForm):
+    access_token = forms.CharField(
+        label=_("Access Token"),
+        widget=forms.PasswordInput(render_value=True),
+        required=True,
+    )
+
+    class Meta:
+        model = SocialMediaAccount
+        fields = ["platform_username", "is_active"]
+        labels = {
+            "platform_username": _("Configuration Name"),
+        }
+        help_texts = {
+            "platform_username": _("e.g. My Organization Buffer Link"),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            creds = self.instance.credentials
+            if creds.get("access_token"):
+                self.fields["access_token"].initial = "••••••••"
+                self.fields["access_token"].required = False
+
+    def clean_access_token(self):
+        token = self.cleaned_data.get("access_token")
+        if not token and self.instance and self.instance.pk:
+            creds = self.instance.credentials
+            return creds.get("access_token")
+        return token
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.provider = "buffer"
+        instance.credentials = {
+            "access_token": self.cleaned_data.get("access_token"),
+        }
+        if commit:
+            instance.save()
+        return instance
+
+
+PROVIDER_FORMS = {
+    "telegram": TelegramAccountForm,
+    "mastodon": MastodonAccountForm,
+    "postiz": PostizAccountForm,
+    "buffer": BufferAccountForm,
+}

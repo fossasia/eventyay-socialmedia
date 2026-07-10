@@ -1,0 +1,47 @@
+{% extends "eventyay_common/organizers/base.html" %}
+{% load i18n %}
+{% load bootstrap3 %}
+
+{% block title %}{% trans "Disconnect Account" %} :: {{ organizer.name }}{% endblock %}
+
+{% block inner %}
+    <h1>{% trans "Disconnect Social Account" %}</h1>
+
+    <div class="panel panel-default">
+        <div class="panel-body">
+            <p>
+                {% blocktranslate trimmed with provider=object.get_provider_display username=object.platform_username %}
+                    Are you sure you want to disconnect the <strong>{{ provider }}</strong> account <strong>{{ username }}</strong>?
+                {% endblocktranslate %}
+            </p>
+
+            {% if has_active_posts %}
+                <div class="alert alert-warning">
+                    <h4><i class="fa fa-warning"></i> {% trans "Warning: Active Scheduled Posts" %}</h4>
+                    <p>
+                        {% blocktranslate trimmed count count=active_posts_count %}
+                            There is currently <strong>1</strong> active scheduled post linked to this connection/scheduler.
+                        {% plural %}
+                            There are currently <strong>{{ count }}</strong> active scheduled posts linked to this connection/scheduler.
+                        {% endblocktranslate %}
+                    </p>
+                    <p>
+                        {% trans "Disconnecting this account will prevent these scheduled posts from being published. If you proceed, they may remain unpublished or fail." %}
+                    </p>
+                </div>
+            {% endif %}
+
+            <form action="" method="post">
+                {% csrf_token %}
+                <div class="form-group submit-group">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fa fa-trash"></i> {% trans "Disconnect Account" %}
+                    </button>
+                    <a href="{% url 'plugins:socialmedia:organizer_accounts' organizer=organizer.slug %}" class="btn btn-default">
+                        {% trans "Cancel" %}
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}

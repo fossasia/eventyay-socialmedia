@@ -6,15 +6,21 @@ from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.http import Http404, HttpResponse, JsonResponse
+from django.shortcuts import redirect
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_POST
-from django.views.generic import FormView
+from django.views.generic import CreateView, DeleteView, FormView, ListView, UpdateView
+from eventyay.control.permissions import OrganizerPermissionRequiredMixin
 from eventyay.control.views.event import DecoupleMixin
+from eventyay.control.views.organizer_views.organizer_detail_view_mixin import (
+    OrganizerDetailViewMixin,
+)
 
 from .export import build_posts, generate_csv_from_posts, sync_posts_to_db
-from .forms import SocialMediaSettingsForm
-from .models import SocialMediaPost, SocialMediaPostStatus
+from .forms import PROVIDER_FORMS, SocialMediaSettingsForm
+from .models import SocialMediaAccount, SocialMediaPost, SocialMediaPostStatus
 
 
 def _check_plugin_active(request):
@@ -227,3 +233,130 @@ def export_csv(request, organizer, event):
     response = HttpResponse(csv_data, content_type="text/csv; charset=utf-8")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
+
+
+class OrganizerAccountsListView(
+    OrganizerPermissionRequiredMixin, OrganizerDetailViewMixin, ListView
+):
+    model = SocialMediaAccount
+    template_name = "socialmedia/organizer/accounts.html"
+    context_object_name = "accounts"
+    permission = "can_change_organizer_settings"
+
+    def get_queryset(self):
+        return SocialMediaAccount.objects.filter(organizer=self.request.organizer)
+
+
+class OrganizerAccountCreateView(
+    OrganizerPermissionRequiredMixin, OrganizerDetailViewMixin, CreateView
+):
+    model = SocialMediaAccount
+    template_name = "socialmedia/organizer/account_form.html"
+    permission = "can_change_organizer_settings"
+
+    def dispatch(self, request, *args, **kwargs):
+        self.provider = request.GET.get("provider")
+        if not self.provider or self.provider not in PROVIDER_FORMS:
+            messages.error(request, _("Please select a provider first."))
+            return redirect(
+                reverse(
+                    "plugins:socialmedia:organizer_accounts",
+                    kwargs={"organizer": request.organizer.slug},
+                )
+            )
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_class(self):
+        return PROVIDER_FORMS[self.provider]
+
+    def form_valid(self, form):
+        form.instance.organizer = self.request.organizer
+        response = super().form_valid(form)
+        messages.success(self.request, _("Account successfully connected."))
+        return response
+
+    def get_success_url(self):
+        return reverse(
+            "plugins:socialmedia:organizer_accounts",
+            kwargs={"organizer": self.request.organizer.slug},
+        )
+
+
+class OrganizerAccountUpdateView(
+    OrganizerPermissionRequiredMixin, OrganizerDetailViewMixin, UpdateView
+):
+    model = SocialMediaAccount
+    template_name = "socialmedia/organizer/account_form.html"
+    permission = "can_change_organizer_settings"
+
+    def get_object(self, queryset=None):
+        return super(OrganizerDetailViewMixin, self).get_object(queryset)
+
+    def get_queryset(self):
+        return SocialMediaAccount.objects.filter(organizer=self.request.organizer)
+
+    def get_form_class(self):
+        provider = self.get_object().provider
+        return PROVIDER_FORMS.get(provider)
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        messages.success(self.request, _("Account settings updated."))
+        return response
+
+    def get_success_url(self):
+        return reverse(
+            "plugins:socialmedia:organizer_accounts",
+            kwargs={"organizer": self.request.organizer.slug},
+        )
+
+
+class OrganizerAccountDeleteView(
+    OrganizerPermissionRequiredMixin, OrganizerDetailViewMixin, DeleteView
+):
+    model = SocialMediaAccount
+    template_name = "socialmedia/organizer/account_delete.html"
+    permission = "can_change_organizer_settings"
+
+    def get_object(self, queryset=None):
+        return super(OrganizerDetailViewMixin, self).get_object(queryset)
+
+    def get_queryset(self):
+        return SocialMediaAccount.objects.filter(organizer=self.request.organizer)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        account = self.get_object()
+        events = self.request.organizer.events.all()
+
+        active_posts = SocialMediaPost.objects.filter(
+            event__in=events,
+            status=SocialMediaPostStatus.SCHEDULED,
+            scheduled_at__gt=timezone.now(),
+        )
+
+        if account.provider in ["postiz", "buffer"]:
+            has_active = active_posts.exists()
+            count = active_posts.count()
+        else:
+            has_active = active_posts.filter(
+                entity_id__endswith=f"_{account.provider}"
+            ).exists()
+            count = active_posts.filter(
+                entity_id__endswith=f"_{account.provider}"
+            ).count()
+
+        ctx["has_active_posts"] = has_active
+        ctx["active_posts_count"] = count
+        return ctx
+
+    def delete(self, request, *args, **kwargs):
+        response = super().delete(request, *args, **kwargs)
+        messages.success(self.request, _("Account successfully disconnected."))
+        return response
+
+    def get_success_url(self):
+        return reverse(
+            "plugins:socialmedia:organizer_accounts",
+            kwargs={"organizer": self.request.organizer.slug},
+        )

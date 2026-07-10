@@ -6,7 +6,35 @@ from eventyay.control.signals import (
     event_dashboard_components,
     nav_event_common,
     nav_global,
+    nav_organizer,
 )
+
+
+@receiver(nav_organizer, dispatch_uid="socialmedia_nav_organizer")
+def control_nav_organizer_socialmedia(sender, request=None, **kwargs):
+    if not request or not request.user.is_authenticated:
+        return []
+    if not request.user.has_organizer_permission(
+        sender, "can_change_organizer_settings", request=request
+    ):
+        return []
+    url = resolve(request.path_info)
+    return [
+        {
+            "label": _("Social Media Accounts"),
+            "url": reverse(
+                "plugins:socialmedia:organizer_accounts",
+                kwargs={
+                    "organizer": sender.slug,
+                },
+            ),
+            "icon": "share-alt",
+            "active": (
+                url.namespace == "plugins:socialmedia"
+                and url.url_name.startswith("organizer_account")
+            ),
+        }
+    ]
 
 
 @receiver(nav_global, dispatch_uid="socialmedia_nav")

@@ -26,4 +26,24 @@ urlpatterns = [
         views.update_post,
         name="update",
     ),
+    path(
+        "social/organizer/<orgslug:organizer>/accounts/",
+        views.OrganizerAccountsListView.as_view(),
+        name="organizer_accounts",
+    ),
+    path(
+        "social/organizer/<orgslug:organizer>/accounts/add/",
+        views.OrganizerAccountCreateView.as_view(),
+        name="organizer_account_add",
+    ),
+    path(
+        "social/organizer/<orgslug:organizer>/accounts/<int:pk>/edit/",
+        views.OrganizerAccountUpdateView.as_view(),
+        name="organizer_account_edit",
+    ),
+    path(
+        "social/organizer/<orgslug:organizer>/accounts/<int:pk>/delete/",
+        views.OrganizerAccountDeleteView.as_view(),
+        name="organizer_account_delete",
+    ),
 ]

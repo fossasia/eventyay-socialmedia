@@ -1,0 +1,43 @@
+{% extends "eventyay_common/organizers/base.html" %}
+{% load i18n %}
+{% load bootstrap3 %}
+
+{% block title %}
+    {% if object %}
+        {% blocktranslate trimmed with provider=object.get_provider_display %}Edit {{ provider }} Account{% endblocktranslate %}
+    {% else %}
+        {% trans "Connect Account" %}
+    {% endif %}
+    :: {{ organizer.name }}
+{% endblock %}
+
+{% block inner %}
+    <h1>
+        {% if object %}
+            {% blocktranslate trimmed with provider=object.get_provider_display %}Edit {{ provider }} Account{% endblocktranslate %}
+        {% else %}
+            {% blocktranslate trimmed with provider=view.provider|title %}Connect {{ provider }} Account{% endblocktranslate %}
+        {% endif %}
+    </h1>
+
+    <div class="panel panel-default">
+        <div class="panel-body">
+            <form action="" method="post" class="form-horizontal">
+                {% csrf_token %}
+                {% bootstrap_form_errors form %}
+                {% bootstrap_form form layout="horizontal" %}
+
+                <div class="form-group submit-group">
+                    <div class="col-sm-offset-3 col-sm-9">
+                        <button type="submit" class="btn btn-primary">
+                            {% trans "Save Connection" %}
+                        </button>
+                        <a href="{% url 'plugins:socialmedia:organizer_accounts' organizer=organizer.slug %}" class="btn btn-default">
+                            {% trans "Cancel" %}
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}
