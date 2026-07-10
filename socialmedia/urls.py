@@ -21,4 +21,9 @@ urlpatterns = [
         views.export_csv,
         name="export",
     ),
+    path(
+        "social/event/<orgslug:organizer>/<slug:event>/update/",
+        views.update_post,
+        name="update",
+    ),
 ]

@@ -77,8 +77,12 @@ def test_socialmedia_settings_view_post(
 
     assert response.status_code == 302
 
+    from django.core.cache import cache
+
+    cache.clear()
+
     with scope(organizer=organizer, event=event):
-        event.refresh_from_db()
+        event = event.__class__.objects.get(pk=event.pk)
         event.settings.flush()
         assert event.settings.get("socialmedia_default_hashtags") == "#pytest #testing"
         assert event.settings.get("socialmedia_cfp_offset") == "5"
@@ -86,6 +90,47 @@ def test_socialmedia_settings_view_post(
             event.settings.get("socialmedia_cfp_template")
             == "CFP Deadline: {cfp_deadline}"
         )
+
+
+@pytest.mark.django_db
+def test_update_post_view(logged_in_organizer_client, organizer, event, settings):
+    settings.SITE_URL = "https://testserver"
+    from socialmedia.export import sync_posts_to_db
+    from socialmedia.models import SocialMediaPost
+
+    with scope(organizer=organizer, event=event):
+        sync_posts_to_db(event)
+        post = SocialMediaPost.objects.filter(event=event).first()
+        if not post:
+            post = SocialMediaPost.objects.create(
+                event=event,
+                post_type="custom",
+                entity_id="custom_1",
+                scheduled_at=event.date_from or event.created,
+                post_text="Original text",
+            )
+
+    url = reverse(
+        "plugins:socialmedia:update",
+        kwargs={"organizer": organizer.slug, "event": event.slug},
+    )
+    payload = {
+        "db_id": post.pk,
+        "post_text": "Updated custom text",
+        "post_date": "2026-07-01",
+        "post_time": "14:30",
+    }
+    response = logged_in_organizer_client.post(
+        url, data=json.dumps(payload), content_type="application/json"
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["is_pinned"] is True
+
+    post.refresh_from_db()
+    assert post.post_text == "Updated custom text"
+    assert post.is_pinned is True
 
 
 @pytest.mark.django_db
@@ -186,12 +231,112 @@ def test_confirmed_submissions_and_schedule_metadata(
         assert "is_schedule_associated" in post
 
     session_posts = [p for p in posts if p["type"] == "session"]
-    # Should include confirmed session but not accepted session
-    titles = [p["post_text"] for p in session_posts]
-    assert any("Confirmed Session" in t for t in titles)
-    assert not any("Accepted Only Session" in t for t in titles)
+    # Unscheduled submissions should NOT produce session posts — session offsets are
+    # relative to talk start time in minutes, so they are meaningless without one.
+    assert not any("Confirmed Session" in p["post_text"] for p in session_posts)
+    assert not any("Accepted Only Session" in p["post_text"] for p in session_posts)
 
-    # Check unscheduled status
-    conf_post = next(p for p in session_posts if "Confirmed Session" in p["post_text"])
-    assert conf_post["event_schedule_display"] == "Unscheduled"
-    assert conf_post["is_schedule_associated"] is True
+
+@pytest.mark.django_db
+def test_multi_offset_generation_and_db_sync(organizer, event):
+    from eventyay.base.models import Submission, SubmissionStates, User
+
+    from socialmedia.export import build_posts, sync_posts_to_db
+    from socialmedia.models import SocialMediaPost, SocialMediaPostStatus
+
+    try:
+        from eventyay.base.models.type import SubmissionType
+    except ImportError:
+        from eventyay.base.models import SubmissionType
+
+    with scope(organizer=organizer, event=event):
+        event = event.__class__.objects.get(pk=event.pk)
+        sub_type = event.submission_types.first() or SubmissionType.objects.create(
+            event=event, name="Talk"
+        )
+        sub = Submission.objects.create(
+            event=event,
+            submission_type=sub_type,
+            title="Multi Offset Talk",
+            state=SubmissionStates.CONFIRMED,
+            code="MOFF1",
+        )
+        speaker = User.objects.create(fullname="Jane Doe", email="jane@example.com")
+        sub.speakers.add(speaker)
+
+        event.settings.set("socialmedia_speaker_offset", "30, 7, 1")
+        event.settings.flush()
+
+        posts = build_posts(event)
+        speaker_posts = [p for p in posts if p["type"] == "speaker"]
+        assert len(speaker_posts) == 3
+
+        sync_posts_to_db(event)
+        db_posts = SocialMediaPost.objects.filter(event=event, post_type="speaker")
+        assert db_posts.count() == 3
+        assert all(p.status == SocialMediaPostStatus.SCHEDULED for p in db_posts)
+
+
+@pytest.mark.django_db
+def test_post_exclusion_from_preview(
+    logged_in_organizer_client, organizer, event, settings
+):
+    settings.SITE_URL = "https://testserver"
+    import json
+
+    from socialmedia.export import sync_posts_to_db
+    from socialmedia.models import SocialMediaPost
+
+    # 1. Sync posts and get one
+    with scope(organizer=organizer, event=event):
+        sync_posts_to_db(event)
+        post = SocialMediaPost.objects.filter(event=event).first()
+        if not post:
+            post = SocialMediaPost.objects.create(
+                event=event,
+                post_type="custom",
+                entity_id="custom_excl_1",
+                scheduled_at=event.date_from or event.created,
+                post_text="Test exclusion post",
+            )
+
+    # 2. Assert it is present in preview
+    url_preview = reverse(
+        "plugins:socialmedia:preview",
+        kwargs={"organizer": organizer.slug, "event": event.slug},
+    )
+    response = logged_in_organizer_client.get(url_preview)
+    assert response.status_code == 200
+    posts = response.json().get("posts", [])
+    assert any(
+        p.get("id") == post.entity_id or p.get("db_id") == post.pk for p in posts
+    )
+
+    # 3. Update status to excluded
+    url_update = reverse(
+        "plugins:socialmedia:update",
+        kwargs={"organizer": organizer.slug, "event": event.slug},
+    )
+    payload = {
+        "db_id": post.pk,
+        "status": "excluded",
+    }
+    response_update = logged_in_organizer_client.post(
+        url_update, data=json.dumps(payload), content_type="application/json"
+    )
+    assert response_update.status_code == 200
+    assert response_update.json()["status"] == "ok"
+
+    # 4. Assert it is returned with status "excluded"
+    response_after = logged_in_organizer_client.get(url_preview)
+    posts_after = response_after.json().get("posts", [])
+    matched_post = next(
+        (
+            p
+            for p in posts_after
+            if p.get("id") == post.entity_id or p.get("db_id") == post.pk
+        ),
+        None,
+    )
+    assert matched_post is not None
+    assert matched_post.get("status") == "excluded"

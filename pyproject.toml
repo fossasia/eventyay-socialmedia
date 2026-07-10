@@ -53,6 +53,7 @@ namespaces = false
 [tool.ruff]
 line-length = 88
 target-version = "py312"
+extend-exclude = ["socialmedia/migrations/"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]

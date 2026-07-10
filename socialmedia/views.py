@@ -1,5 +1,7 @@
 import json
+from datetime import datetime
 
+import pytz
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
@@ -10,8 +12,9 @@ from django.views.decorators.http import require_POST
 from django.views.generic import FormView
 from eventyay.control.views.event import DecoupleMixin
 
-from .export import build_posts, generate_csv_from_posts
+from .export import build_posts, generate_csv_from_posts, sync_posts_to_db
 from .forms import SocialMediaSettingsForm
+from .models import SocialMediaPost, SocialMediaPostStatus
 
 
 def _check_plugin_active(request):
@@ -79,18 +82,26 @@ class SocialMediaSettingsView(DecoupleMixin, FormView):
                 "event": self.request.event.slug,
             },
         )
+        ctx["update_url"] = reverse(
+            "plugins:socialmedia:update",
+            kwargs={
+                "organizer": self.request.event.organizer.slug,
+                "event": self.request.event.slug,
+            },
+        )
         return ctx
 
     @transaction.atomic
     def form_valid(self, form):
+        self._save_decoupled(form)
+        form.save()
         if form.has_changed():
-            form.save()
-            self._save_decoupled(form)
             self.request.event.log_action(
                 "eventyay.event.settings",
                 user=self.request.user,
                 data={k: form.cleaned_data.get(k) for k in form.changed_data},
             )
+        sync_posts_to_db(self.request.event, self.request)
         messages.success(self.request, _("Your changes have been saved."))
         return super().form_valid(form)
 
@@ -103,14 +114,99 @@ class SocialMediaSettingsView(DecoupleMixin, FormView):
 
 
 def preview_posts(request, organizer, event):
-    """AJAX GET — returns JSON list of generated posts from live DB data."""
+    """AJAX GET — returns JSON list of generated posts merged with DB state.
+
+    This is a read-only view: it calls build_posts() for generation and merges
+    in any existing DB state (pinned text, custom schedule, status).  Writes
+    and cleanup are deliberately deferred to the sync endpoint so that simply
+    loading the preview page cannot mutate or delete persistent records.
+    """
     _check_permission(request)
     _check_plugin_active(request)
     try:
-        posts = build_posts(request.event, request)
-    except Exception as exc:  # pragma: no cover
-        return JsonResponse({"error": str(exc)}, status=500)
+        raw_posts = build_posts(request.event, request)
+        db_posts = {
+            (p.post_type, p.entity_id, p.offset_days): p
+            for p in SocialMediaPost.objects.filter(event=request.event)
+        }
+        posts = []
+        for p in raw_posts:
+            entity_id = str(p["id"])
+            offset = p.get("offset_days", 0)
+            db_p = db_posts.get((p["type"], entity_id, offset))
+            if db_p:
+                p["db_id"] = db_p.pk
+                p["status"] = db_p.status
+                p["is_pinned"] = db_p.is_pinned
+                p["post_text"] = db_p.post_text
+
+                tz = pytz.timezone(getattr(request.event, "timezone", None) or "UTC")
+                local_dt = db_p.scheduled_at.astimezone(tz)
+                p["post_date"] = local_dt.strftime("%Y-%m-%d")
+                p["post_time"] = local_dt.strftime("%H:%M")
+            posts.append(p)
+    except Exception:  # pragma: no cover
+        return JsonResponse({"error": "Internal server error"}, status=500)
     return JsonResponse({"posts": posts})
+
+
+@require_POST
+def update_post(request, organizer, event):
+    """AJAX POST — update social media post copy or scheduled date/time/status."""
+    _check_permission(request)
+    _check_plugin_active(request)
+    try:
+        data = json.loads(request.body)
+        post_id = data.get("id")
+        db_id = data.get("db_id")
+        post_text = data.get("post_text")
+        post_date = data.get("post_date")
+        post_time = data.get("post_time")
+        status = data.get("status")
+
+        is_pinned = data.get("is_pinned")
+
+        post_type = data.get("post_type")
+
+        db_post = None
+        if db_id:
+            db_post = SocialMediaPost.objects.filter(
+                pk=db_id, event=request.event
+            ).first()
+        if not db_post and post_id:
+            lookup_filters = {"entity_id": str(post_id), "event": request.event}
+            if post_type:
+                lookup_filters["post_type"] = post_type
+            db_post = SocialMediaPost.objects.filter(**lookup_filters).first()
+
+        if not db_post:
+            return JsonResponse({"error": "Post not found"}, status=404)
+
+        if post_text is not None:
+            db_post.post_text = post_text
+        if status is not None:
+            if status not in SocialMediaPostStatus.values:
+                return JsonResponse({"error": "Invalid status"}, status=400)
+            db_post.status = status
+        if post_date and post_time:
+            tz = pytz.timezone(getattr(request.event, "timezone", None) or "UTC")
+            dt_str = f"{post_date} {post_time}"
+            naive_dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
+            db_post.scheduled_at = tz.localize(naive_dt)
+
+        if is_pinned is not None:
+            db_post.is_pinned = is_pinned
+        elif post_text is not None or (post_date and post_time):
+            # Auto-pin when the organizer explicitly edits text or reschedules a post
+            db_post.is_pinned = True
+        db_post.save()
+        return JsonResponse(
+            {"status": "ok", "db_id": db_post.pk, "is_pinned": db_post.is_pinned}
+        )
+    except (json.JSONDecodeError, ValueError) as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+    except Exception:
+        return JsonResponse({"error": "Internal server error"}, status=500)
 
 
 @require_POST

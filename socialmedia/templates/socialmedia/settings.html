@@ -41,6 +41,9 @@
     <button class="sm-filter-btn" data-type="schedule">
       {% trans "Schedule" %} <span class="count" id="cnt-schedule">0</span>
     </button>
+    <button class="sm-filter-btn" data-type="excluded">
+      {% trans "Excluded" %} <span class="count" id="cnt-excluded">0</span>
+    </button>
   </div>
 
   <!-- Action bar -->
@@ -50,9 +53,12 @@
     <div class="bulk-schedule-wrap">
       <select id="bulk-schedule-preset" class="form-control input-sm bulk-schedule-select">
         <option value="">{% trans "Schedule preset..." %}</option>
+        <option value="default">{% trans "Revert to default timing" %}</option>
         <option value="0">{% trans "On event / session day" %}</option>
         <option value="-1">{% trans "1 day before" %}</option>
         <option value="-2">{% trans "2 days before" %}</option>
+        <option value="-3">{% trans "3 days before" %}</option>
+        <option value="-5">{% trans "5 days before" %}</option>
         <option value="-7">{% trans "1 week before (7 days)" %}</option>
         <option value="-14">{% trans "2 weeks before (14 days)" %}</option>
         <option value="-30">{% trans "1 month before (30 days)" %}</option>
@@ -80,21 +86,23 @@
           <th>{% trans "Type" %}</th>
           <th><span title="{% trans 'Official date & time of the session on the event agenda schedule.' %}" class="help-tooltip">{% trans "Schedule Date & Time" %}</span></th>
           <th>
-            <span title="{% trans 'The date & time this social media post is scheduled to be published.' %}" class="help-tooltip">{% trans "Post Schedule Date & Time" %}</span>
+            <span title="{% trans 'The date & time this social media post is scheduled to be published.' %}" class="help-tooltip">{% trans "Post Date & Time" %}</span>
             <div class="th-timezone">{{ event.timezone }}</div>
           </th>
           <th>{% trans "Content" %} <span class="th-hint">— {% trans "click to edit" %}</span></th>
+          <th>{% trans "Actions" %}</th>
         </tr>
       </thead>
       <tbody id="posts-tbody">
         <!-- Skeleton rows -->
         {% for i in "12345" %}
         <tr class="skeleton-row">
-          <td><div class="skeleton-bar" style="width:16px;height:16px;border-radius:3px;"></div></td>
-          <td><div class="skeleton-bar" style="width:60px;"></div></td>
-          <td><div class="skeleton-bar" style="width:110px;"></div></td>
-          <td><div class="skeleton-bar" style="width:125px;"></div></td>
-          <td><div class="skeleton-bar" style="width:100%;"></div></td>
+          <td><div class="skeleton-bar"></div></td>
+          <td><div class="skeleton-bar"></div></td>
+          <td><div class="skeleton-bar"></div></td>
+          <td><div class="skeleton-bar"></div></td>
+          <td><div class="skeleton-bar"></div></td>
+          <td><div class="skeleton-bar"></div></td>
         </tr>
         {% endfor %}
       </tbody>
@@ -138,11 +146,39 @@
           <div class="adv-group-title"><i class="fa fa-bullhorn"></i> {% trans "CFP" %}</div>
           {% bootstrap_field form.socialmedia_cfp_enabled layout="horizontal" %}
           {% bootstrap_field form.socialmedia_cfp_offset layout="horizontal" %}
+          <div class="form-group helper-row">
+            <div class="col-md-9 col-md-offset-3">
+              <div class="presets-container" data-target="id_socialmedia_cfp_offset" data-unit="{% trans 'days' %}">
+                <span class="presets-label">{% trans "Quick Presets:" %}</span>
+                <button type="button" class="btn btn-default btn-xs preset-btn" data-val="30">30d</button>
+                <button type="button" class="btn btn-default btn-xs preset-btn" data-val="14">14d</button>
+                <button type="button" class="btn btn-default btn-xs preset-btn" data-val="7">7d</button>
+                <button type="button" class="btn btn-default btn-xs preset-btn" data-val="3">3d</button>
+                <button type="button" class="btn btn-default btn-xs preset-btn" data-val="1">1d</button>
+                <span class="live-offsets-preview"></span>
+              </div>
+            </div>
+          </div>
           <div class="default-template-preview">
-            <strong>{% trans "Default template:" %}</strong>
-            {{ form.default_template_preview.cfp }}
+            <strong>{% trans "Default templates per wave:" %}</strong>
+            <div class="wave-template-list">
+              <div class="wave-template-item"><span class="wave-label">{% trans "30+ days:" %}</span> {{ form.default_template_preview.cfp.announcement }}</div>
+              <div class="wave-template-item"><span class="wave-label">{% trans "3–29 days:" %}</span> {{ form.default_template_preview.cfp.reminder }}</div>
+              <div class="wave-template-item"><span class="wave-label">{% trans "0–2 days:" %}</span> {{ form.default_template_preview.cfp.final_call }}</div>
+            </div>
           </div>
           {% bootstrap_field form.socialmedia_cfp_template layout="horizontal" %}
+          <div class="form-group helper-row">
+            <div class="col-md-9 col-md-offset-3">
+              <div class="tokens-container">
+                <span class="tokens-label">{% trans "Insert Placeholders:" %}</span>
+                <span class="token-chip" data-target="id_socialmedia_cfp_template">{event_name}</span>
+                <span class="token-chip" data-target="id_socialmedia_cfp_template">{cfp_deadline}</span>
+                <span class="token-chip" data-target="id_socialmedia_cfp_template">{cfp_link}</span>
+                <span class="token-chip" data-target="id_socialmedia_cfp_template">{hashtags}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Speaker -->
@@ -150,11 +186,40 @@
           <div class="adv-group-title"><i class="fa fa-user"></i> {% trans "Speaker" %}</div>
           {% bootstrap_field form.socialmedia_speaker_enabled layout="horizontal" %}
           {% bootstrap_field form.socialmedia_speaker_offset layout="horizontal" %}
+          <div class="form-group helper-row">
+            <div class="col-md-9 col-md-offset-3">
+              <div class="presets-container" data-target="id_socialmedia_speaker_offset" data-unit="{% trans 'days' %}">
+                <span class="presets-label">{% trans "Quick Presets:" %}</span>
+                <button type="button" class="btn btn-default btn-xs preset-btn" data-val="30">30d</button>
+                <button type="button" class="btn btn-default btn-xs preset-btn" data-val="14">14d</button>
+                <button type="button" class="btn btn-default btn-xs preset-btn" data-val="7">7d</button>
+                <button type="button" class="btn btn-default btn-xs preset-btn" data-val="3">3d</button>
+                <button type="button" class="btn btn-default btn-xs preset-btn" data-val="1">1d</button>
+                <span class="live-offsets-preview"></span>
+              </div>
+            </div>
+          </div>
           <div class="default-template-preview">
-            <strong>{% trans "Default template:" %}</strong>
-            {{ form.default_template_preview.speaker }}
+            <strong>{% trans "Default templates per wave:" %}</strong>
+            <div class="wave-template-list">
+              <div class="wave-template-item"><span class="wave-label">{% trans "14+ days:" %}</span> {{ form.default_template_preview.speaker.announcement }}</div>
+              <div class="wave-template-item"><span class="wave-label">{% trans "3–13 days:" %}</span> {{ form.default_template_preview.speaker.reminder }}</div>
+              <div class="wave-template-item"><span class="wave-label">{% trans "0–2 days:" %}</span> {{ form.default_template_preview.speaker.final_call }}</div>
+            </div>
           </div>
           {% bootstrap_field form.socialmedia_speaker_template layout="horizontal" %}
+          <div class="form-group helper-row">
+            <div class="col-md-9 col-md-offset-3">
+              <div class="tokens-container">
+                <span class="tokens-label">{% trans "Insert Placeholders:" %}</span>
+                <span class="token-chip" data-target="id_socialmedia_speaker_template">{event_name}</span>
+                <span class="token-chip" data-target="id_socialmedia_speaker_template">{speaker_name}</span>
+                <span class="token-chip" data-target="id_socialmedia_speaker_template">{speaker_link}</span>
+                <span class="token-chip" data-target="id_socialmedia_speaker_template">{talk_title}</span>
+                <span class="token-chip" data-target="id_socialmedia_speaker_template">{hashtags}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Session -->
@@ -162,11 +227,42 @@
           <div class="adv-group-title"><i class="fa fa-calendar"></i> {% trans "Session" %}</div>
           {% bootstrap_field form.socialmedia_session_enabled layout="horizontal" %}
           {% bootstrap_field form.socialmedia_session_offset layout="horizontal" %}
+          <div class="form-group helper-row">
+            <div class="col-md-9 col-md-offset-3">
+              <div class="presets-container" data-target="id_socialmedia_session_offset" data-unit="{% trans 'min' %}">
+                <span class="presets-label">{% trans "Quick Presets:" %}</span>
+                <button type="button" class="btn btn-default btn-xs preset-btn" data-val="1440">1440m</button>
+                <button type="button" class="btn btn-default btn-xs preset-btn" data-val="120">120m</button>
+                <button type="button" class="btn btn-default btn-xs preset-btn" data-val="60">60m</button>
+                <button type="button" class="btn btn-default btn-xs preset-btn" data-val="30">30m</button>
+                <button type="button" class="btn btn-default btn-xs preset-btn" data-val="15">15m</button>
+                <span class="live-offsets-preview"></span>
+              </div>
+            </div>
+          </div>
           <div class="default-template-preview">
-            <strong>{% trans "Default template:" %}</strong>
-            {{ form.default_template_preview.session }}
+            <strong>{% trans "Default templates per wave:" %}</strong>
+            <div class="wave-template-list">
+              <div class="wave-template-item"><span class="wave-label">{% trans "1440+ min:" %}</span> {{ form.default_template_preview.session.announcement }}</div>
+              <div class="wave-template-item"><span class="wave-label">{% trans "60–1439 min:" %}</span> {{ form.default_template_preview.session.reminder }}</div>
+              <div class="wave-template-item"><span class="wave-label">{% trans "0–59 min:" %}</span> {{ form.default_template_preview.session.final_call }}</div>
+            </div>
           </div>
           {% bootstrap_field form.socialmedia_session_template layout="horizontal" %}
+          <div class="form-group helper-row">
+            <div class="col-md-9 col-md-offset-3">
+              <div class="tokens-container">
+                <span class="tokens-label">{% trans "Insert Placeholders:" %}</span>
+                <span class="token-chip" data-target="id_socialmedia_session_template">{event_name}</span>
+                <span class="token-chip" data-target="id_socialmedia_session_template">{talk_title}</span>
+                <span class="token-chip" data-target="id_socialmedia_session_template">{talk_room}</span>
+                <span class="token-chip" data-target="id_socialmedia_session_template">{talk_start_time}</span>
+                <span class="token-chip" data-target="id_socialmedia_session_template">{speaker_names}</span>
+                <span class="token-chip" data-target="id_socialmedia_session_template">{talk_link}</span>
+                <span class="token-chip" data-target="id_socialmedia_session_template">{hashtags}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Ticket -->
@@ -174,11 +270,40 @@
           <div class="adv-group-title"><i class="fa fa-ticket"></i> {% trans "Ticket" %}</div>
           {% bootstrap_field form.socialmedia_ticket_enabled layout="horizontal" %}
           {% bootstrap_field form.socialmedia_ticket_offset layout="horizontal" %}
+          <div class="form-group helper-row">
+            <div class="col-md-9 col-md-offset-3">
+              <div class="presets-container" data-target="id_socialmedia_ticket_offset" data-unit="{% trans 'days' %}">
+                <span class="presets-label">{% trans "Quick Presets:" %}</span>
+                <button type="button" class="btn btn-default btn-xs preset-btn" data-val="30">30d</button>
+                <button type="button" class="btn btn-default btn-xs preset-btn" data-val="14">14d</button>
+                <button type="button" class="btn btn-default btn-xs preset-btn" data-val="7">7d</button>
+                <button type="button" class="btn btn-default btn-xs preset-btn" data-val="5">5d</button>
+                <button type="button" class="btn btn-default btn-xs preset-btn" data-val="1">1d</button>
+                <span class="live-offsets-preview"></span>
+              </div>
+            </div>
+          </div>
           <div class="default-template-preview">
-            <strong>{% trans "Default template:" %}</strong>
-            {{ form.default_template_preview.ticket }}
+            <strong>{% trans "Default templates per wave:" %}</strong>
+            <div class="wave-template-list">
+              <div class="wave-template-item"><span class="wave-label">{% trans "14+ days:" %}</span> {{ form.default_template_preview.ticket.announcement }}</div>
+              <div class="wave-template-item"><span class="wave-label">{% trans "3–13 days:" %}</span> {{ form.default_template_preview.ticket.reminder }}</div>
+              <div class="wave-template-item"><span class="wave-label">{% trans "0–2 days:" %}</span> {{ form.default_template_preview.ticket.final_call }}</div>
+            </div>
           </div>
           {% bootstrap_field form.socialmedia_ticket_template layout="horizontal" %}
+          <div class="form-group helper-row">
+            <div class="col-md-9 col-md-offset-3">
+              <div class="tokens-container">
+                <span class="tokens-label">{% trans "Insert Placeholders:" %}</span>
+                <span class="token-chip" data-target="id_socialmedia_ticket_template">{event_name}</span>
+                <span class="token-chip" data-target="id_socialmedia_ticket_template">{ticket_name}</span>
+                <span class="token-chip" data-target="id_socialmedia_ticket_template">{ticket_price}</span>
+                <span class="token-chip" data-target="id_socialmedia_ticket_template">{ticket_link}</span>
+                <span class="token-chip" data-target="id_socialmedia_ticket_template">{hashtags}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Schedule -->
@@ -186,11 +311,37 @@
           <div class="adv-group-title"><i class="fa fa-list-alt"></i> {% trans "Schedule" %}</div>
           {% bootstrap_field form.socialmedia_schedule_enabled layout="horizontal" %}
           {% bootstrap_field form.socialmedia_schedule_offset layout="horizontal" %}
+          <div class="form-group helper-row">
+            <div class="col-md-9 col-md-offset-3">
+              <div class="presets-container" data-target="id_socialmedia_schedule_offset" data-unit="{% trans 'days' %}">
+                <span class="presets-label">{% trans "Quick Presets:" %}</span>
+                <button type="button" class="btn btn-default btn-xs preset-btn" data-val="14">14d</button>
+                <button type="button" class="btn btn-default btn-xs preset-btn" data-val="7">7d</button>
+                <button type="button" class="btn btn-default btn-xs preset-btn" data-val="3">3d</button>
+                <button type="button" class="btn btn-default btn-xs preset-btn" data-val="2">2d</button>
+                <button type="button" class="btn btn-default btn-xs preset-btn" data-val="1">1d</button>
+                <span class="live-offsets-preview"></span>
+              </div>
+            </div>
+          </div>
           <div class="default-template-preview">
-            <strong>{% trans "Default template:" %}</strong>
-            {{ form.default_template_preview.schedule }}
+            <strong>{% trans "Default templates per wave:" %}</strong>
+            <div class="wave-template-list">
+              <div class="wave-template-item"><span class="wave-label">{% trans "7+ days:" %}</span> {{ form.default_template_preview.schedule.announcement }}</div>
+              <div class="wave-template-item"><span class="wave-label">{% trans "0–6 days:" %}</span> {{ form.default_template_preview.schedule.reminder }}</div>
+            </div>
           </div>
           {% bootstrap_field form.socialmedia_schedule_template layout="horizontal" %}
+          <div class="form-group helper-row">
+            <div class="col-md-9 col-md-offset-3">
+              <div class="tokens-container">
+                <span class="tokens-label">{% trans "Insert Placeholders:" %}</span>
+                <span class="token-chip" data-target="id_socialmedia_schedule_template">{event_name}</span>
+                <span class="token-chip" data-target="id_socialmedia_schedule_template">{schedule_link}</span>
+                <span class="token-chip" data-target="id_socialmedia_schedule_template">{hashtags}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div style="padding-top: 10px; border-top: 1px solid #eee; display:flex; gap:10px;">
@@ -210,6 +361,7 @@
   {
     "previewUrl": "{{ preview_url }}",
     "exportUrl": "{{ export_url }}",
+    "updateUrl": "{{ update_url }}",
     "csrfToken": "{{ csrf_token }}",
     "transSelectAtLeastOne": "{% trans 'Please select at least one post to export.' %}",
     "transClickToEdit": "{% trans 'Click to edit · Ctrl+Enter to save' %}"
