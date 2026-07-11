@@ -98,13 +98,13 @@
         <!-- Skeleton rows -->
         {% for i in "12345" %}
         <tr class="skeleton-row">
-          <td><div class="skeleton-bar" style="width:16px;height:16px;border-radius:3px;"></div></td>
-          <td><div class="skeleton-bar" style="width:60px;"></div></td>
-          <td><div class="skeleton-bar" style="width:80px;"></div></td>
-          <td><div class="skeleton-bar" style="width:110px;"></div></td>
-          <td><div class="skeleton-bar" style="width:125px;"></div></td>
-          <td><div class="skeleton-bar" style="width:100%;"></div></td>
-          <td><div class="skeleton-bar" style="width:30px;"></div></td>
+          <td><div class="skeleton-bar skeleton-col-check"></div></td>
+          <td><div class="skeleton-bar skeleton-col-type"></div></td>
+          <td><div class="skeleton-bar skeleton-col-platform"></div></td>
+          <td><div class="skeleton-bar skeleton-col-date"></div></td>
+          <td><div class="skeleton-bar skeleton-col-postdate"></div></td>
+          <td><div class="skeleton-bar skeleton-col-content"></div></td>
+          <td><div class="skeleton-bar skeleton-col-actions"></div></td>
         </tr>
         {% endfor %}
       </tbody>
@@ -167,17 +167,17 @@
               </div>
             </div>
 
-            <!-- Mastodon -->
-            <div class="platform-block" id="platform-block-mastodon">
+            <!-- LinkedIn -->
+            <div class="platform-block" id="platform-block-linkedin">
               <div class="platform-block-header">
-                {% bootstrap_field form.socialmedia_mastodon_enabled layout="horizontal" %}
+                {% bootstrap_field form.socialmedia_linkedin_enabled layout="horizontal" %}
               </div>
-              <div class="platform-block-templates" id="plat-tpls-mastodon">
-                {% bootstrap_field form.socialmedia_mastodon_cfp_template layout="horizontal" %}
-                {% bootstrap_field form.socialmedia_mastodon_speaker_template layout="horizontal" %}
-                {% bootstrap_field form.socialmedia_mastodon_session_template layout="horizontal" %}
-                {% bootstrap_field form.socialmedia_mastodon_ticket_template layout="horizontal" %}
-                {% bootstrap_field form.socialmedia_mastodon_schedule_template layout="horizontal" %}
+              <div class="platform-block-templates" id="plat-tpls-linkedin">
+                {% bootstrap_field form.socialmedia_linkedin_cfp_template layout="horizontal" %}
+                {% bootstrap_field form.socialmedia_linkedin_speaker_template layout="horizontal" %}
+                {% bootstrap_field form.socialmedia_linkedin_session_template layout="horizontal" %}
+                {% bootstrap_field form.socialmedia_linkedin_ticket_template layout="horizontal" %}
+                {% bootstrap_field form.socialmedia_linkedin_schedule_template layout="horizontal" %}
               </div>
             </div>
 
@@ -195,17 +195,17 @@
               </div>
             </div>
 
-            <!-- LinkedIn -->
-            <div class="platform-block" id="platform-block-linkedin">
+            <!-- Mastodon -->
+            <div class="platform-block" id="platform-block-mastodon">
               <div class="platform-block-header">
-                {% bootstrap_field form.socialmedia_linkedin_enabled layout="horizontal" %}
+                {% bootstrap_field form.socialmedia_mastodon_enabled layout="horizontal" %}
               </div>
-              <div class="platform-block-templates" id="plat-tpls-linkedin">
-                {% bootstrap_field form.socialmedia_linkedin_cfp_template layout="horizontal" %}
-                {% bootstrap_field form.socialmedia_linkedin_speaker_template layout="horizontal" %}
-                {% bootstrap_field form.socialmedia_linkedin_session_template layout="horizontal" %}
-                {% bootstrap_field form.socialmedia_linkedin_ticket_template layout="horizontal" %}
-                {% bootstrap_field form.socialmedia_linkedin_schedule_template layout="horizontal" %}
+              <div class="platform-block-templates" id="plat-tpls-mastodon">
+                {% bootstrap_field form.socialmedia_mastodon_cfp_template layout="horizontal" %}
+                {% bootstrap_field form.socialmedia_mastodon_speaker_template layout="horizontal" %}
+                {% bootstrap_field form.socialmedia_mastodon_session_template layout="horizontal" %}
+                {% bootstrap_field form.socialmedia_mastodon_ticket_template layout="horizontal" %}
+                {% bootstrap_field form.socialmedia_mastodon_schedule_template layout="horizontal" %}
               </div>
             </div>
           </div>

@@ -935,3 +935,16 @@ body .sm-toast i {
 .skeleton-row td:nth-child(6) .skeleton-bar {
   width: 30px;
 }
+
+/* Named skeleton column helpers (match HTML class names) */
+.skeleton-bar.skeleton-col-check {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+}
+.skeleton-bar.skeleton-col-type    { width: 60px; }
+.skeleton-bar.skeleton-col-platform { width: 80px; }
+.skeleton-bar.skeleton-col-date    { width: 110px; }
+.skeleton-bar.skeleton-col-postdate { width: 125px; }
+.skeleton-bar.skeleton-col-content { width: 100%; }
+.skeleton-bar.skeleton-col-actions { width: 30px; }

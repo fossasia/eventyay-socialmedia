@@ -91,9 +91,9 @@ DEFAULT_TEMPLATES = {
 
 PLATFORMS = {
     "twitter": "X / Twitter",
-    "mastodon": "Mastodon",
-    "telegram": "Telegram",
     "linkedin": "LinkedIn",
+    "telegram": "Telegram",
+    "mastodon": "Mastodon",
 }
 
 # Platform-specific default template overrides.
@@ -182,10 +182,66 @@ PLATFORM_DEFAULT_TEMPLATES = {
                 "Submit now: {cfp_link} {hashtags}"
             ),
         },
-        "speaker": DEFAULT_TEMPLATES["speaker"],
-        "session": DEFAULT_TEMPLATES["session"],
-        "ticket": DEFAULT_TEMPLATES["ticket"],
-        "schedule": DEFAULT_TEMPLATES["schedule"],
+        "speaker": {
+            "announcement": (
+                "🎤 Speaker announcement for {event_name}!\n"
+                "{speaker_name} will present '{talk_title}'.\n"
+                "Learn more: {speaker_link}\n{hashtags}"
+            ),
+            "reminder": (
+                "🗓 Reminder: {speaker_name} is presenting '{talk_title}' "
+                "at {event_name}!\n"
+                "Details: {speaker_link}\n{hashtags}"
+            ),
+            "final_call": (
+                "🔥 Starting soon! Catch {speaker_name} presenting "
+                "'{talk_title}' at {event_name}.\n"
+                "{speaker_link}\n{hashtags}"
+            ),
+        },
+        "session": {
+            "announcement": (
+                "🗓 Upcoming session at {event_name}:\n"
+                "'{talk_title}' by {speaker_names}\n"
+                "Room: {talk_room} | Time: {talk_start_time}\n"
+                "Full info: {talk_link}\n{hashtags}"
+            ),
+            "reminder": (
+                "⏰ Session starting soon at {event_name}:\n"
+                "'{talk_title}' by {speaker_names} at {talk_start_time}\n"
+                "{talk_link}\n{hashtags}"
+            ),
+            "final_call": (
+                "🔥 Starting now! '{talk_title}' by {speaker_names} "
+                "in {talk_room}.\n"
+                "Join: {talk_link}\n{hashtags}"
+            ),
+        },
+        "ticket": {
+            "announcement": (
+                "🎟 Tickets now available for {event_name}!\n"
+                "{ticket_name} — {ticket_price}\n"
+                "Register: {ticket_link}\n{hashtags}"
+            ),
+            "reminder": (
+                "⚡ Still time to register for {event_name}!\n"
+                "{ticket_name}: {ticket_link}\n{hashtags}"
+            ),
+            "final_call": (
+                "🔥 Last chance! Grab your {ticket_name} ticket for "
+                "{event_name}: {ticket_link}\n{hashtags}"
+            ),
+        },
+        "schedule": {
+            "announcement": (
+                "📅 The {event_name} schedule is live!\n"
+                "Browse sessions and plan your days: {schedule_link}\n{hashtags}"
+            ),
+            "reminder": (
+                "🗓 Have you checked the {event_name} schedule?\n"
+                "{schedule_link}\n{hashtags}"
+            ),
+        },
     },
     "telegram": {
         # Telegram supports Markdown; use bold via *text*
