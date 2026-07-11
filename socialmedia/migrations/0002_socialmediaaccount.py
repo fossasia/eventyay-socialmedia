@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("base", "0043_remove_order_order_code_trgm_and_more"),
+        ("base", "0043_remove_sendmail_from_plugins"),
         ("socialmedia", "0001_initial"),
     ]
 
