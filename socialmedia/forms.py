@@ -2,7 +2,7 @@ from django import forms
 from django.utils.translation import gettext_lazy as _
 from eventyay.base.forms import SettingsForm
 
-from .export import DEFAULT_TEMPLATES
+from .export import DEFAULT_TEMPLATES, PLATFORMS
 
 MAX_OFFSETS = 10
 MAX_OFFSET_VALUE_CFP = 365
@@ -10,6 +10,46 @@ MAX_OFFSET_VALUE_SPEAKER = 365
 MAX_OFFSET_VALUE_SESSION = 1440
 MAX_OFFSET_VALUE_TICKET = 365
 MAX_OFFSET_VALUE_SCHEDULE = 90
+
+# Display order for platforms in the UI
+PLATFORM_ORDER = ["twitter", "linkedin", "telegram", "mastodon"]
+
+# Character limits per platform (None means no enforced limit)
+PLATFORM_CHAR_LIMITS = {
+    "twitter": 280,
+    "mastodon": 500,
+    "telegram": None,
+    "linkedin": None,
+}
+
+# Extra help-text hints per platform
+_PLATFORM_HINTS = {
+    "twitter": "≤280 chars.",
+    "mastodon": "≤500 chars.",
+    "telegram": "Markdown supported.",
+    "linkedin": "Professional tone.",
+}
+
+# Available placeholder tokens per post type
+_TYPE_TOKENS = {
+    "cfp": "{event_name}, {cfp_deadline}, {cfp_link}, {hashtags}",
+    "speaker": "{event_name}, {speaker_name}, {speaker_link}, {talk_title}, {hashtags}",
+    "session": (
+        "{event_name}, {talk_title}, {talk_room}, {talk_start_time}, "
+        "{speaker_names}, {talk_link}, {hashtags}"
+    ),
+    "ticket": "{event_name}, {ticket_name}, {ticket_price}, {ticket_link}, {hashtags}",
+    "schedule": "{event_name}, {schedule_link}, {hashtags}",
+}
+
+# Human-readable post-type labels
+_TYPE_LABELS = {
+    "cfp": "CFP",
+    "speaker": "Speaker",
+    "session": "Session",
+    "ticket": "Ticket",
+    "schedule": "Schedule",
+}
 
 
 def _validate_offsets(value, max_value, unit_label="days"):
@@ -49,6 +89,30 @@ def _validate_offsets(value, max_value, unit_label="days"):
     return ", ".join(str(v) for v in sorted(cleaned, reverse=True))
 
 
+def _check_platform_char_limit(value, limit, platform_name):
+    """Raise ValidationError if the template text (excluding {token} placeholders)
+    already exceeds the platform character limit."""
+    import re
+
+    if not value or not limit:
+        return value
+    stripped = re.sub(r"\{[^}]+\}", "", value)
+    if len(stripped) > limit:
+        raise forms.ValidationError(
+            _(
+                "The template text (excluding placeholders) is %(length)s characters, "
+                "which already exceeds the %(platform)s limit of %(limit)s characters. "
+                "Shorten the template so interpolated posts fit within the limit."
+            ),
+            params={
+                "length": len(stripped),
+                "platform": platform_name,
+                "limit": limit,
+            },
+        )
+    return value
+
+
 class SocialMediaSettingsForm(SettingsForm):
     # ------------------------------------------------------------------
     # Global settings
@@ -70,6 +134,43 @@ class SocialMediaSettingsForm(SettingsForm):
         required=False,
         max_length=200,
     )
+
+    # ------------------------------------------------------------------
+    # Platform toggles  (order: Twitter, LinkedIn, Telegram, Mastodon)
+    # ------------------------------------------------------------------
+    socialmedia_twitter_enabled = forms.BooleanField(
+        label=_("Enable X / Twitter"),
+        help_text=_(
+            "Generate separate draft posts optimised for X / Twitter (≤280 chars)."
+        ),
+        required=False,
+        initial=False,
+    )
+    socialmedia_linkedin_enabled = forms.BooleanField(
+        label=_("Enable LinkedIn"),
+        help_text=_(
+            "Generate separate draft posts for LinkedIn (long-form, professional tone)."
+        ),
+        required=False,
+        initial=False,
+    )
+    socialmedia_telegram_enabled = forms.BooleanField(
+        label=_("Enable Telegram"),
+        help_text=_(
+            "Generate separate draft posts for Telegram (Markdown formatting)."
+        ),
+        required=False,
+        initial=False,
+    )
+    socialmedia_mastodon_enabled = forms.BooleanField(
+        label=_("Enable Mastodon"),
+        help_text=_("Generate separate draft posts for Mastodon (≤500 chars)."),
+        required=False,
+        initial=False,
+    )
+
+    # Per-platform × per-type template fields are generated dynamically
+    # in __init__() below via PLATFORM_ORDER × _TYPE_LABELS.
 
     # ------------------------------------------------------------------
     # CFP
@@ -277,3 +378,66 @@ class SocialMediaSettingsForm(SettingsForm):
             MAX_OFFSET_VALUE_SCHEDULE,
             "days",
         )
+
+    # ------------------------------------------------------------------
+    # Dynamic per-platform template field generation
+    # ------------------------------------------------------------------
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Generate per-platform × per-type template fields.
+        # Field order follows PLATFORM_ORDER × _TYPE_LABELS.
+        for platform in PLATFORM_ORDER:
+            platform_label = PLATFORMS[platform]
+            hint = _PLATFORM_HINTS.get(platform, "")
+            rows = 3 if platform == "linkedin" else 2
+            for post_type, type_label in _TYPE_LABELS.items():
+                tokens = _TYPE_TOKENS[post_type]
+                field_name = f"socialmedia_{platform}_{post_type}_template"
+                help_parts = [
+                    f"Leave blank to use the {platform_label}-specific default."
+                ]
+                if hint:
+                    help_parts.append(hint)
+                help_parts.append(f"Available: {tokens}")
+                self.fields[field_name] = forms.CharField(
+                    label=f"{platform_label} \u2014 {type_label} template",
+                    widget=forms.Textarea(attrs={"rows": rows}),
+                    required=False,
+                    help_text=" ".join(help_parts),
+                )
+
+    # ------------------------------------------------------------------
+    # Per-platform character limit validation (helper, called by generated methods)
+    # ------------------------------------------------------------------
+    def _clean_platform_template(self, field_name, platform):
+        value = self.cleaned_data.get(field_name, "")
+        limit = PLATFORM_CHAR_LIMITS.get(platform)
+        platform_label = PLATFORMS.get(platform, platform)
+        return _check_platform_char_limit(value, limit, platform_label)
+
+
+def _add_platform_clean_methods():
+    """Dynamically attach clean_<field>() methods to SocialMediaSettingsForm
+    for all platform × type combinations that have a character limit."""
+    for platform in PLATFORM_ORDER:
+        if PLATFORM_CHAR_LIMITS.get(platform) is None:
+            continue
+        for post_type in _TYPE_LABELS:
+            field_name = f"socialmedia_{platform}_{post_type}_template"
+            method_name = f"clean_{field_name}"
+
+            def _make_cleaner(fn, pl):
+                def cleaner(self):
+                    return self._clean_platform_template(fn, pl)
+
+                cleaner.__name__ = f"clean_{fn}"
+                return cleaner
+
+            setattr(
+                SocialMediaSettingsForm,
+                method_name,
+                _make_cleaner(field_name, platform),
+            )
+
+
+_add_platform_clean_methods()

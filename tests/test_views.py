@@ -340,3 +340,149 @@ def test_post_exclusion_from_preview(
     )
     assert matched_post is not None
     assert matched_post.get("status") == "excluded"
+
+
+# ---------------------------------------------------------------------------
+# Multi-platform tests (Issue #21)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_multi_platform_build_posts(organizer, event):
+    """Enabling 2 platforms should double the number of posts generated, and
+    every post should have a 'platform' field matching one of the enabled ones."""
+    from django_scopes import scope
+
+    from socialmedia.export import build_posts
+
+    with scope(organizer=organizer, event=event):
+        event = event.__class__.objects.get(pk=event.pk)
+        event.settings.set("socialmedia_twitter_enabled", True)
+        event.settings.set("socialmedia_linkedin_enabled", True)
+        # Ensure at least one content type is enabled so posts are generated
+        event.settings.set("socialmedia_schedule_enabled", True)
+        event.settings.flush()
+
+        posts_without_platforms = []
+        # Temporarily collect the count without platforms
+        event.settings.set("socialmedia_twitter_enabled", False)
+        event.settings.set("socialmedia_linkedin_enabled", False)
+        event.settings.flush()
+        posts_without_platforms = build_posts(event)
+
+        event.settings.set("socialmedia_twitter_enabled", True)
+        event.settings.set("socialmedia_linkedin_enabled", True)
+        event.settings.flush()
+        posts_with_platforms = build_posts(event)
+
+    # Posts with 2 platforms should be 2× the generic count (if any generic exist)
+    if posts_without_platforms:
+        assert len(posts_with_platforms) == len(posts_without_platforms) * 2
+
+    # Every post must have a 'platform' key set to one of the enabled platforms
+    for post in posts_with_platforms:
+        assert "platform" in post
+        assert post["platform"] in ("twitter", "linkedin")
+
+
+@pytest.mark.django_db
+def test_platform_uses_correct_template(organizer, event):
+    """A platform-specific saved template should appear in the generated post text."""
+    from django_scopes import scope
+
+    from socialmedia.export import build_posts
+
+    custom_tpl = "CUSTOM_TWITTER_SCHEDULE: {schedule_link}"
+
+    with scope(organizer=organizer, event=event):
+        event = event.__class__.objects.get(pk=event.pk)
+        event.settings.set("socialmedia_twitter_enabled", True)
+        event.settings.set("socialmedia_schedule_enabled", True)
+        event.settings.set("socialmedia_twitter_schedule_template", custom_tpl)
+        event.settings.flush()
+
+        posts = build_posts(event)
+
+    twitter_schedule_posts = [
+        p for p in posts if p["type"] == "schedule" and p.get("platform") == "twitter"
+    ]
+    assert twitter_schedule_posts, "Expected at least one Twitter schedule post"
+    assert all(
+        "CUSTOM_TWITTER_SCHEDULE" in p["post_text"] for p in twitter_schedule_posts
+    )
+
+
+@pytest.mark.django_db
+def test_no_platforms_fallback(organizer, event):
+    """When no platforms are enabled, posts should have no platform key (or None)
+    — preserving full backwards compatibility."""
+    from django_scopes import scope
+
+    from socialmedia.export import build_posts
+
+    with scope(organizer=organizer, event=event):
+        event = event.__class__.objects.get(pk=event.pk)
+        for plat in ("twitter", "mastodon", "telegram", "linkedin"):
+            event.settings.set(f"socialmedia_{plat}_enabled", False)
+        event.settings.set("socialmedia_schedule_enabled", True)
+        event.settings.flush()
+
+        posts = build_posts(event)
+
+    for post in posts:
+        assert (
+            post.get("platform") is None
+        ), f"Expected no platform on post {post['id']}, got {post['platform']!r}"
+
+
+@pytest.mark.django_db
+def test_export_csv_presets(logged_in_organizer_client, organizer, event, settings):
+    settings.SITE_URL = "https://testserver"
+    url = reverse(
+        "plugins:socialmedia:export",
+        kwargs={"organizer": organizer.slug, "event": event.slug},
+    )
+    payload_base = {
+        "posts": [
+            {
+                "enabled": True,
+                "post_date": "2026-06-20",
+                "post_time": "12:00",
+                "post_text": "Hello world!",
+                "media_url": "https://testserver/img.png",
+            }
+        ]
+    }
+
+    # Test Postiz preset
+    payload = payload_base.copy()
+    payload["format"] = "postiz"
+    response = logged_in_organizer_client.post(
+        url, data=json.dumps(payload), content_type="application/json"
+    )
+    assert response.status_code == 200
+    content = response.content.decode("utf-8")
+    assert "content,date,time,media" in content
+    assert "Hello world!,2026-06-20,12:00,https://testserver/img.png" in content
+
+    # Test Buffer preset
+    payload = payload_base.copy()
+    payload["format"] = "buffer"
+    response = logged_in_organizer_client.post(
+        url, data=json.dumps(payload), content_type="application/json"
+    )
+    assert response.status_code == 200
+    content = response.content.decode("utf-8")
+    assert "text,scheduled_at,link,image" in content
+    assert "Hello world!,2026-06-20 12:00,,https://testserver/img.png" in content
+
+    # Test Hootsuite preset
+    payload = payload_base.copy()
+    payload["format"] = "hootsuite"
+    response = logged_in_organizer_client.post(
+        url, data=json.dumps(payload), content_type="application/json"
+    )
+    assert response.status_code == 200
+    content = response.content.decode("utf-8")
+    assert "date,time,text,link" in content
+    assert "2026-06-20,12:00,Hello world!,https://testserver/img.png" in content

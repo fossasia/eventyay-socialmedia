@@ -187,7 +187,44 @@
   color: #7a6000;
 }
 
-/* Date/time cell */
+/* Platform badge */
+.platform-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.plat-twitter {
+  background: #e8f6ff;
+  color: #1a8cd8;
+}
+
+.plat-mastodon {
+  background: #ede8ff;
+  color: #6364ff;
+}
+
+.plat-telegram {
+  background: #e8f7ff;
+  color: #0088cc;
+}
+
+.plat-linkedin {
+  background: #e8f0fb;
+  color: #0077b5;
+}
+
+.plat-generic {
+  background: #f2f2f2;
+  color: #777;
+}
+
+
 .dt-cell {
   white-space: nowrap;
 }
@@ -357,6 +394,37 @@
   gap: 6px;
 }
 
+.adv-group-desc {
+  font-size: 12px;
+  color: #777;
+  margin: -6px 0 12px;
+  line-height: 1.5;
+}
+
+.platform-toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.platform-block {
+  border: 1px solid #e8e8e8;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.platform-block-header {
+  padding: 4px 0;
+}
+
+.platform-block-templates {
+  border-top: 1px solid #f0f0f0;
+  padding: 8px 0 0;
+  background: #fafafa;
+}
+
 .default-template-preview {
   background: #f0f4ff;
   border: 1px solid #c8d8f0;
@@ -378,28 +446,21 @@
 
 /* ---- Export button bar ---- */
 .export-bar {
-  position: sticky;
-  bottom: 0;
-  background: rgba(255, 255, 255, .95);
-  backdrop-filter: blur(4px);
-  border-top: 1px solid #e4e4e4;
-  padding: 12px 0;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 10px;
-  z-index: 100;
-  margin: 0 -15px;
-  padding-left: 15px;
-  padding-right: 15px;
+  padding: 10px 0;
+  margin-top: 8px;
 }
 
 .export-bar .selected-count {
   font-size: 13px;
   color: #666;
+  margin-right: auto;
 }
 
 .export-bar .btn-export {
-  margin-left: auto;
 }
 
 /* Time input styling to ensure AM/PM and clock picker are fully visible */
@@ -673,6 +734,17 @@ body .sm-toast i {
   flex-wrap: wrap;
 }
 
+.char-count.has-warning {
+  color: #d9534f;
+  font-weight: 700;
+}
+
+.post-text-edit.has-error {
+  border-color: #d9534f;
+  box-shadow: inset 0 1px 1px rgba(0,0,0,.075), 0 0 8px rgba(217, 83, 79, .6);
+}
+
+
 /* ---- Validation alert banner ---- */
 .sm-validation-alert {
   margin-bottom: 12px;
@@ -863,3 +935,16 @@ body .sm-toast i {
 .skeleton-row td:nth-child(6) .skeleton-bar {
   width: 30px;
 }
+
+/* Named skeleton column helpers (match HTML class names) */
+.skeleton-bar.skeleton-col-check {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+}
+.skeleton-bar.skeleton-col-type    { width: 60px; }
+.skeleton-bar.skeleton-col-platform { width: 80px; }
+.skeleton-bar.skeleton-col-date    { width: 110px; }
+.skeleton-bar.skeleton-col-postdate { width: 125px; }
+.skeleton-bar.skeleton-col-content { width: 100%; }
+.skeleton-bar.skeleton-col-actions { width: 30px; }

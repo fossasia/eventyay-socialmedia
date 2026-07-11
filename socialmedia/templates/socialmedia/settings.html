@@ -84,6 +84,7 @@
         <tr>
           <th><input type="checkbox" id="chk-all" title="{% trans 'Toggle all' %}"></th>
           <th>{% trans "Type" %}</th>
+          <th>{% trans "Platform" %}</th>
           <th><span title="{% trans 'Official date & time of the session on the event agenda schedule.' %}" class="help-tooltip">{% trans "Schedule Date & Time" %}</span></th>
           <th>
             <span title="{% trans 'The date & time this social media post is scheduled to be published.' %}" class="help-tooltip">{% trans "Post Date & Time" %}</span>
@@ -97,25 +98,35 @@
         <!-- Skeleton rows -->
         {% for i in "12345" %}
         <tr class="skeleton-row">
-          <td><div class="skeleton-bar"></div></td>
-          <td><div class="skeleton-bar"></div></td>
-          <td><div class="skeleton-bar"></div></td>
-          <td><div class="skeleton-bar"></div></td>
-          <td><div class="skeleton-bar"></div></td>
-          <td><div class="skeleton-bar"></div></td>
+          <td><div class="skeleton-bar skeleton-col-check"></div></td>
+          <td><div class="skeleton-bar skeleton-col-type"></div></td>
+          <td><div class="skeleton-bar skeleton-col-platform"></div></td>
+          <td><div class="skeleton-bar skeleton-col-date"></div></td>
+          <td><div class="skeleton-bar skeleton-col-postdate"></div></td>
+          <td><div class="skeleton-bar skeleton-col-content"></div></td>
+          <td><div class="skeleton-bar skeleton-col-actions"></div></td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 
-  <!-- Sticky export bar -->
+  <!-- Export bar (below table, right-aligned) -->
   <div class="export-bar">
     <span class="selected-count" id="export-count">0 {% trans "posts selected" %}</span>
-    <button id="btn-export" class="btn btn-primary btn-export">
-      <i class="fa fa-download"></i> {% trans "Export CSV" %}
-    </button>
+    <div style="display: inline-flex; align-items: center; gap: 8px;">
+      <select id="export-preset-select" class="form-control input-sm" style="width: 150px; display: inline-block;">
+        <option value="generic">{% trans "Generic CSV" %}</option>
+        <option value="postiz">{% trans "Postiz CSV" %}</option>
+        <option value="buffer">{% trans "Buffer CSV" %}</option>
+        <option value="hootsuite">{% trans "Hootsuite CSV" %}</option>
+      </select>
+      <button id="btn-export" class="btn btn-primary btn-export">
+        <i class="fa fa-download"></i> {% trans "Export CSV" %}
+      </button>
+    </div>
   </div>
+
 
   <!-- ================================================================
        Advanced Settings (collapsible)
@@ -133,6 +144,72 @@
       <form action="" method="post" class="form-horizontal">
         {% csrf_token %}
         {% bootstrap_form_errors form %}
+
+        <!-- Platforms -->
+        <div class="adv-group">
+          <div class="adv-group-title"><i class="fa fa-share-alt"></i> {% trans "Platforms" %}</div>
+          <p class="adv-group-desc">
+            {% trans "Enable the platforms you post to. Each enabled platform generates its own draft row in the preview table with a platform-specific default template. Leave all disabled to generate a single generic draft per content item." %}
+          </p>
+
+          <div class="platform-toggles">
+            <!-- Twitter / X -->
+            <div class="platform-block" id="platform-block-twitter">
+              <div class="platform-block-header">
+                {% bootstrap_field form.socialmedia_twitter_enabled layout="horizontal" %}
+              </div>
+              <div class="platform-block-templates" id="plat-tpls-twitter">
+                {% bootstrap_field form.socialmedia_twitter_cfp_template layout="horizontal" %}
+                {% bootstrap_field form.socialmedia_twitter_speaker_template layout="horizontal" %}
+                {% bootstrap_field form.socialmedia_twitter_session_template layout="horizontal" %}
+                {% bootstrap_field form.socialmedia_twitter_ticket_template layout="horizontal" %}
+                {% bootstrap_field form.socialmedia_twitter_schedule_template layout="horizontal" %}
+              </div>
+            </div>
+
+            <!-- LinkedIn -->
+            <div class="platform-block" id="platform-block-linkedin">
+              <div class="platform-block-header">
+                {% bootstrap_field form.socialmedia_linkedin_enabled layout="horizontal" %}
+              </div>
+              <div class="platform-block-templates" id="plat-tpls-linkedin">
+                {% bootstrap_field form.socialmedia_linkedin_cfp_template layout="horizontal" %}
+                {% bootstrap_field form.socialmedia_linkedin_speaker_template layout="horizontal" %}
+                {% bootstrap_field form.socialmedia_linkedin_session_template layout="horizontal" %}
+                {% bootstrap_field form.socialmedia_linkedin_ticket_template layout="horizontal" %}
+                {% bootstrap_field form.socialmedia_linkedin_schedule_template layout="horizontal" %}
+              </div>
+            </div>
+
+            <!-- Telegram -->
+            <div class="platform-block" id="platform-block-telegram">
+              <div class="platform-block-header">
+                {% bootstrap_field form.socialmedia_telegram_enabled layout="horizontal" %}
+              </div>
+              <div class="platform-block-templates" id="plat-tpls-telegram">
+                {% bootstrap_field form.socialmedia_telegram_cfp_template layout="horizontal" %}
+                {% bootstrap_field form.socialmedia_telegram_speaker_template layout="horizontal" %}
+                {% bootstrap_field form.socialmedia_telegram_session_template layout="horizontal" %}
+                {% bootstrap_field form.socialmedia_telegram_ticket_template layout="horizontal" %}
+                {% bootstrap_field form.socialmedia_telegram_schedule_template layout="horizontal" %}
+              </div>
+            </div>
+
+            <!-- Mastodon -->
+            <div class="platform-block" id="platform-block-mastodon">
+              <div class="platform-block-header">
+                {% bootstrap_field form.socialmedia_mastodon_enabled layout="horizontal" %}
+              </div>
+              <div class="platform-block-templates" id="plat-tpls-mastodon">
+                {% bootstrap_field form.socialmedia_mastodon_cfp_template layout="horizontal" %}
+                {% bootstrap_field form.socialmedia_mastodon_speaker_template layout="horizontal" %}
+                {% bootstrap_field form.socialmedia_mastodon_session_template layout="horizontal" %}
+                {% bootstrap_field form.socialmedia_mastodon_ticket_template layout="horizontal" %}
+                {% bootstrap_field form.socialmedia_mastodon_schedule_template layout="horizontal" %}
+              </div>
+            </div>
+          </div>
+        </div>
 
         <!-- Global -->
         <div class="adv-group">

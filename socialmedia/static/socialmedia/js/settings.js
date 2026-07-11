@@ -17,6 +17,22 @@
 
   if (!Config) return;
 
+  // ---- Platform metadata ----
+  const PLATFORM_META = {
+    twitter:  { label: "X / Twitter", iconClass: "fa fa-twitter",   colorClass: "plat-twitter" },
+    mastodon: { label: "Mastodon",    iconClass: "fa fa-globe",      colorClass: "plat-mastodon" },
+    telegram: { label: "Telegram",    iconClass: "fa fa-paper-plane", colorClass: "plat-telegram" },
+    linkedin: { label: "LinkedIn",    iconClass: "fa fa-linkedin",   colorClass: "plat-linkedin" },
+  };
+
+  const PLATFORM_LIMITS = {
+    twitter: 280,
+    mastodon: 500,
+    telegram: 4096,
+    linkedin: 3000
+  };
+
+
   // ---- Helper functions ----
   const Helpers = {
     addDays(dateStr, days) {
@@ -111,15 +127,19 @@
       validate() {
         let pastCount = 0;
         let placeholderCount = 0;
+        let limitExceededCount = 0;
         const todayStr = Helpers.getLocalTodayStr();
 
         posts.forEach(p => {
           if (!p.enabled) return;
           if (p.post_date < todayStr) pastCount++;
           if (p.post_text.includes("{") || p.post_text.includes("}")) placeholderCount++;
+
+          const limit = PLATFORM_LIMITS[p.platform] || null;
+          if (limit && p.post_text.length > limit) limitExceededCount++;
         });
 
-        return { pastCount, placeholderCount };
+        return { pastCount, placeholderCount, limitExceededCount };
       }
     };
   })();
@@ -148,7 +168,7 @@
         return r.text();
       });
     },
-    exportCSV(posts) {
+    exportCSV(posts, format) {
       return fetch(Config.EXPORT_URL, {
         method: "POST",
         headers: {
@@ -156,7 +176,7 @@
           "X-CSRFToken": Config.CSRF_TOKEN,
           "X-Requested-With": "XMLHttpRequest",
         },
-        body: JSON.stringify({ posts })
+        body: JSON.stringify({ posts, format })
       }).then(r => {
         if (!r.ok) throw new Error(`Export failed: ${r.status}`);
         return r.blob();
@@ -279,15 +299,56 @@
 
       for (let i = 0; i < 5; i++) {
         const tr = document.createElement("tr");
-        tr.className = "skeleton-row";
+        const tdChk = document.createElement("td");
+        const bChk = document.createElement("div");
+        bChk.className = "skeleton-bar";
+        bChk.style.width = "16px";
+        bChk.style.height = "16px";
+        bChk.style.borderRadius = "3px";
+        tdChk.appendChild(bChk);
+        tr.appendChild(tdChk);
 
-        for (let j = 0; j < 6; j++) {
-          const td = document.createElement("td");
-          const bar = document.createElement("div");
-          bar.className = "skeleton-bar";
-          td.appendChild(bar);
-          tr.appendChild(td);
-        }
+        const tdType = document.createElement("td");
+        const bType = document.createElement("div");
+        bType.className = "skeleton-bar";
+        bType.style.width = "60px";
+        tdType.appendChild(bType);
+        tr.appendChild(tdType);
+
+        // Platform column skeleton
+        const tdPlat = document.createElement("td");
+        const bPlat = document.createElement("div");
+        bPlat.className = "skeleton-bar";
+        bPlat.style.width = "80px";
+        tdPlat.appendChild(bPlat);
+        tr.appendChild(tdPlat);
+
+        const tdSched = document.createElement("td");
+        const bSched = document.createElement("div");
+        bSched.className = "skeleton-bar";
+        bSched.style.width = "110px";
+        tdSched.appendChild(bSched);
+        tr.appendChild(tdSched);
+
+        const tdInput = document.createElement("td");
+        const bInput = document.createElement("div");
+        bInput.className = "skeleton-bar";
+        bInput.style.width = "125px";
+        tdInput.appendChild(bInput);
+        tr.appendChild(tdInput);
+
+        const tdText = document.createElement("td");
+        const bText = document.createElement("div");
+        bText.className = "skeleton-bar";
+        tdText.appendChild(bText);
+        tr.appendChild(tdText);
+
+        const tdActions = document.createElement("td");
+        const bActions = document.createElement("div");
+        bActions.className = "skeleton-bar";
+        bActions.style.width = "30px";
+        tdActions.appendChild(bActions);
+        tr.appendChild(tdActions);
 
         tbody.appendChild(tr);
       }
@@ -321,6 +382,29 @@
       typeSpan.textContent = p.type_label;
       tdType.appendChild(typeSpan);
       tr.appendChild(tdType);
+
+      // Platform column
+      const tdPlat = document.createElement("td");
+      if (p.platform) {
+        const meta = PLATFORM_META[p.platform];
+        const platSpan = document.createElement("span");
+        platSpan.className = `platform-badge ${meta ? meta.colorClass : ""}`;
+        if (meta && meta.iconClass) {
+          const icon = document.createElement("i");
+          icon.className = meta.iconClass;
+          platSpan.appendChild(icon);
+          platSpan.appendChild(document.createTextNode(" " + (meta.label || p.platform_label || p.platform)));
+        } else {
+          platSpan.textContent = p.platform_label || p.platform;
+        }
+        tdPlat.appendChild(platSpan);
+      } else {
+        const naSpan = document.createElement("span");
+        naSpan.className = "platform-badge plat-generic";
+        naSpan.textContent = "Generic";
+        tdPlat.appendChild(naSpan);
+      }
+      tr.appendChild(tdPlat);
 
       const tdSched = document.createElement("td");
       tdSched.className = "event-schedule-cell";
@@ -417,8 +501,11 @@
       viewSpan.textContent = p.post_text;
       tdContent.appendChild(viewSpan);
 
+      const limit = PLATFORM_LIMITS[p.platform] || null;
+      const exceedsLimit = limit && p.post_text.length > limit;
+
       const editArea = document.createElement("textarea");
-      editArea.className = `post-text-edit${hasPlaceholder ? ' has-warning' : ''}`;
+      editArea.className = `post-text-edit${hasPlaceholder ? ' has-warning' : ''}${exceedsLimit ? ' has-error' : ''}`;
       editArea.dataset.postId = p.id;
       editArea.value = p.post_text;
       
@@ -426,8 +513,12 @@
       cWrap.className = "char-count-wrap";
       const charSpan = document.createElement("span");
       const numSpan = document.createElement("span");
-      numSpan.className = "char-count";
-      numSpan.textContent = p.post_text.length;
+      numSpan.className = `char-count${exceedsLimit ? ' has-warning' : ''}`;
+      if (limit) {
+        numSpan.textContent = `${p.post_text.length} / ${limit}`;
+      } else {
+        numSpan.textContent = p.post_text.length;
+      }
       charSpan.appendChild(numSpan);
       charSpan.appendChild(document.createTextNode(" characters"));
       cWrap.appendChild(charSpan);
@@ -491,7 +582,7 @@
       if (!visible.length) {
         const tr = document.createElement("tr");
         const td = document.createElement("td");
-        td.colSpan = 6;
+        td.colSpan = 7;
 
         const emptyDiv = document.createElement("div");
         emptyDiv.className = "sm-empty";
@@ -578,11 +669,11 @@
       this.updateSelectedCount();
     },
 
-    renderValidationAlert(pastCount, placeholderCount) {
+    renderValidationAlert(pastCount, placeholderCount, limitExceededCount) {
       const alertContainer = document.getElementById("validation-alert-container");
       if (!alertContainer) return;
 
-      if (pastCount > 0 || placeholderCount > 0) {
+      if (pastCount > 0 || placeholderCount > 0 || limitExceededCount > 0) {
         const alertDiv = document.createElement("div");
         alertDiv.className = "alert alert-warning sm-validation-alert";
 
@@ -597,8 +688,11 @@
         if (placeholderCount > 0) {
           parts.push(`${placeholderCount} post(s) with unresolved placeholders (e.g. {tag})`);
         }
+        if (limitExceededCount > 0) {
+          parts.push(`${limitExceededCount} post(s) exceeding platform character limits`);
+        }
 
-        alertDiv.appendChild(document.createTextNode(parts.join(" and ") + ". Review highlighted rows before exporting."));
+        alertDiv.appendChild(document.createTextNode(parts.join(", ") + ". Review highlighted rows before exporting."));
         alertContainer.textContent = "";
         alertContainer.appendChild(alertDiv);
         alertContainer.style.display = "block";
@@ -723,7 +817,7 @@
             tbody.textContent = "";
             const tr = document.createElement("tr");
             const td = document.createElement("td");
-            td.colSpan = 6;
+            td.colSpan = 7;
 
             const emptyDiv = document.createElement("div");
             emptyDiv.className = "sm-empty";
@@ -747,8 +841,8 @@
     },
 
     triggerValidation() {
-      const { pastCount, placeholderCount } = PostState.validate();
-      UI.renderValidationAlert(pastCount, placeholderCount);
+      const { pastCount, placeholderCount, limitExceededCount } = PostState.validate();
+      UI.renderValidationAlert(pastCount, placeholderCount, limitExceededCount);
     },
 
     saveAndRegenerate(e) {
@@ -830,12 +924,15 @@
         return;
       }
 
-      APIClient.exportCSV(visiblePosts)
+      const presetSelect = document.getElementById("export-preset-select");
+      const exportFormat = presetSelect ? presetSelect.value : "generic";
+
+      APIClient.exportCSV(visiblePosts, exportFormat)
         .then(blob => {
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
           a.href = url;
-          a.download = "socialmedia_posts.csv";
+          a.download = `socialmedia_posts_${exportFormat}.csv`;
           document.body.appendChild(a);
           a.click();
           a.remove();
@@ -974,7 +1071,22 @@
             const row = e.target.closest("tr");
             if (row) {
               const countSpan = row.querySelector(".char-count");
-              if (countSpan) countSpan.textContent = e.target.value.length;
+              if (countSpan) {
+                const post = PostState.get(postId);
+                const limit = PLATFORM_LIMITS[post.platform] || null;
+                if (limit) {
+                  countSpan.textContent = `${e.target.value.length} / ${limit}`;
+                  if (e.target.value.length > limit) {
+                    countSpan.classList.add("has-warning");
+                    e.target.classList.add("has-error");
+                  } else {
+                    countSpan.classList.remove("has-warning");
+                    e.target.classList.remove("has-error");
+                  }
+                } else {
+                  countSpan.textContent = e.target.value.length;
+                }
+              }
             }
           }
         });
@@ -1125,6 +1237,20 @@
         input.addEventListener("change", updateFn);
         updateFn();
       }
+    });
+
+    // Platform toggle: show/hide per-platform template fields
+    const platformKeys = ["twitter", "mastodon", "telegram", "linkedin"];
+    platformKeys.forEach(platform => {
+      const checkbox = document.getElementById(`id_socialmedia_${platform}_enabled`);
+      const tplBlock = document.getElementById(`plat-tpls-${platform}`);
+      if (!checkbox || !tplBlock) return;
+
+      const syncVisibility = () => {
+        tplBlock.style.display = checkbox.checked ? "block" : "none";
+      };
+      syncVisibility();
+      checkbox.addEventListener("change", syncVisibility);
     });
   }
   // Run on load
