@@ -32,7 +32,7 @@
                         <button type="submit" class="btn btn-primary">
                             {% trans "Save Connection" %}
                         </button>
-                        <a href="{% url 'plugins:socialmedia:organizer_accounts' organizer=organizer.slug %}" class="btn btn-default">
+                        <a href="{% url 'plugins:socialmedia:organizer_accounts' organizer=organizer.slug %}{% if request.GET.event %}?event={{ request.GET.event }}{% endif %}" class="btn btn-default">
                             {% trans "Cancel" %}
                         </a>
                     </div>

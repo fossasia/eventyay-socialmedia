@@ -246,6 +246,19 @@ class OrganizerAccountsListView(
     def get_queryset(self):
         return SocialMediaAccount.objects.filter(organizer=self.request.organizer)
 
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        event_slug = self.request.GET.get("event")
+        if event_slug:
+            ctx["back_to_event_url"] = reverse(
+                "plugins:socialmedia:index",
+                kwargs={
+                    "organizer": self.request.organizer.slug,
+                    "event": event_slug,
+                },
+            )
+        return ctx
+
 
 class OrganizerAccountCreateView(
     OrganizerPermissionRequiredMixin, OrganizerDetailViewMixin, CreateView
@@ -276,10 +289,14 @@ class OrganizerAccountCreateView(
         return response
 
     def get_success_url(self):
-        return reverse(
+        url = reverse(
             "plugins:socialmedia:organizer_accounts",
             kwargs={"organizer": self.request.organizer.slug},
         )
+        event_slug = self.request.GET.get("event")
+        if event_slug:
+            url = f"{url}?event={event_slug}"
+        return url
 
 
 class OrganizerAccountUpdateView(
@@ -305,10 +322,14 @@ class OrganizerAccountUpdateView(
         return response
 
     def get_success_url(self):
-        return reverse(
+        url = reverse(
             "plugins:socialmedia:organizer_accounts",
             kwargs={"organizer": self.request.organizer.slug},
         )
+        event_slug = self.request.GET.get("event")
+        if event_slug:
+            url = f"{url}?event={event_slug}"
+        return url
 
 
 class OrganizerAccountDeleteView(
@@ -356,7 +377,11 @@ class OrganizerAccountDeleteView(
         return response
 
     def get_success_url(self):
-        return reverse(
+        url = reverse(
             "plugins:socialmedia:organizer_accounts",
             kwargs={"organizer": self.request.organizer.slug},
         )
+        event_slug = self.request.GET.get("event")
+        if event_slug:
+            url = f"{url}?event={event_slug}"
+        return url

@@ -5,6 +5,17 @@
 {% block title %}{% trans "Social Media Accounts" %} :: {{ organizer.name }}{% endblock %}
 
 {% block inner %}
+    <div class="pull-right flip">
+        {% if back_to_event_url %}
+            <a href="{{ back_to_event_url }}" class="btn btn-default">
+                <i class="fa fa-arrow-left"></i> {% trans "Back to Event Social Media" %}
+            </a>
+        {% else %}
+            <a href="{% url 'control:organizer' organizer=organizer.slug %}" class="btn btn-default">
+                <i class="fa fa-arrow-left"></i> {% trans "Back to Events" %}
+            </a>
+        {% endif %}
+    </div>
     <h1>{% trans "Social Media Accounts" %}</h1>
     <p class="text-muted">
         {% trans "Connect and manage your social media accounts and scheduler integrations (Postiz, Buffer) at the organizer level." %}
@@ -53,10 +64,10 @@
                                         {% endif %}
                                     </td>
                                     <td class="text-right">
-                                        <a href="{% url 'plugins:socialmedia:organizer_account_edit' organizer=organizer.slug pk=account.pk %}" class="btn btn-default btn-sm">
+                                        <a href="{% url 'plugins:socialmedia:organizer_account_edit' organizer=organizer.slug pk=account.pk %}{% if request.GET.event %}?event={{ request.GET.event }}{% endif %}" class="btn btn-default btn-sm">
                                             <i class="fa fa-edit"></i> {% trans "Edit" %}
                                         </a>
-                                        <a href="{% url 'plugins:socialmedia:organizer_account_delete' organizer=organizer.slug pk=account.pk %}" class="btn btn-danger btn-sm">
+                                        <a href="{% url 'plugins:socialmedia:organizer_account_delete' organizer=organizer.slug pk=account.pk %}{% if request.GET.event %}?event={{ request.GET.event }}{% endif %}" class="btn btn-danger btn-sm">
                                             <i class="fa fa-trash"></i> {% trans "Disconnect" %}
                                         </a>
                                     </td>
@@ -84,7 +95,7 @@
                         <h4><i class="fa fa-telegram fa-2x text-info"></i></h4>
                         <h5>Telegram</h5>
                         <p class="text-muted"><small>{% trans "Post updates directly to a Telegram channel or chat." %}</small></p>
-                        <a href="{% url 'plugins:socialmedia:organizer_account_add' organizer=organizer.slug %}?provider=telegram" class="btn btn-primary btn-sm btn-block">
+                        <a href="{% url 'plugins:socialmedia:organizer_account_add' organizer=organizer.slug %}?provider=telegram{% if request.GET.event %}&event={{ request.GET.event }}{% endif %}" class="btn btn-primary btn-sm btn-block">
                             {% trans "Connect Bot" %}
                         </a>
                     </div>
@@ -94,7 +105,7 @@
                         <h4><i class="fa fa-share-alt-square fa-2x text-primary"></i></h4>
                         <h5>Mastodon</h5>
                         <p class="text-muted"><small>{% trans "Publish statuses to any Mastodon instance." %}</small></p>
-                        <a href="{% url 'plugins:socialmedia:organizer_account_add' organizer=organizer.slug %}?provider=mastodon" class="btn btn-primary btn-sm btn-block">
+                        <a href="{% url 'plugins:socialmedia:organizer_account_add' organizer=organizer.slug %}?provider=mastodon{% if request.GET.event %}&event={{ request.GET.event }}{% endif %}" class="btn btn-primary btn-sm btn-block">
                             {% trans "Connect Instance" %}
                         </a>
                     </div>
@@ -104,7 +115,7 @@
                         <h4><i class="fa fa-clock-o fa-2x text-success"></i></h4>
                         <h5>Postiz</h5>
                         <p class="text-muted"><small>{% trans "Sync schedules to your Postiz aggregator dashboard." %}</small></p>
-                        <a href="{% url 'plugins:socialmedia:organizer_account_add' organizer=organizer.slug %}?provider=postiz" class="btn btn-primary btn-sm btn-block">
+                        <a href="{% url 'plugins:socialmedia:organizer_account_add' organizer=organizer.slug %}?provider=postiz{% if request.GET.event %}&event={{ request.GET.event }}{% endif %}" class="btn btn-primary btn-sm btn-block">
                             {% trans "Connect Postiz" %}
                         </a>
                     </div>
@@ -114,7 +125,7 @@
                         <h4><i class="fa fa-refresh fa-2x text-warning"></i></h4>
                         <h5>Buffer</h5>
                         <p class="text-muted"><small>{% trans "Queue posts to your connected Buffer queues." %}</small></p>
-                        <a href="{% url 'plugins:socialmedia:organizer_account_add' organizer=organizer.slug %}?provider=buffer" class="btn btn-primary btn-sm btn-block">
+                        <a href="{% url 'plugins:socialmedia:organizer_account_add' organizer=organizer.slug %}?provider=buffer{% if request.GET.event %}&event={{ request.GET.event }}{% endif %}" class="btn btn-primary btn-sm btn-block">
                             {% trans "Connect Buffer" %}
                         </a>
                     </div>
