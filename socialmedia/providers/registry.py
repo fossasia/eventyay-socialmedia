@@ -1,11 +1,10 @@
-from typing import Dict, Type
 from .base import BaseSocialProvider
-from .telegram import TelegramProvider
+from .buffer import BufferProvider
 from .mastodon import MastodonProvider
 from .postiz import PostizProvider
-from .buffer import BufferProvider
+from .telegram import TelegramProvider
 
-_registry: Dict[str, Type[BaseSocialProvider]] = {
+_registry: dict[str, type[BaseSocialProvider]] = {
     "telegram": TelegramProvider,
     "mastodon": MastodonProvider,
     "postiz": PostizProvider,
@@ -13,7 +12,7 @@ _registry: Dict[str, Type[BaseSocialProvider]] = {
 }
 
 
-def get_provider_class(provider_name: str) -> Type[BaseSocialProvider]:
+def get_provider_class(provider_name: str) -> type[BaseSocialProvider]:
     """Retrieve the provider adapter class for the given provider name.
 
     Args:
@@ -26,7 +25,9 @@ def get_provider_class(provider_name: str) -> Type[BaseSocialProvider]:
         ValueError: If the provider is not supported or registered.
     """
     if provider_name not in _registry:
-        raise ValueError(f"Unsupported or unregistered social media provider: {provider_name}")
+        raise ValueError(
+            f"Unsupported or unregistered social media provider: {provider_name}"
+        )
     return _registry[provider_name]
 
 

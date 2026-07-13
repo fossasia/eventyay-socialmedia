@@ -1,5 +1,5 @@
 from datetime import timedelta
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from django.urls import reverse
@@ -249,3 +249,26 @@ def test_multi_tenancy_isolation(organizer_admin_client, organizer, settings):
     # Trying to access other organizer's connection via our organizer slug
     response = organizer_admin_client.get(url)
     assert response.status_code == 404
+
+
+@pytest.mark.django_db
+@patch("socialmedia.providers.telegram.TelegramProvider.send_test_message")
+def test_test_connection_view(mock_send_test, organizer_admin_client, organizer):
+    mock_send_test.return_value = {"success": True, "message": "Test message sent."}
+    with scope(organizer=organizer):
+        account = SocialMediaAccount.objects.create(
+            organizer=organizer,
+            provider="telegram",
+            platform_username="@mychannel",
+            credentials={"bot_token": "fake_token"},
+        )
+
+    url = reverse(
+        "plugins:socialmedia:organizer_account_test",
+        kwargs={"organizer": organizer.slug, "pk": account.pk},
+    )
+    response = organizer_admin_client.post(url, content_type="application/json")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert data["message"] == "Test message sent."

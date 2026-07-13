@@ -1,6 +1,8 @@
 import logging
+from typing import Any
+
 import requests
-from typing import Any, Dict, List, Optional
+
 from .base import BaseSocialProvider, PublishingError
 
 logger = logging.getLogger(__name__)
@@ -28,7 +30,31 @@ class TelegramProvider(BaseSocialProvider):
             logger.error(f"Telegram credentials validation failed: {e}")
             return False
 
-    def publish_post(self, text: str, media: Optional[List[str]] = None) -> Dict[str, Any]:
+    def send_test_message(self) -> dict[str, Any]:
+        if not self.token or not self.chat_id:
+            return {"success": False, "message": "Missing bot token or chat ID."}
+        try:
+            url = f"{self.base_url}sendMessage"
+            payload = {
+                "chat_id": self.chat_id,
+                "text": "✅ Connection successful from Eventyay!",
+                "parse_mode": "Markdown",
+            }
+            response = requests.post(url, data=payload, timeout=15)
+            if response.status_code == 200:
+                result = response.json()
+                if result.get("ok"):
+                    return {
+                        "success": True,
+                        "message": "Test message sent successfully.",
+                    }
+            return {"success": False, "message": f"Telegram API error: {response.text}"}
+        except requests.RequestException as e:
+            return {"success": False, "message": f"Network error: {e}"}
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+
+    def publish_post(self, text: str, media: list[str] | None = None) -> dict[str, Any]:
         if not self.token or not self.chat_id:
             raise PublishingError("Missing Telegram bot token or chat ID.")
 
@@ -43,27 +69,35 @@ class TelegramProvider(BaseSocialProvider):
 
                 if is_url:
                     url = f"{self.base_url}sendPhoto"
-                    payload.update({
-                        "photo": media_item,
-                        "caption": text,
-                        "parse_mode": "Markdown",
-                    })
+                    payload.update(
+                        {
+                            "photo": media_item,
+                            "caption": text,
+                            "parse_mode": "Markdown",
+                        }
+                    )
                     response = requests.post(url, data=payload, timeout=15)
                 else:
                     url = f"{self.base_url}sendPhoto"
-                    payload.update({
-                        "caption": text,
-                        "parse_mode": "Markdown",
-                    })
+                    payload.update(
+                        {
+                            "caption": text,
+                            "parse_mode": "Markdown",
+                        }
+                    )
                     with open(media_item, "rb") as f:
                         files = {"photo": f}
-                        response = requests.post(url, data=payload, files=files, timeout=20)
+                        response = requests.post(
+                            url, data=payload, files=files, timeout=20
+                        )
             else:
                 url = f"{self.base_url}sendMessage"
-                payload.update({
-                    "text": text,
-                    "parse_mode": "Markdown",
-                })
+                payload.update(
+                    {
+                        "text": text,
+                        "parse_mode": "Markdown",
+                    }
+                )
                 response = requests.post(url, data=payload, timeout=15)
 
             if response.status_code != 200:
@@ -87,6 +121,8 @@ class TelegramProvider(BaseSocialProvider):
             }
 
         except requests.RequestException as e:
-            raise PublishingError(f"Network error communicating with Telegram Bot API: {e}")
+            raise PublishingError(
+                f"Network error communicating with Telegram Bot API: {e}"
+            ) from e
         except Exception as e:
-            raise PublishingError(f"Error publishing to Telegram: {e}")
+            raise PublishingError(f"Error publishing to Telegram: {e}") from e

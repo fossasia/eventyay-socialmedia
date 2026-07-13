@@ -1,6 +1,8 @@
 import logging
+from typing import Any
+
 import requests
-from typing import Any, Dict, List, Optional
+
 from .base import BaseSocialProvider, PublishingError
 
 logger = logging.getLogger(__name__)
@@ -20,13 +22,34 @@ class BufferProvider(BaseSocialProvider):
             return False
         try:
             url = f"{self.base_url}user.json"
-            response = requests.get(url, params={"access_token": self.access_token}, timeout=10)
+            response = requests.get(
+                url, params={"access_token": self.access_token}, timeout=10
+            )
             return response.status_code == 200
         except Exception as e:
             logger.error(f"Buffer credentials validation failed: {e}")
             return False
 
-    def publish_post(self, text: str, media: Optional[List[str]] = None) -> Dict[str, Any]:
+    def send_test_message(self) -> dict[str, Any]:
+        if not self.access_token:
+            return {"success": False, "message": "Missing access token."}
+        try:
+            url = f"{self.base_url}user.json"
+            response = requests.get(
+                url, params={"access_token": self.access_token}, timeout=10
+            )
+            if response.status_code == 200:
+                return {
+                    "success": True,
+                    "message": "Connection successful. Buffer account accessible.",
+                }
+            return {"success": False, "message": f"Buffer API error: {response.text}"}
+        except requests.RequestException as e:
+            return {"success": False, "message": f"Network error: {e}"}
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+
+    def publish_post(self, text: str, media: list[str] | None = None) -> dict[str, Any]:
         if not self.access_token or not self.profile_id:
             raise PublishingError("Missing Buffer access token or profile ID.")
 
@@ -47,7 +70,7 @@ class BufferProvider(BaseSocialProvider):
                 url,
                 data=payload,
                 params={"access_token": self.access_token},
-                timeout=15
+                timeout=15,
             )
             if response.status_code != 200:
                 raise PublishingError(f"Buffer API error: {response.text}")
@@ -55,7 +78,9 @@ class BufferProvider(BaseSocialProvider):
             result = response.json()
             updates = result.get("updates", [])
             if not updates:
-                raise PublishingError(f"Buffer API response did not contain updates: {result}")
+                raise PublishingError(
+                    f"Buffer API response did not contain updates: {result}"
+                )
 
             update = updates[0]
             post_id = str(update.get("id"))
@@ -66,6 +91,8 @@ class BufferProvider(BaseSocialProvider):
                 "url": public_url,
             }
         except requests.RequestException as e:
-            raise PublishingError(f"Network error communicating with Buffer API: {e}")
+            raise PublishingError(
+                f"Network error communicating with Buffer API: {e}"
+            ) from e
         except Exception as e:
-            raise PublishingError(f"Error publishing to Buffer: {e}")
+            raise PublishingError(f"Error publishing to Buffer: {e}") from e

@@ -46,4 +46,9 @@ urlpatterns = [
         views.OrganizerAccountDeleteView.as_view(),
         name="organizer_account_delete",
     ),
+    path(
+        "social/organizer/<orgslug:organizer>/accounts/<int:pk>/test/",
+        views.test_connection,
+        name="organizer_account_test",
+    ),
 ]

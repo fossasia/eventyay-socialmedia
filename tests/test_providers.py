@@ -1,11 +1,18 @@
 from unittest.mock import MagicMock, mock_open, patch
+
 import pytest
+
 from socialmedia.models import SocialMediaAccount
-from socialmedia.providers import BaseSocialProvider, PublishingError, get_provider, get_provider_class
-from socialmedia.providers.telegram import TelegramProvider
+from socialmedia.providers import (
+    BaseSocialProvider,
+    PublishingError,
+    get_provider,
+    get_provider_class,
+)
+from socialmedia.providers.buffer import BufferProvider
 from socialmedia.providers.mastodon import MastodonProvider
 from socialmedia.providers.postiz import PostizProvider
-from socialmedia.providers.buffer import BufferProvider
+from socialmedia.providers.telegram import TelegramProvider
 
 
 @pytest.fixture
@@ -96,7 +103,9 @@ def test_telegram_publish_post_with_remote_media(mock_post, mock_account):
     mock_response.json.return_value = {"ok": True, "result": {"message_id": 789}}
     mock_post.return_value = mock_response
 
-    res = provider.publish_post("hello remote media", media=["https://example.com/img.png"])
+    res = provider.publish_post(
+        "hello remote media", media=["https://example.com/img.png"]
+    )
     assert res["post_id"] == "789"
     assert "photo" in mock_post.call_args[1]["data"]
 
@@ -141,7 +150,10 @@ def test_mastodon_publish_post(mock_mastodon_cls, mock_account):
     }
     provider = MastodonProvider(mock_account)
     mock_client = mock_mastodon_cls.return_value
-    mock_client.status_post.return_value = {"id": 12345, "url": "https://mastodon.social/@testuser/12345"}
+    mock_client.status_post.return_value = {
+        "id": 12345,
+        "url": "https://mastodon.social/@testuser/12345",
+    }
 
     res = provider.publish_post("Mastodon post")
     assert res["post_id"] == "12345"
@@ -178,7 +190,10 @@ def test_postiz_publish_post(mock_post, mock_account):
     provider = PostizProvider(mock_account)
     mock_response = MagicMock()
     mock_response.status_code = 201
-    mock_response.json.return_value = {"id": "postiz_123", "url": "https://postiz.com/posts/postiz_123"}
+    mock_response.json.return_value = {
+        "id": "postiz_123",
+        "url": "https://postiz.com/posts/postiz_123",
+    }
     mock_post.return_value = mock_response
 
     res = provider.publish_post("Postiz status")

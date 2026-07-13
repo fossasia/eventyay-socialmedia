@@ -1,6 +1,8 @@
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from mastodon import Mastodon
+
 from .base import BaseSocialProvider, PublishingError
 
 logger = logging.getLogger(__name__)
@@ -26,7 +28,9 @@ class MastodonProvider(BaseSocialProvider):
                     api_base_url=self.api_base_url,
                 )
             except Exception as e:
-                raise PublishingError(f"Failed to initialize Mastodon client: {e}")
+                raise PublishingError(
+                    f"Failed to initialize Mastodon client: {e}"
+                ) from e
         return self._client
 
     def validate_credentials(self) -> bool:
@@ -37,14 +41,23 @@ class MastodonProvider(BaseSocialProvider):
             logger.error(f"Mastodon credentials validation failed: {e}")
             return False
 
-    def publish_post(self, text: str, media: Optional[List[str]] = None) -> Dict[str, Any]:
+    def send_test_message(self) -> dict[str, Any]:
+        try:
+            self.client.account_verify_credentials()
+            self.client.status_post(status="✅ Connection successful from Eventyay!")
+            return {"success": True, "message": "Test post published successfully."}
+        except Exception as e:
+            return {"success": False, "message": f"Mastodon API error: {e}"}
+
+    def publish_post(self, text: str, media: list[str] | None = None) -> dict[str, Any]:
         try:
             media_ids = []
             if media:
                 for file_path in media:
-                    import requests
-                    import tempfile
                     import os
+                    import tempfile
+
+                    import requests
 
                     if file_path.startswith(("http://", "https://")):
                         r = requests.get(file_path, timeout=20)
@@ -68,7 +81,10 @@ class MastodonProvider(BaseSocialProvider):
             )
 
             post_id = str(status.get("id"))
-            url = status.get("url") or f"{self.api_base_url}/@{self.account.platform_username}/{post_id}"
+            url = (
+                status.get("url")
+                or f"{self.api_base_url}/@{self.account.platform_username}/{post_id}"
+            )
 
             return {
                 "post_id": post_id,
@@ -76,4 +92,4 @@ class MastodonProvider(BaseSocialProvider):
             }
 
         except Exception as e:
-            raise PublishingError(f"Error publishing status to Mastodon: {e}")
+            raise PublishingError(f"Error publishing status to Mastodon: {e}") from e
