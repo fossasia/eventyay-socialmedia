@@ -1,0 +1,79 @@
+import logging
+from typing import Any, Dict, List, Optional
+from mastodon import Mastodon
+from .base import BaseSocialProvider, PublishingError
+
+logger = logging.getLogger(__name__)
+
+
+class MastodonProvider(BaseSocialProvider):
+    """Mastodon API integration adapter using Mastodon.py."""
+
+    def __init__(self, account):
+        super().__init__(account)
+        self.api_base_url = self.credentials.get("api_base_url")
+        self.access_token = self.credentials.get("access_token")
+        self._client = None
+
+    @property
+    def client(self) -> Mastodon:
+        if not self._client:
+            if not self.api_base_url or not self.access_token:
+                raise PublishingError("Missing Mastodon base URL or access token.")
+            try:
+                self._client = Mastodon(
+                    access_token=self.access_token,
+                    api_base_url=self.api_base_url,
+                )
+            except Exception as e:
+                raise PublishingError(f"Failed to initialize Mastodon client: {e}")
+        return self._client
+
+    def validate_credentials(self) -> bool:
+        try:
+            self.client.account_verify_credentials()
+            return True
+        except Exception as e:
+            logger.error(f"Mastodon credentials validation failed: {e}")
+            return False
+
+    def publish_post(self, text: str, media: Optional[List[str]] = None) -> Dict[str, Any]:
+        try:
+            media_ids = []
+            if media:
+                for file_path in media:
+                    import requests
+                    import tempfile
+                    import os
+
+                    if file_path.startswith(("http://", "https://")):
+                        r = requests.get(file_path, timeout=20)
+                        r.raise_for_status()
+                        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+                            tmp.write(r.content)
+                            tmp_path = tmp.name
+                        try:
+                            res = self.client.media_post(tmp_path)
+                            media_ids.append(res["id"])
+                        finally:
+                            if os.path.exists(tmp_path):
+                                os.remove(tmp_path)
+                    else:
+                        res = self.client.media_post(file_path)
+                        media_ids.append(res["id"])
+
+            status = self.client.status_post(
+                status=text,
+                media_ids=media_ids if media_ids else None,
+            )
+
+            post_id = str(status.get("id"))
+            url = status.get("url") or f"{self.api_base_url}/@{self.account.platform_username}/{post_id}"
+
+            return {
+                "post_id": post_id,
+                "url": url,
+            }
+
+        except Exception as e:
+            raise PublishingError(f"Error publishing status to Mastodon: {e}")
