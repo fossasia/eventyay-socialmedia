@@ -19,14 +19,26 @@
                 <div class="alert alert-warning">
                     <h4><i class="fa fa-warning"></i> {% trans "Warning: Active Scheduled Posts" %}</h4>
                     <p>
-                        {% blocktranslate trimmed count count=active_posts_count %}
-                            There is currently <strong>1</strong> active scheduled post linked to this connection/scheduler.
-                        {% plural %}
-                            There are currently <strong>{{ count }}</strong> active scheduled posts linked to this connection/scheduler.
-                        {% endblocktranslate %}
+                        {% if object.provider == "postiz" or object.provider == "buffer" %}
+                            {% blocktranslate trimmed count count=active_posts_count %}
+                                There is currently <strong>1</strong> active scheduled post for your events. Disconnecting this aggregator/scheduler will prevent these posts from being published through this connection.
+                            {% plural %}
+                                There are currently <strong>{{ count }}</strong> active scheduled posts for your events. Disconnecting this aggregator/scheduler will prevent these posts from being published through this connection.
+                            {% endblocktranslate %}
+                        {% else %}
+                            {% blocktranslate trimmed count count=active_posts_count %}
+                                There is currently <strong>1</strong> active scheduled post linked to this connection/scheduler.
+                            {% plural %}
+                                There are currently <strong>{{ count }}</strong> active scheduled posts linked to this connection/scheduler.
+                            {% endblocktranslate %}
+                        {% endif %}
                     </p>
                     <p>
-                        {% trans "Disconnecting this account will prevent these scheduled posts from being published. If you proceed, they may remain unpublished or fail." %}
+                        {% if object.provider == "postiz" or object.provider == "buffer" %}
+                            {% trans "If you proceed, these posts will no longer be synced to this aggregator/scheduler." %}
+                        {% else %}
+                            {% trans "Disconnecting this account will prevent these scheduled posts from being published. If you proceed, they may remain unpublished or fail." %}
+                        {% endif %}
                     </p>
                 </div>
             {% endif %}

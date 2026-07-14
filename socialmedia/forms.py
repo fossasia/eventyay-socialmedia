@@ -472,7 +472,7 @@ class TelegramAccountForm(forms.ModelForm):
 
     def clean_bot_token(self):
         token = self.cleaned_data.get("bot_token")
-        if not token and self.instance and self.instance.pk:
+        if (not token or token == "••••••••") and self.instance and self.instance.pk:
             creds = self.instance.credentials
             return creds.get("bot_token")
         return token
@@ -522,7 +522,7 @@ class MastodonAccountForm(forms.ModelForm):
 
     def clean_access_token(self):
         token = self.cleaned_data.get("access_token")
-        if not token and self.instance and self.instance.pk:
+        if (not token or token == "••••••••") and self.instance and self.instance.pk:
             creds = self.instance.credentials
             return creds.get("access_token")
         return token
@@ -573,7 +573,7 @@ class PostizAccountForm(forms.ModelForm):
 
     def clean_api_key(self):
         key = self.cleaned_data.get("api_key")
-        if not key and self.instance and self.instance.pk:
+        if (not key or key == "••••••••") and self.instance and self.instance.pk:
             creds = self.instance.credentials
             return creds.get("api_key")
         return key
@@ -617,7 +617,7 @@ class BufferAccountForm(forms.ModelForm):
 
     def clean_access_token(self):
         token = self.cleaned_data.get("access_token")
-        if not token and self.instance and self.instance.pk:
+        if (not token or token == "••••••••") and self.instance and self.instance.pk:
             creds = self.instance.credentials
             return creds.get("access_token")
         return token
