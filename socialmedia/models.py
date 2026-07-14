@@ -1,6 +1,6 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from eventyay.base.models import Event
+from eventyay.base.models import Event, Organizer
 
 
 class SocialMediaPostStatus(models.TextChoices):
@@ -63,3 +63,57 @@ class SocialMediaPost(models.Model):
 
     def __str__(self):
         return f"[{self.post_type}] {self.event.slug} - {self.scheduled_at}"
+
+
+class SocialMediaAccount(models.Model):
+    organizer = models.ForeignKey(
+        Organizer,
+        on_delete=models.CASCADE,
+        related_name="social_media_accounts",
+    )
+    provider = models.CharField(
+        max_length=20,
+        choices=[
+            ("mastodon", _("Mastodon")),
+            ("telegram", _("Telegram")),
+            ("twitter", _("Twitter / X")),
+            ("linkedin", _("LinkedIn")),
+            ("postiz", _("Postiz")),
+            ("buffer", _("Buffer")),
+        ],
+    )
+    platform_username = models.CharField(
+        max_length=255,
+        help_text=_("e.g. channel ID, username handle, or scheduler workspace name"),
+    )
+    encrypted_credentials = models.TextField(
+        blank=True,
+        default="",
+        help_text=_("Fernet-encrypted JSON credentials blob"),
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text=_("True if this integration connection is active"),
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = _("Social Media Account")
+        verbose_name_plural = _("Social Media Accounts")
+        unique_together = [("organizer", "provider", "platform_username")]
+
+    def __str__(self):
+        return f"{self.provider} - {self.platform_username} ({self.organizer.slug})"
+
+    @property
+    def credentials(self) -> dict:
+        from .crypto import decrypt_credentials
+
+        return decrypt_credentials(self.encrypted_credentials)
+
+    @credentials.setter
+    def credentials(self, data: dict):
+        from .crypto import encrypt_credentials
+
+        self.encrypted_credentials = encrypt_credentials(data)
