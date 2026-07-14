@@ -7,6 +7,7 @@ from django.utils import timezone
 from django_scopes import scope
 from eventyay.base.models import Organizer, Team
 
+from socialmedia.forms import TelegramAccountForm
 from socialmedia.models import (
     SocialMediaAccount,
     SocialMediaPost,
@@ -142,6 +143,45 @@ def test_account_create_post(organizer_admin_client, organizer):
         assert account.is_active is True
 
 
+def test_telegram_account_form_normalizes_public_tme_link():
+    form = TelegramAccountForm(
+        data={
+            "platform_username": " t.me/mypublicchannel ",
+            "bot_token": "my_secret_bot_token",
+            "is_active": "on",
+        }
+    )
+
+    assert form.is_valid()
+    assert form.cleaned_data["platform_username"] == "@mypublicchannel"
+
+
+def test_telegram_account_form_normalizes_web_telegram_link():
+    form = TelegramAccountForm(
+        data={
+            "platform_username": "https://web.telegram.org/k/#-4482182411",
+            "bot_token": "my_secret_bot_token",
+            "is_active": "on",
+        }
+    )
+
+    assert form.is_valid()
+    assert form.cleaned_data["platform_username"] == "-1004482182411"
+
+
+def test_telegram_account_form_rejects_private_invite_link():
+    form = TelegramAccountForm(
+        data={
+            "platform_username": "https://t.me/+abcdef",
+            "bot_token": "my_secret_bot_token",
+            "is_active": "on",
+        }
+    )
+
+    assert not form.is_valid()
+    assert "platform_username" in form.errors
+
+
 @pytest.mark.django_db
 def test_account_update_view(organizer_admin_client, organizer):
     with scope(organizer=organizer):
@@ -173,6 +213,19 @@ def test_account_update_view(organizer_admin_client, organizer):
 
     account.refresh_from_db()
     assert account.platform_username == "@newchannel"
+    assert account.credentials == {"bot_token": "old_token"}
+
+    # POST with placeholder secret - should also keep old token
+    payload_placeholder = {
+        "platform_username": "@newchannel2",
+        "bot_token": "••••••••",
+        "is_active": "on",
+    }
+    response = organizer_admin_client.post(url, data=payload_placeholder)
+    assert response.status_code == 302
+
+    account.refresh_from_db()
+    assert account.platform_username == "@newchannel2"
     assert account.credentials == {"bot_token": "old_token"}
 
 
