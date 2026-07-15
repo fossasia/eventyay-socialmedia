@@ -60,3 +60,8 @@ class BaseSocialProvider:
         and sends them to the scheduling queue in a single sync session.
         """
         return []
+
+    @classmethod
+    def get_setup_instructions(cls) -> list[str]:
+        """Return a list of step-by-step setup instructions for the provider."""
+        return []

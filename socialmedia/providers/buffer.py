@@ -140,3 +140,11 @@ class BufferProvider(BaseSocialProvider):
             ) from e
         except Exception as e:
             raise PublishingError(f"Error publishing to Buffer: {e}") from e
+
+    @classmethod
+    def get_setup_instructions(cls) -> list[str]:
+        return [
+            "Access the Buffer Developer Portal (https://publish.buffer.com/developers).",
+            "Register a new developer application to generate an Access Token.",
+            "Copy the Access Token and input it above.",
+        ]

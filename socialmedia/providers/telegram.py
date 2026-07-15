@@ -190,3 +190,16 @@ class TelegramProvider(BaseSocialProvider):
             ) from e
         except Exception as e:
             raise PublishingError(f"Error publishing to Telegram: {e}") from e
+
+    @classmethod
+    def get_setup_instructions(cls) -> list[str]:
+        return [
+            "Message @BotFather on Telegram and send /newbot to create your bot.",
+            "Copy the Bot API Token provided by BotFather.",
+            "Add the bot as an administrator (or member) to your target group/channel.",
+            (
+                "Obtain the numeric Channel/Chat ID (prefixed with -100 for "
+                "supergroups, e.g. -1004301847700) or public @username, then "
+                "input it above."
+            ),
+        ]

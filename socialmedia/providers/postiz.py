@@ -111,3 +111,12 @@ class PostizProvider(BaseSocialProvider):
             ) from e
         except Exception as e:
             raise PublishingError(f"Error publishing to Postiz: {e}") from e
+
+    @classmethod
+    def get_setup_instructions(cls) -> list[str]:
+        return [
+            "Log in to your Postiz dashboard instance.",
+            "Navigate to Settings -> API Keys (or Developer Settings).",
+            "Generate a new API Key and copy the value.",
+            "Enter your Postiz API instance URL and key to establish connection.",
+        ]

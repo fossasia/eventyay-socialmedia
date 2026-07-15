@@ -282,6 +282,17 @@ class OrganizerAccountCreateView(
             )
         return super().dispatch(request, *args, **kwargs)
 
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        from .providers.registry import get_provider_class
+
+        try:
+            provider_cls = get_provider_class(self.provider)
+            ctx["setup_instructions"] = provider_cls.get_setup_instructions()
+        except ValueError:
+            pass
+        return ctx
+
     def get_form_class(self):
         return PROVIDER_FORMS[self.provider]
 
@@ -331,6 +342,18 @@ class OrganizerAccountUpdateView(
 
     def get_object(self, queryset=None):
         return super(OrganizerDetailViewMixin, self).get_object(queryset)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        provider = self.get_object().provider
+        from .providers.registry import get_provider_class
+
+        try:
+            provider_cls = get_provider_class(provider)
+            ctx["setup_instructions"] = provider_cls.get_setup_instructions()
+        except ValueError:
+            pass
+        return ctx
 
     def get_queryset(self):
         return SocialMediaAccount.objects.filter(organizer=self.request.organizer)

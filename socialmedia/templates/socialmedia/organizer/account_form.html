@@ -44,6 +44,17 @@
                 </div>
             </form>
 
+            {% if setup_instructions %}
+            <div class="well" style="margin-top: 20px; background-color: #f7f9fa; border-left: 4px solid #337ab7;">
+                <h4><i class="fa fa-info-circle"></i> {% trans "How to connect:" %}</h4>
+                <ol style="padding-left: 20px; margin-bottom: 0;">
+                    {% for step in setup_instructions %}
+                        <li style="margin-bottom: 5px;">{{ step }}</li>
+                    {% endfor %}
+                </ol>
+            </div>
+            {% endif %}
+
             {% if object %}
             <div id="test-connection-result" style="display:none; margin-top:15px;"></div>
             {% endif %}

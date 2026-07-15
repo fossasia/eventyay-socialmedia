@@ -93,3 +93,15 @@ class MastodonProvider(BaseSocialProvider):
 
         except Exception as e:
             raise PublishingError(f"Error publishing status to Mastodon: {e}") from e
+
+    @classmethod
+    def get_setup_instructions(cls) -> list[str]:
+        return [
+            "Log in to your Mastodon instance page.",
+            "Navigate to Preferences -> Development -> New Application.",
+            (
+                "Give the application a name and ensure it has "
+                "'write:statuses' or 'write' scope permissions authorized."
+            ),
+            "Click Save, click on your new application, and copy the Access Token.",
+        ]
