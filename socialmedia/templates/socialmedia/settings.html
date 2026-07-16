@@ -16,6 +16,9 @@
       {% trans "Social Media Posts" %}
       <small>{{ event.name }}</small>
     </h1>
+    <a href="{% url 'plugins:socialmedia:organizer_accounts' organizer=event.organizer.slug %}?event={{ event.slug }}" class="btn btn-default">
+      <i class="fa fa-share-alt"></i> {% trans "Manage Social Accounts" %}
+    </a>
     <button id="btn-regenerate" class="btn btn-default">
       <i class="fa fa-refresh"></i> {% trans "Regenerate" %}
     </button>

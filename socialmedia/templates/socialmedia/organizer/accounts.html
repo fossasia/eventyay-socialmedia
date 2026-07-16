@@ -1,0 +1,136 @@
+{% extends "eventyay_common/organizers/base.html" %}
+{% load i18n %}
+{% load bootstrap3 %}
+
+{% block title %}{% trans "Social Media Accounts" %} :: {{ organizer.name }}{% endblock %}
+
+{% block inner %}
+    <div class="pull-right flip">
+        {% if back_to_event_url %}
+            <a href="{{ back_to_event_url }}" class="btn btn-default">
+                <i class="fa fa-arrow-left"></i> {% trans "Back to Event Social Media" %}
+            </a>
+        {% else %}
+            <a href="{% url 'control:organizer' organizer=organizer.slug %}" class="btn btn-default">
+                <i class="fa fa-arrow-left"></i> {% trans "Back to Events" %}
+            </a>
+        {% endif %}
+    </div>
+    <h1>{% trans "Social Media Accounts" %}</h1>
+    <p class="text-muted">
+        {% trans "Connect and manage your social media accounts and scheduler integrations (Postiz, Buffer) at the organizer level." %}
+    </p>
+
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <h3 class="panel-title">{% trans "Connected Accounts & Schedulers" %}</h3>
+        </div>
+        <div class="panel-body">
+            {% if accounts %}
+                <div class="table-responsive">
+                    <table class="table table-hover table-vertical-middle">
+                        <thead>
+                            <tr>
+                                <th>{% trans "Platform/Scheduler" %}</th>
+                                <th>{% trans "Account/Profile/Workspace" %}</th>
+                                <th>{% trans "Status" %}</th>
+                                <th class="text-right">{% trans "Actions" %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for account in accounts %}
+                                <tr>
+                                    <td>
+                                        <strong>
+                                            {% if account.provider == 'telegram' %}
+                                                <i class="fa fa-telegram"></i> Telegram
+                                            {% elif account.provider == 'mastodon' %}
+                                                <i class="fa fa-share-alt-square"></i> Mastodon
+                                            {% elif account.provider == 'postiz' %}
+                                                <i class="fa fa-clock-o"></i> Postiz
+                                            {% elif account.provider == 'buffer' %}
+                                                <i class="fa fa-refresh"></i> Buffer
+                                            {% else %}
+                                                {{ account.get_provider_display }}
+                                            {% endif %}
+                                        </strong>
+                                    </td>
+                                    <td>{{ account.platform_username }}</td>
+                                    <td>
+                                        {% if account.is_active %}
+                                            <span class="label label-success">{% trans "Active" %}</span>
+                                        {% else %}
+                                            <span class="label label-default">{% trans "Inactive" %}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-right">
+                                        <a href="{% url 'plugins:socialmedia:organizer_account_edit' organizer=organizer.slug pk=account.pk %}{% if request.GET.event %}?event={{ request.GET.event }}{% endif %}" class="btn btn-default btn-sm">
+                                            <i class="fa fa-edit"></i> {% trans "Edit" %}
+                                        </a>
+                                        <a href="{% url 'plugins:socialmedia:organizer_account_delete' organizer=organizer.slug pk=account.pk %}{% if request.GET.event %}?event={{ request.GET.event }}{% endif %}" class="btn btn-danger btn-sm">
+                                            <i class="fa fa-trash"></i> {% trans "Disconnect" %}
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-muted py-3">
+                    {% trans "No social accounts connected yet." %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <h3 class="panel-title">{% trans "Connect New Integration" %}</h3>
+        </div>
+        <div class="panel-body">
+            <div class="row">
+                <div class="col-sm-3 text-center">
+                    <div class="well">
+                        <h4><i class="fa fa-telegram fa-2x text-info"></i></h4>
+                        <h5>Telegram</h5>
+                        <p class="text-muted"><small>{% trans "Post updates directly to a Telegram channel or chat." %}</small></p>
+                        <a href="{% url 'plugins:socialmedia:organizer_account_add' organizer=organizer.slug %}?provider=telegram{% if request.GET.event %}&event={{ request.GET.event }}{% endif %}" class="btn btn-primary btn-sm btn-block">
+                            {% trans "Connect Bot" %}
+                        </a>
+                    </div>
+                </div>
+                <div class="col-sm-3 text-center">
+                    <div class="well">
+                        <h4><i class="fa fa-share-alt-square fa-2x text-primary"></i></h4>
+                        <h5>Mastodon</h5>
+                        <p class="text-muted"><small>{% trans "Publish statuses to any Mastodon instance." %}</small></p>
+                        <a href="{% url 'plugins:socialmedia:organizer_account_add' organizer=organizer.slug %}?provider=mastodon{% if request.GET.event %}&event={{ request.GET.event }}{% endif %}" class="btn btn-primary btn-sm btn-block">
+                            {% trans "Connect Instance" %}
+                        </a>
+                    </div>
+                </div>
+                <div class="col-sm-3 text-center">
+                    <div class="well">
+                        <h4><i class="fa fa-clock-o fa-2x text-success"></i></h4>
+                        <h5>Postiz</h5>
+                        <p class="text-muted"><small>{% trans "Sync schedules to your Postiz aggregator dashboard." %}</small></p>
+                        <a href="{% url 'plugins:socialmedia:organizer_account_add' organizer=organizer.slug %}?provider=postiz{% if request.GET.event %}&event={{ request.GET.event }}{% endif %}" class="btn btn-primary btn-sm btn-block">
+                            {% trans "Connect Postiz" %}
+                        </a>
+                    </div>
+                </div>
+                <div class="col-sm-3 text-center">
+                    <div class="well">
+                        <h4><i class="fa fa-refresh fa-2x text-warning"></i></h4>
+                        <h5>Buffer</h5>
+                        <p class="text-muted"><small>{% trans "Queue posts to your connected Buffer queues." %}</small></p>
+                        <a href="{% url 'plugins:socialmedia:organizer_account_add' organizer=organizer.slug %}?provider=buffer{% if request.GET.event %}&event={{ request.GET.event }}{% endif %}" class="btn btn-primary btn-sm btn-block">
+                            {% trans "Connect Buffer" %}
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
