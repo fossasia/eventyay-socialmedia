@@ -163,11 +163,17 @@ def preview_posts(request, organizer, event):
                 p["status"] = db_p.status
                 p["is_pinned"] = db_p.is_pinned
                 p["post_text"] = db_p.post_text
+                p["media_url"] = db_p.media_url or p.get("media_url") or ""
+                p["error_message"] = db_p.error_message or ""
 
                 tz = pytz.timezone(getattr(request.event, "timezone", None) or "UTC")
                 local_dt = db_p.scheduled_at.astimezone(tz)
                 p["post_date"] = local_dt.strftime("%Y-%m-%d")
                 p["post_time"] = local_dt.strftime("%H:%M")
+            else:
+                p["status"] = "scheduled"
+                p["error_message"] = ""
+                p["media_url"] = p.get("media_url") or ""
             posts.append(p)
     except Exception:  # pragma: no cover
         return JsonResponse({"error": "Internal server error"}, status=500)
@@ -510,5 +516,130 @@ def test_connection(request, organizer, pk):
         provider = get_provider(account)
         result = provider.send_test_message()
         return JsonResponse(result)
+    except Exception as e:
+        return JsonResponse({"success": False, "message": str(e)}, status=500)
+
+
+@require_POST
+def sync_to_schedulers(request, organizer, event):
+    """AJAX POST — trigger synchronization of active scheduled posts to Postiz or Buffer scheduler accounts."""
+    _check_permission(request)
+    _check_plugin_active(request)
+    try:
+        scheduler_accounts = SocialMediaAccount.objects.filter(
+            organizer=request.organizer,
+            provider__in=["postiz", "buffer"],
+            is_active=True,
+        )
+        if not scheduler_accounts.exists():
+            return JsonResponse({"success": False, "message": _("No active scheduler accounts connected.")}, status=400)
+
+        posts_to_sync = SocialMediaPost.objects.filter(
+            event=request.event,
+            status=SocialMediaPostStatus.SCHEDULED,
+            scheduled_at__gt=timezone.now(),
+        )
+        if not posts_to_sync.exists():
+            return JsonResponse({"success": True, "message": _("No scheduled posts found to sync.")})
+
+        from .providers.registry import get_provider
+        synced_count = 0
+        errors = []
+
+        for account in scheduler_accounts:
+            try:
+                provider = get_provider(account)
+                provider.sync_campaign(list(posts_to_sync))
+                synced_count += 1
+            except Exception as e:
+                errors.append(f"{account.provider}: {str(e)}")
+
+        if errors:
+            return JsonResponse({
+                "success": False,
+                "message": f"Synchronization partially failed: {', '.join(errors)}"
+            }, status=500)
+
+        posts_to_sync.update(status=SocialMediaPostStatus.EXPORTED)
+
+        return JsonResponse({
+            "success": True,
+            "message": f"Successfully synchronized posts to {synced_count} scheduler platform(s)."
+        })
+    except Exception as e:
+        return JsonResponse({"success": False, "message": str(e)}, status=500)
+
+
+@require_POST
+def publish_post_now(request, organizer, event):
+    """AJAX POST — manual retry or immediate publishing for a specific post."""
+    _check_permission(request)
+    _check_plugin_active(request)
+    try:
+        data = json.loads(request.body)
+        db_id = data.get("db_id")
+        post_id = data.get("post_id")
+
+        db_post = None
+        if db_id:
+            db_post = SocialMediaPost.objects.filter(pk=db_id, event=request.event).first()
+        if not db_post and post_id:
+            db_post = SocialMediaPost.objects.filter(entity_id=str(post_id), event=request.event).first()
+
+        if not db_post:
+            return JsonResponse({"success": False, "message": _("Post not found.")}, status=404)
+
+        entity_id = db_post.entity_id or ""
+        provider_name = None
+        for prov in ["telegram", "mastodon", "postiz", "buffer"]:
+            if entity_id.endswith(f"_{prov}"):
+                provider_name = prov
+                break
+
+        if not provider_name:
+            provider_name = db_post.post_type
+
+        account = SocialMediaAccount.objects.filter(
+            organizer=request.organizer,
+            provider=provider_name,
+            is_active=True,
+        ).first()
+
+        if not account:
+            return JsonResponse({
+                "success": False,
+                "message": f"No active {provider_name or 'corresponding'} account found to publish this post."
+            }, status=400)
+
+        from .providers.registry import get_provider
+        try:
+            provider = get_provider(account)
+            media = [db_post.media_url] if db_post.media_url else None
+            provider.publish_post(text=db_post.post_text, media=media)
+
+            if provider_name in ["postiz", "buffer"]:
+                db_post.status = SocialMediaPostStatus.EXPORTED
+            else:
+                db_post.status = SocialMediaPostStatus.PUBLISHED
+            db_post.error_message = ""
+            db_post.save()
+
+            return JsonResponse({
+                "success": True,
+                "message": _("Post successfully published/synced!"),
+                "status": db_post.status,
+            })
+        except Exception as e:
+            db_post.status = SocialMediaPostStatus.FAILED
+            db_post.error_message = str(e)
+            db_post.save()
+            return JsonResponse({
+                "success": False,
+                "message": f"Publishing failed: {str(e)}",
+                "status": db_post.status,
+            }, status=500)
+
+    except (json.JSONDecodeError, ValueError) as exc:
+        return JsonResponse({"success": False, "message": str(exc)}, status=400)
     except Exception as e:
         return JsonResponse({"success": False, "message": str(e)}, status=500)

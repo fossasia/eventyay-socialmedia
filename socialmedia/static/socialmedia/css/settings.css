@@ -948,3 +948,55 @@ body .sm-toast i {
 .skeleton-bar.skeleton-col-postdate { width: 125px; }
 .skeleton-bar.skeleton-col-content { width: 100%; }
 .skeleton-bar.skeleton-col-actions { width: 30px; }
+
+/* ---- Status Badges & Actions ---- */
+.status-badge {
+  display: inline-block;
+  padding: 3px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.status-badge.status-draft {
+  background-color: #f1f3f5;
+  color: #495057;
+  border: 1px solid #dee2e6;
+}
+.status-badge.status-scheduled {
+  background-color: #e7f5ff;
+  color: #1c7ed6;
+  border: 1px solid #a5d8ff;
+}
+.status-badge.status-published {
+  background-color: #ebfbee;
+  color: #2b8a3e;
+  border: 1px solid #b2f2bb;
+}
+.status-badge.status-exported {
+  background-color: #e6fcf5;
+  color: #0ca678;
+  border: 1px solid #96f2d7;
+}
+.status-badge.status-failed {
+  background-color: #fff5f5;
+  color: #c92a2a;
+  border: 1px solid #ffc9c9;
+}
+
+.btn-publish-now {
+  background: none;
+  border: none;
+  color: #1c7ed6;
+  padding: 4px 8px;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.15s, color 0.15s;
+  margin-right: 4px;
+}
+.btn-publish-now:hover {
+  background: #e7f5ff;
+  color: #1062a6;
+}

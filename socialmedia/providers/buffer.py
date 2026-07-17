@@ -141,6 +141,13 @@ class BufferProvider(BaseSocialProvider):
         except Exception as e:
             raise PublishingError(f"Error publishing to Buffer: {e}") from e
 
+    def sync_campaign(self, posts: list[Any]) -> list[Any]:
+        results = []
+        for post in posts:
+            res = self._create_post(post.post_text, save_to_draft=True)
+            results.append(res)
+        return results
+
     @classmethod
     def get_setup_instructions(cls) -> list[str]:
         return [

@@ -112,6 +112,14 @@ class PostizProvider(BaseSocialProvider):
         except Exception as e:
             raise PublishingError(f"Error publishing to Postiz: {e}") from e
 
+    def sync_campaign(self, posts: list[Any]) -> list[Any]:
+        results = []
+        for post in posts:
+            media = [post.media_url] if post.media_url else None
+            res = self.publish_post(post.post_text, media=media)
+            results.append(res)
+        return results
+
     @classmethod
     def get_setup_instructions(cls) -> list[str]:
         return [

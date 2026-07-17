@@ -9,6 +9,8 @@
       PREVIEW_URL: config.previewUrl,
       EXPORT_URL: config.exportUrl,
       UPDATE_URL: config.updateUrl,
+      SYNC_URL: config.syncUrl,
+      PUBLISH_NOW_URL: config.publishNowUrl,
       CSRF_TOKEN: config.csrfToken,
       TRANS_CLICK_TO_EDIT: config.transClickToEdit || "Click to edit · Ctrl+Enter to save",
       TRANS_SELECT_AT_LEAST_ONE: config.transSelectAtLeastOne || "Please select at least one post to export.",
@@ -241,6 +243,40 @@
           return res;
         })
         .catch(err => console.error("Failed to update post status:", err));
+    },
+
+    syncSchedulers() {
+      if (!Config.SYNC_URL) return Promise.reject(new Error("Sync URL not configured"));
+      return fetch(Config.SYNC_URL, {
+        method: "POST",
+        headers: {
+          "X-CSRFToken": Config.CSRF_TOKEN,
+          "X-Requested-With": "XMLHttpRequest",
+        }
+      }).then(r => {
+        return r.json().then(data => {
+          if (!r.ok) throw new Error(data.message || `HTTP error ${r.status}`);
+          return data;
+        });
+      });
+    },
+
+    publishPostNow(dbId, postId) {
+      if (!Config.PUBLISH_NOW_URL) return Promise.reject(new Error("Publish URL not configured"));
+      return fetch(Config.PUBLISH_NOW_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": Config.CSRF_TOKEN,
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: JSON.stringify({ db_id: dbId, post_id: postId })
+      }).then(r => {
+        return r.json().then(data => {
+          if (!r.ok) throw new Error(data.message || `HTTP error ${r.status}`);
+          return data;
+        });
+      });
     }
   };
 
@@ -404,6 +440,34 @@
         naSpan.textContent = "Generic";
         tdPlat.appendChild(naSpan);
       }
+
+      // Add status badge
+      const statusDiv = document.createElement("div");
+      statusDiv.className = "status-badge-wrap";
+      statusDiv.style.marginTop = "4px";
+
+      const statusVal = p.status || "draft";
+      const statusBadge = document.createElement("span");
+      statusBadge.className = `status-badge status-${statusVal}`;
+      
+      let statusLabel = statusVal.charAt(0).toUpperCase() + statusVal.slice(1);
+      
+      if (statusVal === "failed" && p.error_message) {
+        statusBadge.title = p.error_message;
+        statusBadge.style.cursor = "help";
+        
+        const errIcon = document.createElement("i");
+        errIcon.className = "fa fa-exclamation-circle";
+        errIcon.style.marginLeft = "4px";
+        statusBadge.appendChild(document.createTextNode(statusLabel + " "));
+        statusBadge.appendChild(errIcon);
+      } else {
+        statusBadge.textContent = statusLabel;
+      }
+      
+      statusDiv.appendChild(statusBadge);
+      tdPlat.appendChild(statusDiv);
+
       tr.appendChild(tdPlat);
 
       const tdSched = document.createElement("td");
@@ -553,6 +617,17 @@
         this.setWithIcon(restoreBtn, "", "fa fa-undo");
         tdActions.appendChild(restoreBtn);
       } else {
+        if (p.db_id && p.status !== "published" && p.status !== "exported") {
+          const pubBtn = document.createElement("button");
+          pubBtn.className = "btn-publish-now";
+          pubBtn.dataset.postId = p.id;
+          pubBtn.dataset.dbId = p.db_id;
+          pubBtn.type = "button";
+          pubBtn.title = p.status === "failed" ? "Retry publishing" : "Publish now";
+          this.setWithIcon(pubBtn, "", "fa fa-paper-plane");
+          tdActions.appendChild(pubBtn);
+        }
+
         const delBtn = document.createElement("button");
         delBtn.className = "btn-delete-post";
         delBtn.dataset.postId = p.id;
@@ -943,6 +1018,70 @@
         .catch(err => UI.showToast(`Export error: ${err.message}`, "warning"));
     },
 
+    syncSchedulers() {
+      const btn = document.getElementById("btn-sync-schedulers");
+      let originalText = "";
+      if (btn) {
+        btn.disabled = true;
+        originalText = btn.textContent;
+        UI.setWithIcon(btn, "Syncing…", "fa fa-refresh fa-spin");
+      }
+
+      APIClient.syncSchedulers()
+        .then(res => {
+          UI.showToast(res.message || "Successfully synchronized scheduler platforms.", "success");
+          this.loadInitialData();
+        })
+        .catch(err => {
+          UI.showToast(`Sync failed: ${err.message}`, "warning");
+        })
+        .finally(() => {
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = originalText;
+          }
+        });
+    },
+
+    publishPostNow(postId, dbId, button) {
+      if (button) {
+        button.disabled = true;
+        button.title = "Publishing...";
+        const icon = button.querySelector("i");
+        if (icon) {
+          icon.className = "fa fa-spinner fa-spin";
+        }
+      }
+
+      APIClient.publishPostNow(dbId, postId)
+        .then(res => {
+          UI.showToast(res.message || "Post published successfully!", "success");
+          PostState.update(postId, {
+            status: res.status || "published",
+            error_message: ""
+          });
+          UI.renderTable(PostState.getAll(), PostState.getFilter());
+        })
+        .catch(err => {
+          UI.showToast(`Publishing failed: ${err.message}`, "warning");
+          PostState.update(postId, {
+            status: "failed",
+            error_message: err.message
+          });
+          UI.renderTable(PostState.getAll(), PostState.getFilter());
+        })
+        .finally(() => {
+          if (button) {
+            button.disabled = false;
+            button.title = "Publish now";
+            const icon = button.querySelector("i");
+            if (icon) {
+              icon.className = "fa fa-paper-plane";
+            }
+          }
+        });
+    },
+
     bindEvents() {
       const btnRegen = document.getElementById("btn-regenerate");
       if (btnRegen) btnRegen.addEventListener("click", () => this.loadInitialData());
@@ -983,6 +1122,9 @@
 
       const btnExport = document.getElementById("btn-export");
       if (btnExport) btnExport.addEventListener("click", () => this.exportCSV());
+
+      const btnSync = document.getElementById("btn-sync-schedulers");
+      if (btnSync) btnSync.addEventListener("click", () => this.syncSchedulers());
 
       const advToggle = document.getElementById("adv-toggle");
       if (advToggle) advToggle.addEventListener("click", () => UI.toggleAdv());
@@ -1040,6 +1182,10 @@
               APIClient.updatePostStatus(post, "scheduled");
               UI.showToast("Post restored to preview.", "success");
             }
+          } else if (e.target.closest(".btn-publish-now")) {
+            const btn = e.target.closest(".btn-publish-now");
+            const dbId = btn.dataset.dbId;
+            this.publishPostNow(postId, dbId, btn);
           }
         });
 
