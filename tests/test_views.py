@@ -725,7 +725,8 @@ def test_publish_post_now_view(logged_in_organizer_client, organizer, event, set
             url, data=json.dumps(payload), content_type="application/json"
         )
         assert response.status_code == 500
-        assert "Publishing failed: Rate limited" in response.json()["message"]
+        assert "Publishing failed:" in response.json()["message"]
+        assert "Rate limited" in response.json()["message"]
 
     with scope(organizer=organizer, event=event):
         post.refresh_from_db()

@@ -596,48 +596,64 @@ def publish_post_now(request, organizer, event):
                 provider_name = prov
                 break
 
-        if not provider_name:
-            provider_name = db_post.post_type
+        active_accounts = []
+        if provider_name:
+            account = SocialMediaAccount.objects.filter(
+                organizer=request.organizer,
+                provider=provider_name,
+                is_active=True,
+            ).first()
+            if account:
+                active_accounts.append(account)
+        else:
+            active_accounts = list(
+                SocialMediaAccount.objects.filter(
+                    organizer=request.organizer,
+                    provider__in=["telegram", "mastodon", "postiz", "buffer"],
+                    is_active=True,
+                )
+            )
 
-        account = SocialMediaAccount.objects.filter(
-            organizer=request.organizer,
-            provider=provider_name,
-            is_active=True,
-        ).first()
-
-        if not account:
+        if not active_accounts:
+            expected_prov = provider_name or "corresponding"
             return JsonResponse({
                 "success": False,
-                "message": f"No active {provider_name or 'corresponding'} account found to publish this post."
+                "message": f"No active {expected_prov} account found to publish this post."
             }, status=400)
 
         from .providers.registry import get_provider
-        try:
-            provider = get_provider(account)
-            media = [db_post.media_url] if db_post.media_url else None
-            provider.publish_post(text=db_post.post_text, media=media)
+        errors = []
+        published_providers = []
 
-            if provider_name in ["postiz", "buffer"]:
-                db_post.status = SocialMediaPostStatus.EXPORTED
-            else:
-                db_post.status = SocialMediaPostStatus.PUBLISHED
-            db_post.error_message = ""
-            db_post.save()
+        for account in active_accounts:
+            try:
+                provider = get_provider(account)
+                media = [db_post.media_url] if db_post.media_url else None
+                provider.publish_post(text=db_post.post_text, media=media)
+                published_providers.append(account.provider)
+            except Exception as e:
+                errors.append(f"{account.provider}: {str(e)}")
 
-            return JsonResponse({
-                "success": True,
-                "message": _("Post successfully published/synced!"),
-                "status": db_post.status,
-            })
-        except Exception as e:
+        if errors:
             db_post.status = SocialMediaPostStatus.FAILED
-            db_post.error_message = str(e)
+            db_post.error_message = "; ".join(errors)
             db_post.save()
             return JsonResponse({
                 "success": False,
-                "message": f"Publishing failed: {str(e)}",
+                "message": f"Publishing failed: {'; '.join(errors)}",
                 "status": db_post.status,
             }, status=500)
+
+        is_scheduler = all(p in ["postiz", "buffer"] for p in published_providers)
+        db_post.status = SocialMediaPostStatus.EXPORTED if is_scheduler else SocialMediaPostStatus.PUBLISHED
+        db_post.error_message = ""
+        db_post.save()
+
+        return JsonResponse({
+            "success": True,
+            "message": _("Post successfully published/synced!"),
+            "status": db_post.status,
+        })
 
     except (json.JSONDecodeError, ValueError) as exc:
         return JsonResponse({"success": False, "message": str(exc)}, status=400)
