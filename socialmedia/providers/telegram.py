@@ -177,7 +177,12 @@ class TelegramProvider(BaseSocialProvider):
                 username = self.chat_id.lstrip("@")
                 url_val = f"https://t.me/{username}/{post_id}"
             else:
-                url_val = f"https://t.me/c/{self.chat_id}/{post_id}"
+                clean_id = self.chat_id
+                if clean_id.startswith("-100"):
+                    clean_id = clean_id[4:]
+                elif clean_id.startswith("-"):
+                    clean_id = clean_id[1:]
+                url_val = f"https://t.me/c/{clean_id}/{post_id}"
 
             return {
                 "post_id": post_id,

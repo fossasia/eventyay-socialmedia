@@ -422,7 +422,16 @@ class OrganizerAccountDeleteView(
             scheduled_at__gt=timezone.now(),
         )
 
+        # Note: Since SocialMediaPost rows do not have a foreign key to a
+        # specific SocialMediaAccount, we filter by the provider type suffix
+        # on the entity_id (e.g. "_telegram") or general/aggregator posts.
         if account.provider in ["postiz", "buffer"]:
+            # Aggregator integrations sync general scheduled posts (not
+            # specific to direct platforms). We exclude posts that are
+            # targeted to direct platforms (telegram, mastodon, etc.).
+            direct_platforms = ["telegram", "mastodon", "twitter", "linkedin"]
+            for p in direct_platforms:
+                active_posts = active_posts.exclude(entity_id__endswith=f"_{p}")
             has_active = active_posts.exists()
             count = active_posts.count()
         else:
