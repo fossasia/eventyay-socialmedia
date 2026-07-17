@@ -52,6 +52,17 @@ class SocialMediaPost(models.Model):
         default=False,
         help_text=_("True if manually locked or custom added by organizer"),
     )
+    media_url = models.URLField(
+        max_length=1024,
+        blank=True,
+        null=True,
+        help_text=_("URL of the media/image attachment (e.g. speaker avatar)"),
+    )
+    error_message = models.TextField(
+        blank=True,
+        null=True,
+        help_text=_("Error logs or failure reason returned by the provider API"),
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
