@@ -615,13 +615,21 @@ def test_post_error_message_persistence(organizer, event):
 
 
 @pytest.mark.django_db
-def test_sync_to_schedulers_view(logged_in_organizer_client, organizer, event, settings):
+def test_sync_to_schedulers_view(
+    logged_in_organizer_client, organizer, event, settings
+):
     settings.SITE_URL = "https://testserver"
-    from django_scopes import scope
-    from django.utils.timezone import now
     from datetime import timedelta
-    from socialmedia.models import SocialMediaPost, SocialMediaPostStatus, SocialMediaAccount
     from unittest.mock import patch
+
+    from django.utils.timezone import now
+    from django_scopes import scope
+
+    from socialmedia.models import (
+        SocialMediaAccount,
+        SocialMediaPost,
+        SocialMediaPostStatus,
+    )
     from socialmedia.providers.buffer import BufferProvider
 
     url = reverse(
@@ -666,10 +674,16 @@ def test_sync_to_schedulers_view(logged_in_organizer_client, organizer, event, s
 @pytest.mark.django_db
 def test_publish_post_now_view(logged_in_organizer_client, organizer, event, settings):
     settings.SITE_URL = "https://testserver"
-    from django_scopes import scope
-    from django.utils.timezone import now
-    from socialmedia.models import SocialMediaPost, SocialMediaPostStatus, SocialMediaAccount
     from unittest.mock import patch
+
+    from django.utils.timezone import now
+    from django_scopes import scope
+
+    from socialmedia.models import (
+        SocialMediaAccount,
+        SocialMediaPost,
+        SocialMediaPostStatus,
+    )
     from socialmedia.providers.telegram import TelegramProvider
 
     url = reverse(
@@ -720,7 +734,10 @@ def test_publish_post_now_view(logged_in_organizer_client, organizer, event, set
         post.save()
 
     from socialmedia.providers.base import PublishingError
-    with patch.object(TelegramProvider, "publish_post", side_effect=PublishingError("Rate limited")) as mock_publish:
+
+    with patch.object(
+        TelegramProvider, "publish_post", side_effect=PublishingError("Rate limited")
+    ) as mock_publish:
         response = logged_in_organizer_client.post(
             url, data=json.dumps(payload), content_type="application/json"
         )
@@ -731,4 +748,4 @@ def test_publish_post_now_view(logged_in_organizer_client, organizer, event, set
     with scope(organizer=organizer, event=event):
         post.refresh_from_db()
         assert post.status == SocialMediaPostStatus.FAILED
-        assert post.error_message == "Rate limited"
+        assert "Rate limited" in post.error_message

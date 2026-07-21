@@ -1189,6 +1189,15 @@
           }
         });
 
+        const _scheduleSaveTimers = {};
+        const scheduleSave = (postId) => {
+          clearTimeout(_scheduleSaveTimers[postId]);
+          _scheduleSaveTimers[postId] = setTimeout(() => {
+            APIClient.savePostToDB(PostState.get(postId));
+            delete _scheduleSaveTimers[postId];
+          }, 1000);
+        };
+
         tbody.addEventListener("change", (e) => {
           const postId = e.target.dataset.postId;
           if (!postId) return;
@@ -1199,12 +1208,12 @@
             PostState.update(postId, { post_date: e.target.value });
             UI.updateRow(postId);
             this.triggerValidation();
-            APIClient.savePostToDB(PostState.get(postId));
+            scheduleSave(postId);
           } else if (e.target.classList.contains("sm-time-input")) {
             PostState.update(postId, { post_time: e.target.value });
             UI.updateRow(postId);
             this.triggerValidation();
-            APIClient.savePostToDB(PostState.get(postId));
+            scheduleSave(postId);
           }
         });
 

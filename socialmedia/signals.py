@@ -13,6 +13,7 @@ from eventyay.control.signals import (
     nav_global,
     nav_organizer,
 )
+
 from .models import SocialMediaAccount, SocialMediaPost, SocialMediaPostStatus
 from .providers.registry import get_provider
 
@@ -107,14 +108,13 @@ def control_dashboard_socialmedia(sender, request=None, **kwargs):
 @receiver(periodic_task, dispatch_uid="socialmedia_periodic_publishing")
 @scopes_disabled()
 def publish_scheduled_posts(sender, **kwargs):
-    """Periodic task to publish scheduled social media posts for direct integrations (Telegram, Mastodon)."""
-    due_posts = (
-        SocialMediaPost.objects.filter(
-            status=SocialMediaPostStatus.SCHEDULED,
-            scheduled_at__lte=now(),
-        )
-        .order_by("scheduled_at", "pk")
-    )
+    """Periodic task to publish scheduled social media posts
+    for direct integrations (Telegram, Mastodon).
+    """
+    due_posts = SocialMediaPost.objects.filter(
+        status=SocialMediaPostStatus.SCHEDULED,
+        scheduled_at__lte=now(),
+    ).order_by("scheduled_at", "pk")
 
     for post in due_posts:
         entity_id = post.entity_id or ""
@@ -144,7 +144,9 @@ def publish_scheduled_posts(sender, **kwargs):
 
             if not account:
                 locked_post.status = SocialMediaPostStatus.FAILED
-                locked_post.error_message = f"No active {provider_name} account found for organizer."
+                locked_post.error_message = (
+                    f"No active {provider_name} account found for organizer."
+                )
                 locked_post.save()
                 continue
 

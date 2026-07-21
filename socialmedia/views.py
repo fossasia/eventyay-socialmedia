@@ -522,7 +522,9 @@ def test_connection(request, organizer, pk):
 
 @require_POST
 def sync_to_schedulers(request, organizer, event):
-    """AJAX POST — trigger synchronization of active scheduled posts to Postiz or Buffer scheduler accounts."""
+    """AJAX POST — trigger synchronization of active scheduled posts
+    to Postiz or Buffer scheduler accounts.
+    """
     _check_permission(request)
     _check_plugin_active(request)
     try:
@@ -532,7 +534,13 @@ def sync_to_schedulers(request, organizer, event):
             is_active=True,
         )
         if not scheduler_accounts.exists():
-            return JsonResponse({"success": False, "message": _("No active scheduler accounts connected.")}, status=400)
+            return JsonResponse(
+                {
+                    "success": False,
+                    "message": _("No active scheduler accounts connected."),
+                },
+                status=400,
+            )
 
         posts_to_sync = SocialMediaPost.objects.filter(
             event=request.event,
@@ -540,9 +548,12 @@ def sync_to_schedulers(request, organizer, event):
             scheduled_at__gt=timezone.now(),
         )
         if not posts_to_sync.exists():
-            return JsonResponse({"success": True, "message": _("No scheduled posts found to sync.")})
+            return JsonResponse(
+                {"success": True, "message": _("No scheduled posts found to sync.")}
+            )
 
         from .providers.registry import get_provider
+
         synced_count = 0
         errors = []
 
@@ -555,17 +566,25 @@ def sync_to_schedulers(request, organizer, event):
                 errors.append(f"{account.provider}: {str(e)}")
 
         if errors:
-            return JsonResponse({
-                "success": False,
-                "message": f"Synchronization partially failed: {', '.join(errors)}"
-            }, status=500)
+            return JsonResponse(
+                {
+                    "success": False,
+                    "message": f"Synchronization partially failed: {', '.join(errors)}",
+                },
+                status=500,
+            )
 
         posts_to_sync.update(status=SocialMediaPostStatus.EXPORTED)
 
-        return JsonResponse({
-            "success": True,
-            "message": f"Successfully synchronized posts to {synced_count} scheduler platform(s)."
-        })
+        return JsonResponse(
+            {
+                "success": True,
+                "message": (
+                    f"Successfully synchronized posts to {synced_count} "
+                    "scheduler platform(s)."
+                ),
+            }
+        )
     except Exception as e:
         return JsonResponse({"success": False, "message": str(e)}, status=500)
 
@@ -582,12 +601,18 @@ def publish_post_now(request, organizer, event):
 
         db_post = None
         if db_id:
-            db_post = SocialMediaPost.objects.filter(pk=db_id, event=request.event).first()
+            db_post = SocialMediaPost.objects.filter(
+                pk=db_id, event=request.event
+            ).first()
         if not db_post and post_id:
-            db_post = SocialMediaPost.objects.filter(entity_id=str(post_id), event=request.event).first()
+            db_post = SocialMediaPost.objects.filter(
+                entity_id=str(post_id), event=request.event
+            ).first()
 
         if not db_post:
-            return JsonResponse({"success": False, "message": _("Post not found.")}, status=404)
+            return JsonResponse(
+                {"success": False, "message": _("Post not found.")}, status=404
+            )
 
         entity_id = db_post.entity_id or ""
         provider_name = None
@@ -616,12 +641,19 @@ def publish_post_now(request, organizer, event):
 
         if not active_accounts:
             expected_prov = provider_name or "corresponding"
-            return JsonResponse({
-                "success": False,
-                "message": f"No active {expected_prov} account found to publish this post."
-            }, status=400)
+            return JsonResponse(
+                {
+                    "success": False,
+                    "message": (
+                        f"No active {expected_prov} account found to "
+                        "publish this post."
+                    ),
+                },
+                status=400,
+            )
 
         from .providers.registry import get_provider
+
         errors = []
         published_providers = []
 
@@ -638,22 +670,31 @@ def publish_post_now(request, organizer, event):
             db_post.status = SocialMediaPostStatus.FAILED
             db_post.error_message = "; ".join(errors)
             db_post.save()
-            return JsonResponse({
-                "success": False,
-                "message": f"Publishing failed: {'; '.join(errors)}",
-                "status": db_post.status,
-            }, status=500)
+            return JsonResponse(
+                {
+                    "success": False,
+                    "message": f"Publishing failed: {'; '.join(errors)}",
+                    "status": db_post.status,
+                },
+                status=500,
+            )
 
         is_scheduler = all(p in ["postiz", "buffer"] for p in published_providers)
-        db_post.status = SocialMediaPostStatus.EXPORTED if is_scheduler else SocialMediaPostStatus.PUBLISHED
+        db_post.status = (
+            SocialMediaPostStatus.EXPORTED
+            if is_scheduler
+            else SocialMediaPostStatus.PUBLISHED
+        )
         db_post.error_message = ""
         db_post.save()
 
-        return JsonResponse({
-            "success": True,
-            "message": _("Post successfully published/synced!"),
-            "status": db_post.status,
-        })
+        return JsonResponse(
+            {
+                "success": True,
+                "message": _("Post successfully published/synced!"),
+                "status": db_post.status,
+            }
+        )
 
     except (json.JSONDecodeError, ValueError) as exc:
         return JsonResponse({"success": False, "message": str(exc)}, status=400)

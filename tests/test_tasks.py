@@ -1,14 +1,19 @@
-import pytest
 from datetime import timedelta
-from django.utils.timezone import now
-from django_scopes import scope
 from unittest.mock import patch
 
-from socialmedia.models import SocialMediaPost, SocialMediaPostStatus, SocialMediaAccount
-from socialmedia.signals import publish_scheduled_posts
-from socialmedia.providers.telegram import TelegramProvider
-from socialmedia.providers.mastodon import MastodonProvider
+import pytest
+from django.utils.timezone import now
+from django_scopes import scope
+
+from socialmedia.models import (
+    SocialMediaAccount,
+    SocialMediaPost,
+    SocialMediaPostStatus,
+)
 from socialmedia.providers.base import PublishingError
+from socialmedia.providers.mastodon import MastodonProvider
+from socialmedia.providers.telegram import TelegramProvider
+from socialmedia.signals import publish_scheduled_posts
 
 
 @pytest.mark.django_db
@@ -35,10 +40,16 @@ def test_publish_scheduled_posts_success(organizer, event):
             status=SocialMediaPostStatus.SCHEDULED,
         )
 
-    with patch.object(TelegramProvider, "publish_post", return_value={"post_id": "123", "url": "https://t.me/123"}) as mock_publish:
+    with patch.object(
+        TelegramProvider,
+        "publish_post",
+        return_value={"post_id": "123", "url": "https://t.me/123"},
+    ) as mock_publish:
         publish_scheduled_posts(sender=None)
-        
-        mock_publish.assert_called_once_with(text="Hello Telegram!", media=["https://testserver/img.jpg"])
+
+        mock_publish.assert_called_once_with(
+            text="Hello Telegram!", media=["https://testserver/img.jpg"]
+        )
 
     with scope(organizer=organizer, event=event):
         post.refresh_from_db()
@@ -55,7 +66,10 @@ def test_publish_scheduled_posts_failure(organizer, event):
         platform_username="test_user",
         is_active=True,
     )
-    account.credentials = {"api_base_url": "https://mastodon.social", "access_token": "fake_token"}
+    account.credentials = {
+        "api_base_url": "https://mastodon.social",
+        "access_token": "fake_token",
+    }
     account.save()
 
     # Create due post
@@ -69,9 +83,13 @@ def test_publish_scheduled_posts_failure(organizer, event):
             status=SocialMediaPostStatus.SCHEDULED,
         )
 
-    with patch.object(MastodonProvider, "publish_post", side_effect=PublishingError("API rate limit exceeded")) as mock_publish:
+    with patch.object(
+        MastodonProvider,
+        "publish_post",
+        side_effect=PublishingError("API rate limit exceeded"),
+    ) as mock_publish:
         publish_scheduled_posts(sender=None)
-        
+
         mock_publish.assert_called_once_with(text="Hello Mastodon!", media=None)
 
     with scope(organizer=organizer, event=event):
@@ -83,7 +101,7 @@ def test_publish_scheduled_posts_failure(organizer, event):
 @pytest.mark.django_db
 def test_publish_scheduled_posts_missing_account(organizer, event):
     # No social media accounts created
-    
+
     with scope(organizer=organizer, event=event):
         post = SocialMediaPost.objects.create(
             event=event,
@@ -136,7 +154,7 @@ def test_publish_scheduled_posts_future_or_other_status(organizer, event):
         post_generic = SocialMediaPost.objects.create(
             event=event,
             post_type="cfp",
-            entity_id="cfp_3_postiz", # postiz (skipped by worker)
+            entity_id="cfp_3_postiz",  # postiz (skipped by worker)
             scheduled_at=now() - timedelta(minutes=5),
             post_text="Postiz post!",
             status=SocialMediaPostStatus.SCHEDULED,
@@ -149,9 +167,9 @@ def test_publish_scheduled_posts_future_or_other_status(organizer, event):
     with scope(organizer=organizer, event=event):
         post_future.refresh_from_db()
         assert post_future.status == SocialMediaPostStatus.SCHEDULED
-        
+
         post_published.refresh_from_db()
         assert post_published.status == SocialMediaPostStatus.PUBLISHED
-        
+
         post_generic.refresh_from_db()
         assert post_generic.status == SocialMediaPostStatus.SCHEDULED

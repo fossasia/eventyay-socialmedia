@@ -445,8 +445,8 @@
     "previewUrl": "{{ preview_url }}",
     "exportUrl": "{{ export_url }}",
     "updateUrl": "{{ update_url }}",
-    "syncUrl": "{% url 'plugins:socialmedia:sync' organizer=organizer.slug event=event.slug %}",
-    "publishNowUrl": "{% url 'plugins:socialmedia:publish_now' organizer=organizer.slug event=event.slug %}",
+    "syncUrl": "{% url 'plugins:socialmedia:sync' organizer=event.organizer.slug event=event.slug %}",
+    "publishNowUrl": "{% url 'plugins:socialmedia:publish_now' organizer=event.organizer.slug event=event.slug %}",
     "csrfToken": "{{ csrf_token }}",
     "transSelectAtLeastOne": "{% trans 'Please select at least one post to export.' %}",
     "transClickToEdit": "{% trans 'Click to edit · Ctrl+Enter to save' %}"
