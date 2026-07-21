@@ -86,13 +86,13 @@
         return this.update(id, { enabled });
       },
       selectAll(enabled) {
-        posts.forEach(p => { p.enabled = enabled; });
+        this.getFiltered().forEach(p => { p.enabled = enabled; });
       },
       applyBulkPreset(offsetDays) {
         let updatedCount = 0;
         let skippedCount = 0;
 
-        posts.forEach(p => {
+        this.getFiltered().forEach(p => {
           if (!p.enabled) return;
           if (p.reference_date) {
             p.post_date = Helpers.addDays(p.reference_date, offsetDays);
@@ -106,7 +106,7 @@
       },
       applyBulkCustom(customDate, customTime) {
         let updatedCount = 0;
-        posts.forEach(p => {
+        this.getFiltered().forEach(p => {
           if (!p.enabled) return;
           p.post_date = customDate;
           p.post_time = customTime;
@@ -116,7 +116,7 @@
       },
       applyBulkDefault() {
         let updatedCount = 0;
-        posts.forEach(p => {
+        this.getFiltered().forEach(p => {
           if (!p.enabled) return;
           p.post_date = p.original_post_date;
           p.post_time = p.original_post_time;
@@ -130,7 +130,7 @@
         let limitExceededCount = 0;
         const todayStr = Helpers.getLocalTodayStr();
 
-        posts.forEach(p => {
+        this.getFiltered().forEach(p => {
           if (!p.enabled) return;
           if (p.post_date < todayStr) pastCount++;
           if (p.post_text.includes("{") || p.post_text.includes("}")) placeholderCount++;
@@ -638,7 +638,7 @@
     },
 
     updateSelectedCount() {
-      const posts = PostState.getAll();
+      const posts = PostState.getFiltered();
       const n = posts.filter(p => p.enabled).length;
       const total = posts.length;
 
@@ -927,7 +927,7 @@
       const presetSelect = document.getElementById("export-preset-select");
       const exportFormat = presetSelect ? presetSelect.value : "generic";
 
-      APIClient.exportCSV(visiblePosts, exportFormat)
+      APIClient.exportCSV(enabledVisiblePosts, exportFormat)
         .then(blob => {
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
