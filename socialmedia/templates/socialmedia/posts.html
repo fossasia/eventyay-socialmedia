@@ -1,0 +1,150 @@
+{% extends "eventyay_common/event/base.html" %}
+{% load i18n %}
+{% load bootstrap3 %}
+{% load static %}
+
+{% block title %}{% trans "Social Media — Posts" %} :: {{ event.name }}{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" type="text/css" href="{% static 'socialmedia/css/settings.css' %}">
+
+<div class="sm-page">
+
+  <!-- Toolbar -->
+  <div class="sm-toolbar">
+    <h1>
+      {% trans "Social Media Posts" %}
+      <small>{{ event.name }}</small>
+    </h1>
+    <a href="{% url 'plugins:socialmedia:organizer_accounts' organizer=event.organizer.slug %}?event={{ event.slug }}" class="btn btn-default">
+      <i class="fa fa-share-alt"></i> {% trans "Manage Social Accounts" %}
+    </a>
+    <button id="btn-regenerate" class="btn btn-default">
+      <i class="fa fa-refresh"></i> {% trans "Regenerate" %}
+    </button>
+  </div>
+
+  <!-- Filter pills -->
+  <div class="sm-filters" id="filter-pills">
+    <button class="sm-filter-btn active" data-type="all">
+      {% trans "All" %} <span class="count" id="cnt-all">0</span>
+    </button>
+    <button class="sm-filter-btn" data-type="cfp">
+      {% trans "CFP" %} <span class="count" id="cnt-cfp">0</span>
+    </button>
+    <button class="sm-filter-btn" data-type="speaker">
+      {% trans "Speakers" %} <span class="count" id="cnt-speaker">0</span>
+    </button>
+    <button class="sm-filter-btn" data-type="session">
+      {% trans "Sessions" %} <span class="count" id="cnt-session">0</span>
+    </button>
+    <button class="sm-filter-btn" data-type="ticket">
+      {% trans "Tickets" %} <span class="count" id="cnt-ticket">0</span>
+    </button>
+    <button class="sm-filter-btn" data-type="schedule">
+      {% trans "Schedule" %} <span class="count" id="cnt-schedule">0</span>
+    </button>
+    <button class="sm-filter-btn" data-type="excluded">
+      {% trans "Excluded" %} <span class="count" id="cnt-excluded">0</span>
+    </button>
+  </div>
+
+  <!-- Action bar -->
+  <div class="sm-actions">
+
+    <!-- Bulk schedule preset dropdown -->
+    <div class="bulk-schedule-wrap">
+      <select id="bulk-schedule-preset" class="form-control input-sm bulk-schedule-select">
+        <option value="">{% trans "Schedule preset..." %}</option>
+        <option value="default">{% trans "Revert to default timing" %}</option>
+        <option value="0">{% trans "On event / session day" %}</option>
+        <option value="-1">{% trans "1 day before" %}</option>
+        <option value="-2">{% trans "2 days before" %}</option>
+        <option value="-3">{% trans "3 days before" %}</option>
+        <option value="-5">{% trans "5 days before" %}</option>
+        <option value="-7">{% trans "1 week before (7 days)" %}</option>
+        <option value="-14">{% trans "2 weeks before (14 days)" %}</option>
+        <option value="-30">{% trans "1 month before (30 days)" %}</option>
+        <option value="custom">{% trans "Custom..." %}</option>
+      </select>
+      <div id="bulk-schedule-custom-inputs" class="bulk-schedule-custom-inputs" style="display: none; align-items: center; gap: 4px;">
+        <input type="date" id="bulk-schedule-custom-date" class="form-control input-sm" style="width: 130px; display: inline-block;">
+        <input type="time" id="bulk-schedule-custom-time" class="form-control input-sm" style="width: 100px; display: inline-block;" value="09:00">
+      </div>
+      <button id="btn-apply-schedule" class="btn btn-default btn-sm" type="button">
+        {% trans "Apply" %}
+      </button>
+    </div>
+    <span class="sm-count" id="selected-count">–</span>
+  </div>
+
+  <div id="validation-alert-container" style="display: none; margin-bottom: 12px;"></div>
+
+  <!-- Post table -->
+  <div class="sm-table-wrap">
+    <table class="sm-table">
+      <thead>
+        <tr>
+          <th><input type="checkbox" id="chk-all" title="{% trans 'Toggle all' %}"></th>
+          <th>{% trans "Type" %}</th>
+          <th>{% trans "Platform" %}</th>
+          <th><span title="{% trans 'Official date & time of the session on the event agenda schedule.' %}" class="help-tooltip">{% trans "Schedule Date & Time" %}</span></th>
+          <th>
+            <span title="{% trans 'The date & time this social media post is scheduled to be published.' %}" class="help-tooltip">{% trans "Post Date & Time" %}</span>
+            <div class="th-timezone">{{ event.timezone }}</div>
+          </th>
+          <th>{% trans "Content" %} <span class="th-hint">— {% trans "click to edit" %}</span></th>
+          <th>{% trans "Actions" %}</th>
+        </tr>
+      </thead>
+      <tbody id="posts-tbody">
+        <!-- Skeleton rows -->
+        {% for i in "12345" %}
+        <tr class="skeleton-row">
+          <td><div class="skeleton-bar skeleton-col-check"></div></td>
+          <td><div class="skeleton-bar skeleton-col-type"></div></td>
+          <td><div class="skeleton-bar skeleton-col-platform"></div></td>
+          <td><div class="skeleton-bar skeleton-col-date"></div></td>
+          <td><div class="skeleton-bar skeleton-col-postdate"></div></td>
+          <td><div class="skeleton-bar skeleton-col-content"></div></td>
+          <td><div class="skeleton-bar skeleton-col-actions"></div></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Export bar (below table, right-aligned) -->
+  <div class="export-bar">
+    <span class="selected-count" id="export-count">0 {% trans "posts selected" %}</span>
+    <div style="display: inline-flex; align-items: center; gap: 8px;">
+      <select id="export-preset-select" class="form-control input-sm" style="width: 150px; display: inline-block;">
+        <option value="generic">{% trans "Generic CSV" %}</option>
+        <option value="postiz">{% trans "Postiz CSV" %}</option>
+        <option value="buffer">{% trans "Buffer CSV" %}</option>
+        <option value="hootsuite">{% trans "Hootsuite CSV" %}</option>
+      </select>
+      <button id="btn-export" class="btn btn-primary btn-export">
+        <i class="fa fa-download"></i> {% trans "Export CSV" %}
+      </button>
+      <button id="btn-sync-schedulers" class="btn btn-success" type="button">
+        <i class="fa fa-refresh"></i> {% trans "Sync to Schedulers" %}
+      </button>
+    </div>
+  </div>
+
+</div><!-- /sm-page -->
+<script id="socialmedia-config" type="application/json">
+  {
+    "previewUrl": "{{ preview_url }}",
+    "exportUrl": "{{ export_url }}",
+    "updateUrl": "{{ update_url }}",
+    "syncUrl": "{% url 'plugins:socialmedia:sync' organizer=organizer.slug event=event.slug %}",
+    "publishNowUrl": "{% url 'plugins:socialmedia:publish_now' organizer=organizer.slug event=event.slug %}",
+    "csrfToken": "{{ csrf_token }}",
+    "transSelectAtLeastOne": "{% trans 'Please select at least one post to export.' %}",
+    "transClickToEdit": "{% trans 'Click to edit · Ctrl+Enter to save' %}"
+  }
+</script>
+<script src="{% static 'socialmedia/js/settings.js' %}"></script>
+{% endblock %}
