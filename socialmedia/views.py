@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import datetime
 
 import pytz
@@ -21,6 +22,8 @@ from eventyay.control.views.organizer_views.organizer_detail_view_mixin import (
 from .export import build_posts, generate_csv_from_posts, sync_posts_to_db
 from .forms import PROVIDER_FORMS, SocialMediaSettingsForm
 from .models import SocialMediaAccount, SocialMediaPost, SocialMediaPostStatus
+
+logger = logging.getLogger(__name__)
 
 
 def _check_plugin_active(request):
@@ -279,14 +282,45 @@ class OrganizerAccountCreateView(
             )
         return super().dispatch(request, *args, **kwargs)
 
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        from .providers.registry import get_provider_class
+
+        try:
+            provider_cls = get_provider_class(self.provider)
+            ctx["setup_instructions"] = provider_cls.get_setup_instructions()
+        except ValueError:
+            pass
+        return ctx
+
     def get_form_class(self):
         return PROVIDER_FORMS[self.provider]
 
     def form_valid(self, form):
         form.instance.organizer = self.request.organizer
+        self._validate_connection(form)
         response = super().form_valid(form)
         messages.success(self.request, _("Account successfully connected."))
         return response
+
+    def _validate_connection(self, form):
+        from .providers.registry import get_provider
+
+        try:
+            account = form.save(commit=False)
+            account.organizer = self.request.organizer
+            provider = get_provider(account)
+            if not provider.validate_credentials():
+                raise Exception("Credentials validation returned False.")
+        except Exception as e:
+            logger.warning(f"Connection verification failed during save: {e}")
+            messages.warning(
+                self.request,
+                _(
+                    "Credentials could not be verified. "
+                    "The account was saved but may not work."
+                ),
+            )
 
     def get_success_url(self):
         url = reverse(
@@ -309,6 +343,18 @@ class OrganizerAccountUpdateView(
     def get_object(self, queryset=None):
         return super(OrganizerDetailViewMixin, self).get_object(queryset)
 
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        provider = self.get_object().provider
+        from .providers.registry import get_provider_class
+
+        try:
+            provider_cls = get_provider_class(provider)
+            ctx["setup_instructions"] = provider_cls.get_setup_instructions()
+        except ValueError:
+            pass
+        return ctx
+
     def get_queryset(self):
         return SocialMediaAccount.objects.filter(organizer=self.request.organizer)
 
@@ -317,9 +363,29 @@ class OrganizerAccountUpdateView(
         return PROVIDER_FORMS.get(provider)
 
     def form_valid(self, form):
+        self._validate_connection(form)
         response = super().form_valid(form)
         messages.success(self.request, _("Account settings updated."))
         return response
+
+    def _validate_connection(self, form):
+        from .providers.registry import get_provider
+
+        try:
+            account = form.save(commit=False)
+            account.organizer = self.request.organizer
+            provider = get_provider(account)
+            if not provider.validate_credentials():
+                raise Exception("Credentials validation returned False.")
+        except Exception as e:
+            logger.warning(f"Connection verification failed during save: {e}")
+            messages.warning(
+                self.request,
+                _(
+                    "Credentials could not be verified. "
+                    "The account was saved but may not work."
+                ),
+            )
 
     def get_success_url(self):
         url = reverse(
@@ -356,7 +422,16 @@ class OrganizerAccountDeleteView(
             scheduled_at__gt=timezone.now(),
         )
 
+        # Note: Since SocialMediaPost rows do not have a foreign key to a
+        # specific SocialMediaAccount, we filter by the provider type suffix
+        # on the entity_id (e.g. "_telegram") or general/aggregator posts.
         if account.provider in ["postiz", "buffer"]:
+            # Aggregator integrations sync general scheduled posts (not
+            # specific to direct platforms). We exclude posts that are
+            # targeted to direct platforms (telegram, mastodon, etc.).
+            direct_platforms = ["telegram", "mastodon", "twitter", "linkedin"]
+            for p in direct_platforms:
+                active_posts = active_posts.exclude(entity_id__endswith=f"_{p}")
             has_active = active_posts.exists()
             count = active_posts.count()
         else:
@@ -385,3 +460,38 @@ class OrganizerAccountDeleteView(
         if event_slug:
             url = f"{url}?event={event_slug}"
         return url
+
+
+@require_POST
+def test_connection(request, organizer, pk):
+    """AJAX POST — send a test message to verify the connection works."""
+    if not request.user.is_authenticated:
+        return JsonResponse(
+            {"success": False, "message": "Authentication required."},
+            status=403,
+        )
+    if not request.user.has_organizer_permission(
+        request.organizer, "can_change_organizer_settings", request=request
+    ):
+        return JsonResponse(
+            {"success": False, "message": "Permission denied."},
+            status=403,
+        )
+
+    account = SocialMediaAccount.objects.filter(
+        organizer=request.organizer, pk=pk
+    ).first()
+    if not account:
+        return JsonResponse(
+            {"success": False, "message": "Account not found."},
+            status=404,
+        )
+
+    try:
+        from .providers.registry import get_provider
+
+        provider = get_provider(account)
+        result = provider.send_test_message()
+        return JsonResponse(result)
+    except Exception as e:
+        return JsonResponse({"success": False, "message": str(e)}, status=500)

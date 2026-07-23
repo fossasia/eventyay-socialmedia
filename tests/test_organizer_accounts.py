@@ -1,5 +1,5 @@
 from datetime import timedelta
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from django.urls import reverse
@@ -7,6 +7,7 @@ from django.utils import timezone
 from django_scopes import scope
 from eventyay.base.models import Organizer, Team
 
+from socialmedia.forms import TelegramAccountForm
 from socialmedia.models import (
     SocialMediaAccount,
     SocialMediaPost,
@@ -142,6 +143,45 @@ def test_account_create_post(organizer_admin_client, organizer):
         assert account.is_active is True
 
 
+def test_telegram_account_form_normalizes_public_tme_link():
+    form = TelegramAccountForm(
+        data={
+            "platform_username": " t.me/mypublicchannel ",
+            "bot_token": "my_secret_bot_token",
+            "is_active": "on",
+        }
+    )
+
+    assert form.is_valid()
+    assert form.cleaned_data["platform_username"] == "@mypublicchannel"
+
+
+def test_telegram_account_form_normalizes_web_telegram_link():
+    form = TelegramAccountForm(
+        data={
+            "platform_username": "https://web.telegram.org/k/#-4482182411",
+            "bot_token": "my_secret_bot_token",
+            "is_active": "on",
+        }
+    )
+
+    assert form.is_valid()
+    assert form.cleaned_data["platform_username"] == "-1004482182411"
+
+
+def test_telegram_account_form_rejects_private_invite_link():
+    form = TelegramAccountForm(
+        data={
+            "platform_username": "https://t.me/+abcdef",
+            "bot_token": "my_secret_bot_token",
+            "is_active": "on",
+        }
+    )
+
+    assert not form.is_valid()
+    assert "platform_username" in form.errors
+
+
 @pytest.mark.django_db
 def test_account_update_view(organizer_admin_client, organizer):
     with scope(organizer=organizer):
@@ -173,6 +213,19 @@ def test_account_update_view(organizer_admin_client, organizer):
 
     account.refresh_from_db()
     assert account.platform_username == "@newchannel"
+    assert account.credentials == {"bot_token": "old_token"}
+
+    # POST with placeholder secret - should also keep old token
+    payload_placeholder = {
+        "platform_username": "@newchannel2",
+        "bot_token": "••••••••",
+        "is_active": "on",
+    }
+    response = organizer_admin_client.post(url, data=payload_placeholder)
+    assert response.status_code == 302
+
+    account.refresh_from_db()
+    assert account.platform_username == "@newchannel2"
     assert account.credentials == {"bot_token": "old_token"}
 
 
@@ -249,3 +302,26 @@ def test_multi_tenancy_isolation(organizer_admin_client, organizer, settings):
     # Trying to access other organizer's connection via our organizer slug
     response = organizer_admin_client.get(url)
     assert response.status_code == 404
+
+
+@pytest.mark.django_db
+@patch("socialmedia.providers.telegram.TelegramProvider.send_test_message")
+def test_test_connection_view(mock_send_test, organizer_admin_client, organizer):
+    mock_send_test.return_value = {"success": True, "message": "Test message sent."}
+    with scope(organizer=organizer):
+        account = SocialMediaAccount.objects.create(
+            organizer=organizer,
+            provider="telegram",
+            platform_username="@mychannel",
+            credentials={"bot_token": "fake_token"},
+        )
+
+    url = reverse(
+        "plugins:socialmedia:organizer_account_test",
+        kwargs={"organizer": organizer.slug, "pk": account.pk},
+    )
+    response = organizer_admin_client.post(url, content_type="application/json")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert data["message"] == "Test message sent."

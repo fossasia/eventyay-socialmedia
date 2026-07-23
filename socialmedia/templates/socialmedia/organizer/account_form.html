@@ -32,12 +32,77 @@
                         <button type="submit" class="btn btn-primary">
                             {% trans "Save Connection" %}
                         </button>
+                        {% if object %}
+                        <button type="button" id="test-connection-btn" class="btn btn-info" data-account-pk="{{ object.pk }}">
+                            <i class="fa fa-plug"></i> {% trans "Test Connection" %}
+                        </button>
+                        {% endif %}
                         <a href="{% url 'plugins:socialmedia:organizer_accounts' organizer=organizer.slug %}{% if request.GET.event %}?event={{ request.GET.event }}{% endif %}" class="btn btn-default">
                             {% trans "Cancel" %}
                         </a>
                     </div>
                 </div>
             </form>
+
+            {% if setup_instructions %}
+            <div class="well" style="margin-top: 20px; background-color: #f7f9fa; border-left: 4px solid #337ab7;">
+                <h4><i class="fa fa-info-circle"></i> {% trans "How to connect:" %}</h4>
+                <ol style="padding-left: 20px; margin-bottom: 0;">
+                    {% for step in setup_instructions %}
+                        <li style="margin-bottom: 5px;">{{ step }}</li>
+                    {% endfor %}
+                </ol>
+            </div>
+            {% endif %}
+
+            {% if object %}
+            <div id="test-connection-result" style="display:none; margin-top:15px;"></div>
+            {% endif %}
         </div>
     </div>
+
+    {% if object %}
+    <script>
+    (function() {
+        var btn = document.getElementById('test-connection-btn');
+        if (!btn) return;
+        btn.addEventListener('click', function() {
+            var pk = btn.getAttribute('data-account-pk');
+            var resultDiv = document.getElementById('test-connection-result');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> {% trans "Testing..." %}';
+            resultDiv.style.display = 'none';
+
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '{% url "plugins:socialmedia:organizer_account_test" organizer=organizer.slug pk=object.pk %}');
+            xhr.setRequestHeader('X-CSRFToken', '{{ csrf_token }}');
+            xhr.onload = function() {
+                var data;
+                try {
+                    data = JSON.parse(xhr.responseText);
+                } catch(e) {
+                    data = { success: false, message: "{% trans 'An unexpected server error occurred.' %}" };
+                }
+                resultDiv.style.display = 'block';
+                if (xhr.status === 200 && data.success) {
+                    resultDiv.innerHTML = '<div class="alert alert-success"><i class="fa fa-check-circle"></i> ' + data.message + '</div>';
+                } else {
+                    resultDiv.innerHTML = '<div class="alert alert-danger"><i class="fa fa-times-circle"></i> ' + data.message + '</div>';
+                }
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa fa-plug"></i> {% trans "Test Connection" %}';
+            };
+            xhr.onerror = function() {
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = '<div class="alert alert-danger"><i class="fa fa-times-circle"></i> {% trans "Network error. Please try again." %}</div>';
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa fa-plug"></i> {% trans "Test Connection" %}';
+            };
+
+
+            xhr.send(JSON.stringify({}));
+        });
+    })();
+    </script>
+    {% endif %}
 {% endblock %}

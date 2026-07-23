@@ -4,6 +4,7 @@ from eventyay.base.forms import SettingsForm
 
 from .export import DEFAULT_TEMPLATES, PLATFORMS
 from .models import SocialMediaAccount
+from .telegram_utils import normalize_telegram_chat_id
 
 MAX_OFFSETS = 10
 MAX_OFFSET_VALUE_CFP = 365
@@ -459,7 +460,11 @@ class TelegramAccountForm(forms.ModelForm):
             "platform_username": _("Channel/Chat ID"),
         }
         help_texts = {
-            "platform_username": _("e.g. @mychannel or -100123456789"),
+            "platform_username": _(
+                "Use @publicusername for public chats/channels or the numeric chat "
+                "ID for private groups, e.g. -100123456789. Invite links cannot be "
+                "used as chat IDs."
+            ),
         }
 
     def __init__(self, *args, **kwargs):
@@ -475,7 +480,18 @@ class TelegramAccountForm(forms.ModelForm):
         if (not token or token == "••••••••") and self.instance and self.instance.pk:
             creds = self.instance.credentials
             return creds.get("bot_token")
-        return token
+        return token.strip() if token else token
+
+    def clean_platform_username(self):
+        value = (self.cleaned_data.get("platform_username") or "").strip()
+        if "t.me/+" in value or "t.me/joinchat/" in value:
+            raise forms.ValidationError(
+                _(
+                    "Telegram invite links cannot be used here. Use a public "
+                    "@username or the numeric chat ID, usually starting with -100."
+                )
+            )
+        return normalize_telegram_chat_id(value)
 
     def save(self, commit=True):
         instance = super().save(commit=False)
@@ -525,7 +541,7 @@ class MastodonAccountForm(forms.ModelForm):
         if (not token or token == "••••••••") and self.instance and self.instance.pk:
             creds = self.instance.credentials
             return creds.get("access_token")
-        return token
+        return token.strip() if token else token
 
     def save(self, commit=True):
         instance = super().save(commit=False)
@@ -576,7 +592,7 @@ class PostizAccountForm(forms.ModelForm):
         if (not key or key == "••••••••") and self.instance and self.instance.pk:
             creds = self.instance.credentials
             return creds.get("api_key")
-        return key
+        return key.strip() if key else key
 
     def save(self, commit=True):
         instance = super().save(commit=False)
@@ -601,10 +617,12 @@ class BufferAccountForm(forms.ModelForm):
         model = SocialMediaAccount
         fields = ["platform_username", "is_active"]
         labels = {
-            "platform_username": _("Configuration Name"),
+            "platform_username": _("Buffer Channel ID"),
         }
         help_texts = {
-            "platform_username": _("e.g. My Organization Buffer Link"),
+            "platform_username": _(
+                "The id of the connected Buffer channel/profile you want to post to."
+            ),
         }
 
     def __init__(self, *args, **kwargs):
@@ -620,7 +638,7 @@ class BufferAccountForm(forms.ModelForm):
         if (not token or token == "••••••••") and self.instance and self.instance.pk:
             creds = self.instance.credentials
             return creds.get("access_token")
-        return token
+        return token.strip() if token else token
 
     def save(self, commit=True):
         instance = super().save(commit=False)
