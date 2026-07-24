@@ -13,6 +13,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_POST
 from django.views.generic import CreateView, DeleteView, FormView, ListView, UpdateView
+from eventyay.base.models import Team
 from eventyay.control.permissions import OrganizerPermissionRequiredMixin
 from eventyay.control.views.event import DecoupleMixin
 from eventyay.control.views.organizer_views.organizer_detail_view_mixin import (
@@ -22,6 +23,20 @@ from eventyay.control.views.organizer_views.organizer_detail_view_mixin import (
 from .export import build_posts, generate_csv_from_posts, sync_posts_to_db
 from .forms import PROVIDER_FORMS, SocialMediaSettingsForm
 from .models import SocialMediaAccount, SocialMediaPost, SocialMediaPostStatus
+
+HAS_SOCIAL_MEDIA_PERM = hasattr(Team, "can_manage_social_media")
+
+ORGANIZER_PERMISSION = (
+    ("can_change_organizer_settings", "can_manage_social_media")
+    if HAS_SOCIAL_MEDIA_PERM
+    else "can_change_organizer_settings"
+)
+
+EVENT_PERMISSION = (
+    ("can_change_event_settings", "can_manage_social_media")
+    if HAS_SOCIAL_MEDIA_PERM
+    else "can_change_event_settings"
+)
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +50,7 @@ def _check_permission(request):
     if not request.user.has_event_permission(
         request.organizer,
         request.event,
-        "can_change_event_settings",
+        EVENT_PERMISSION,
         request=request,
     ):
         raise PermissionDenied()
@@ -244,7 +259,7 @@ class OrganizerAccountsListView(
     model = SocialMediaAccount
     template_name = "socialmedia/organizer/accounts.html"
     context_object_name = "accounts"
-    permission = "can_change_organizer_settings"
+    permission = ORGANIZER_PERMISSION
 
     def get_queryset(self):
         return SocialMediaAccount.objects.filter(organizer=self.request.organizer)
@@ -268,7 +283,7 @@ class OrganizerAccountCreateView(
 ):
     model = SocialMediaAccount
     template_name = "socialmedia/organizer/account_form.html"
-    permission = "can_change_organizer_settings"
+    permission = ORGANIZER_PERMISSION
 
     def dispatch(self, request, *args, **kwargs):
         self.provider = request.GET.get("provider")
@@ -338,7 +353,7 @@ class OrganizerAccountUpdateView(
 ):
     model = SocialMediaAccount
     template_name = "socialmedia/organizer/account_form.html"
-    permission = "can_change_organizer_settings"
+    permission = ORGANIZER_PERMISSION
 
     def get_object(self, queryset=None):
         return super(OrganizerDetailViewMixin, self).get_object(queryset)
@@ -403,7 +418,7 @@ class OrganizerAccountDeleteView(
 ):
     model = SocialMediaAccount
     template_name = "socialmedia/organizer/account_delete.html"
-    permission = "can_change_organizer_settings"
+    permission = ORGANIZER_PERMISSION
 
     def get_object(self, queryset=None):
         return super(OrganizerDetailViewMixin, self).get_object(queryset)
@@ -471,7 +486,9 @@ def test_connection(request, organizer, pk):
             status=403,
         )
     if not request.user.has_organizer_permission(
-        request.organizer, "can_change_organizer_settings", request=request
+        request.organizer,
+        ORGANIZER_PERMISSION,
+        request=request,
     ):
         return JsonResponse(
             {"success": False, "message": "Permission denied."},

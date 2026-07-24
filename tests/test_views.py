@@ -486,3 +486,46 @@ def test_export_csv_presets(logged_in_organizer_client, organizer, event, settin
     content = response.content.decode("utf-8")
     assert "date,time,text,link" in content
     assert "2026-06-20,12:00,Hello world!,https://testserver/img.png" in content
+
+
+@pytest.mark.django_db
+def test_build_posts_includes_speaker_avatar(organizer, event):
+    from unittest.mock import patch
+
+    from django_scopes import scope
+    from eventyay.base.models.auth import User
+    from eventyay.base.models.submission import Submission
+
+    try:
+        from eventyay.base.models.type import SubmissionType
+    except ImportError:
+        from eventyay.base.models import SubmissionType
+    from socialmedia.export import build_posts
+
+    with scope(organizer=organizer, event=event):
+        event = event.__class__.objects.get(pk=event.pk)
+        event.settings.set("socialmedia_speaker_enabled", True)
+        event.settings.flush()
+
+        sub_type = event.submission_types.first() or SubmissionType.objects.create(
+            event=event, name="Talk"
+        )
+
+        user = User.objects.create_user("speaker@example.com", "password")
+
+        sub = Submission.objects.create(
+            event=event,
+            submission_type=sub_type,
+            title="Awesome Talk",
+            state="confirmed",
+        )
+        sub.speakers.add(user)
+
+        with patch.object(
+            User, "get_avatar_url", return_value="https://testserver/speaker.jpg"
+        ):
+            posts = build_posts(event)
+
+    speaker_posts = [p for p in posts if p["type"] == "speaker"]
+    assert speaker_posts
+    assert speaker_posts[0]["media_url"] == "https://testserver/speaker.jpg"

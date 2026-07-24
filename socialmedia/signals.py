@@ -2,11 +2,26 @@ from django.dispatch import receiver
 from django.template.loader import render_to_string
 from django.urls import resolve, reverse
 from django.utils.translation import gettext_lazy as _
+from eventyay.base.models import Team
 from eventyay.control.signals import (
     event_dashboard_components,
     nav_event_common,
     nav_global,
     nav_organizer,
+)
+
+HAS_SOCIAL_MEDIA_PERM = hasattr(Team, "can_manage_social_media")
+
+ORGANIZER_PERMISSION = (
+    ("can_change_organizer_settings", "can_manage_social_media")
+    if HAS_SOCIAL_MEDIA_PERM
+    else "can_change_organizer_settings"
+)
+
+EVENT_PERMISSION = (
+    ("can_change_event_settings", "can_manage_social_media")
+    if HAS_SOCIAL_MEDIA_PERM
+    else "can_change_event_settings"
 )
 
 
@@ -15,7 +30,9 @@ def control_nav_organizer_socialmedia(sender, request=None, **kwargs):
     if not request or not request.user.is_authenticated:
         return []
     if not request.user.has_organizer_permission(
-        sender, "can_change_organizer_settings", request=request
+        sender,
+        ORGANIZER_PERMISSION,
+        request=request,
     ):
         return []
     url = resolve(request.path_info)
@@ -45,6 +62,13 @@ def control_nav_socialmedia(sender, request=None, **kwargs):
 @receiver(nav_event_common, dispatch_uid="socialmedia_nav_event_common")
 def control_nav_event_common_socialmedia(sender, request=None, **kwargs):
     if not request or not request.user.is_authenticated:
+        return []
+    if not request.user.has_event_permission(
+        sender.organizer,
+        sender,
+        EVENT_PERMISSION,
+        request=request,
+    ):
         return []
     url = resolve(request.path_info)
     return [
