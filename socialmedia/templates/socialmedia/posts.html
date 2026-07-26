@@ -131,6 +131,29 @@
         <i class="fa fa-refresh"></i> {% trans "Sync to Schedulers" %}
       </button>
     </div>
+  <!-- Live Card Preview Modal -->
+  <div class="modal fade" id="sm-preview-modal" tabindex="-1" role="dialog" aria-labelledby="sm-preview-modal-label">
+    <div class="modal-dialog modal-md" role="document">
+      <div class="modal-content sm-card-modal">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+          <h4 class="modal-title" id="sm-preview-modal-label">
+            <i class="fa fa-eye"></i> {% trans "Post Live Preview" %}
+          </h4>
+        </div>
+        <div class="modal-body">
+          <div id="sm-card-preview-container">
+            <!-- Dynamic card mockup inserted by JS -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">{% trans "Close" %}</button>
+          <button type="button" class="btn btn-primary" id="btn-modal-publish-now">
+            <i class="fa fa-paper-plane"></i> {% trans "Publish Now" %}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 
 </div><!-- /sm-page -->
@@ -139,8 +162,8 @@
     "previewUrl": "{{ preview_url }}",
     "exportUrl": "{{ export_url }}",
     "updateUrl": "{{ update_url }}",
-    "syncUrl": "{% url 'plugins:socialmedia:sync' organizer=organizer.slug event=event.slug %}",
-    "publishNowUrl": "{% url 'plugins:socialmedia:publish_now' organizer=organizer.slug event=event.slug %}",
+    "syncUrl": "{% url 'plugins:socialmedia:sync' organizer=event.organizer.slug event=event.slug %}",
+    "publishNowUrl": "{% url 'plugins:socialmedia:publish_now' organizer=event.organizer.slug event=event.slug %}",
     "csrfToken": "{{ csrf_token }}",
     "transSelectAtLeastOne": "{% trans 'Please select at least one post to export.' %}",
     "transClickToEdit": "{% trans 'Click to edit · Ctrl+Enter to save' %}"

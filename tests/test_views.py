@@ -635,6 +635,27 @@ def test_sync_posts_to_db_saves_media_url(organizer, event):
 
         post = db_posts.first()
         assert post.media_url == "https://testserver/speaker.jpg"
+        with patch(
+            "socialmedia.export.build_posts",
+            return_value=[
+                {
+                    "id": sub.pk,
+                    "type": "speaker",
+                    "post_date": "2026-07-28",
+                    "post_time": "12:00",
+                    "post_text": "Talk by speaker2",
+                    "offset_days": 0,
+                    "media_url": "https://testserver/speaker.jpg",
+                }
+            ],
+        ):
+            sync_posts_to_db(event)
+
+        db_posts = SocialMediaPost.objects.filter(event=event, post_type="speaker")
+        assert db_posts.exists()
+
+        post = db_posts.first()
+        assert post.media_url == "https://testserver/speaker.jpg"
 
         # Verify re-syncing preserves existing media_url if payload omits it
         with patch(

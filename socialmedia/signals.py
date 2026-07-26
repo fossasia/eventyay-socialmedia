@@ -122,7 +122,6 @@ def control_nav_event_common_socialmedia(sender, request=None, **kwargs):
     ]
 
 
-
 @receiver(event_dashboard_components, dispatch_uid="socialmedia_dashboard_components")
 def control_dashboard_socialmedia(sender, request=None, **kwargs):
     return render_to_string(

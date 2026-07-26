@@ -131,29 +131,46 @@ class TelegramProvider(BaseSocialProvider):
                 media_item = media[0]
                 is_url = media_item.startswith(("http://", "https://"))
 
+                url = f"{self.base_url}sendPhoto"
+                payload["caption"] = text
+                payload["parse_mode"] = "Markdown"
+
                 if is_url:
-                    url = f"{self.base_url}sendPhoto"
-                    payload.update(
-                        {
-                            "photo": media_item,
-                            "caption": text,
-                            "parse_mode": "Markdown",
-                        }
-                    )
-                    response = requests.post(url, data=payload, timeout=15)
+                    try:
+                        r = requests.get(media_item, timeout=20)
+                        r.raise_for_status()
+                        content_type = r.headers.get("content-type", "image/jpeg")
+                        ext = "png" if "png" in content_type else "jpg"
+                        files = {"photo": (f"photo.{ext}", r.content, content_type)}
+                        response = requests.post(
+                            url, data=payload, files=files, timeout=20
+                        )
+                    except Exception as download_err:
+                        logger.warning(
+                            "Could not download photo locally (%s)",
+                            download_err,
+                        )
+                        payload["photo"] = media_item
+                        response = requests.post(url, data=payload, timeout=20)
                 else:
-                    url = f"{self.base_url}sendPhoto"
-                    payload.update(
-                        {
-                            "caption": text,
-                            "parse_mode": "Markdown",
-                        }
-                    )
                     with open(media_item, "rb") as f:
                         files = {"photo": f}
                         response = requests.post(
                             url, data=payload, files=files, timeout=20
                         )
+
+                # Retry without parse_mode if Markdown formatting check failed
+                if (
+                    response.status_code != 200
+                    and "can't parse entities" in response.text.lower()
+                ):
+                    payload.pop("parse_mode", None)
+                    if is_url and "files" in locals():
+                        response = requests.post(
+                            url, data=payload, files=files, timeout=20
+                        )
+                    else:
+                        response = requests.post(url, data=payload, timeout=20)
             else:
                 url = f"{self.base_url}sendMessage"
                 payload.update(
@@ -163,6 +180,12 @@ class TelegramProvider(BaseSocialProvider):
                     }
                 )
                 response = requests.post(url, data=payload, timeout=15)
+                if (
+                    response.status_code != 200
+                    and "can't parse entities" in response.text.lower()
+                ):
+                    payload.pop("parse_mode", None)
+                    response = requests.post(url, data=payload, timeout=15)
 
             if response.status_code != 200:
                 raise PublishingError(f"Telegram API error: {response.text}")

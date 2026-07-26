@@ -1041,3 +1041,125 @@ body .sm-toast i {
   background: #e7f5ff;
   color: #1062a6;
 }
+
+/* ---- Preview Button & Character Warnings ---- */
+.btn-preview-post {
+  background: none;
+  border: none;
+  color: #495057;
+  padding: 4px 8px;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.15s, color 0.15s;
+  margin-right: 4px;
+}
+.btn-preview-post:hover {
+  background: #f1f3f5;
+  color: #111;
+}
+
+.char-count.over-limit {
+  color: #d9534f;
+  font-weight: 700;
+}
+.char-count-wrap .over-limit-badge {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 11px;
+  color: #d9534f;
+  font-weight: 600;
+}
+
+/* ---- Card Preview Modal Mockup ---- */
+.sm-card-modal .modal-content {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+}
+
+.sm-card-preview {
+  background: #ffffff;
+  border: 1px solid #e9ecef;
+  border-radius: 12px;
+  padding: 18px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+.sm-preview-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.sm-preview-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #e9ecef;
+  border: 1px solid #dee2e6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #adb5bd;
+  font-size: 20px;
+}
+.sm-preview-author {
+  font-weight: 700;
+  color: #212529;
+  font-size: 15px;
+  line-height: 1.2;
+}
+.sm-preview-handle {
+  font-size: 13px;
+  color: #6c757d;
+  font-weight: 400;
+}
+.sm-preview-platform-tag {
+  margin-left: auto;
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+.sm-preview-text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #212529;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-bottom: 12px;
+}
+.sm-preview-media {
+  margin: 14px auto;
+  width: 180px;
+  height: 180px;
+  aspect-ratio: 1 / 1;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 2px solid #e9ecef;
+  background: #f8f9fa;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+.sm-preview-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sm-preview-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid #f1f3f5;
+  font-size: 12px;
+  color: #6c757d;
+}

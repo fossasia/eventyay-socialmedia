@@ -87,7 +87,7 @@ class SocialMediaSettingsView(DecoupleMixin, FormView):
 
     def get_success_url(self):
         return reverse(
-            "plugins:socialmedia:posts",
+            "plugins:socialmedia:index",
             kwargs={
                 "organizer": self.request.event.organizer.slug,
                 "event": self.request.event.slug,
@@ -97,6 +97,7 @@ class SocialMediaSettingsView(DecoupleMixin, FormView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["event"] = self.request.event
+        ctx["organizer"] = self.request.event.organizer
         ctx["preview_url"] = reverse(
             "plugins:socialmedia:preview",
             kwargs={
@@ -190,6 +191,17 @@ class SocialMediaPostSettingsView(DecoupleMixin, FormView):
             )
         sync_posts_to_db(self.request.event, self.request)
         messages.success(self.request, _("Your changes have been saved."))
+
+        if self.request.POST.get("action") == "save_and_preview":
+            return redirect(
+                reverse(
+                    "plugins:socialmedia:posts",
+                    kwargs={
+                        "organizer": self.request.event.organizer.slug,
+                        "event": self.request.event.slug,
+                    },
+                )
+            )
         return super().form_valid(form)
 
     def form_invalid(self, form):
@@ -230,11 +242,15 @@ class PublishingLogView(DecoupleMixin, FormView):
         valid_statuses = ["published", "exported", "failed", "scheduled", "draft"]
 
         with scope(event=request.event):
-            qs = SocialMediaPost.objects.filter(
-                event=request.event,
-            ).exclude(
-                status=SocialMediaPostStatus.DRAFT,
-            ).order_by("-updated_at")
+            qs = (
+                SocialMediaPost.objects.filter(
+                    event=request.event,
+                )
+                .exclude(
+                    status=SocialMediaPostStatus.DRAFT,
+                )
+                .order_by("-updated_at")
+            )
 
             if status_filter in valid_statuses:
                 qs = qs.filter(status=status_filter)
@@ -245,10 +261,16 @@ class PublishingLogView(DecoupleMixin, FormView):
             )
             counts = {
                 "total": all_qs.count(),
-                "published": all_qs.filter(status=SocialMediaPostStatus.PUBLISHED).count(),
-                "exported": all_qs.filter(status=SocialMediaPostStatus.EXPORTED).count(),
+                "published": all_qs.filter(
+                    status=SocialMediaPostStatus.PUBLISHED
+                ).count(),
+                "exported": all_qs.filter(
+                    status=SocialMediaPostStatus.EXPORTED
+                ).count(),
                 "failed": all_qs.filter(status=SocialMediaPostStatus.FAILED).count(),
-                "scheduled": all_qs.filter(status=SocialMediaPostStatus.SCHEDULED).count(),
+                "scheduled": all_qs.filter(
+                    status=SocialMediaPostStatus.SCHEDULED
+                ).count(),
             }
 
             paginator = Paginator(qs, 50)
@@ -803,6 +825,17 @@ def publish_post_now(request, organizer, event):
             db_post = SocialMediaPost.objects.filter(
                 entity_id=str(post_id), event=request.event
             ).first()
+
+        if not db_post:
+            sync_posts_to_db(request.event, request)
+            if db_id:
+                db_post = SocialMediaPost.objects.filter(
+                    pk=db_id, event=request.event
+                ).first()
+            if not db_post and post_id:
+                db_post = SocialMediaPost.objects.filter(
+                    entity_id=str(post_id), event=request.event
+                ).first()
 
         if not db_post:
             return JsonResponse(

@@ -17,21 +17,18 @@ urlpatterns = [
         views.SocialMediaSettingsView.as_view(),
         name="posts",
     ),
-
     # ── Settings form ─────────────────────────────────────────────────────────
     path(
         "social/event/<orgslug:organizer>/<slug:event>/settings/",
         views.SocialMediaPostSettingsView.as_view(),
         name="plugin_settings",
     ),
-
     # ── Publishing log ────────────────────────────────────────────────────────
     path(
         "social/event/<orgslug:organizer>/<slug:event>/log/",
         views.PublishingLogView.as_view(),
         name="log",
     ),
-
     # ── AJAX endpoints ────────────────────────────────────────────────────────
     path(
         "social/event/<orgslug:organizer>/<slug:event>/preview/",
@@ -58,7 +55,6 @@ urlpatterns = [
         views.publish_post_now,
         name="publish_now",
     ),
-
     # ── Organizer-level account management ────────────────────────────────────
     path(
         "social/organizer/<orgslug:organizer>/accounts/",
