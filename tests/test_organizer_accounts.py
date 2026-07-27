@@ -13,7 +13,10 @@ from socialmedia.models import (
     SocialMediaPost,
     SocialMediaPostStatus,
 )
-from socialmedia.signals import control_nav_organizer_socialmedia
+from socialmedia.signals import (
+    HAS_SOCIAL_MEDIA_PERM,
+    control_nav_organizer_socialmedia,
+)
 
 
 @pytest.fixture
@@ -325,3 +328,60 @@ def test_test_connection_view(mock_send_test, organizer_admin_client, organizer)
     data = response.json()
     assert data["success"] is True
     assert data["message"] == "Test message sent."
+
+
+@pytest.mark.django_db
+@pytest.mark.skipif(
+    not HAS_SOCIAL_MEDIA_PERM,
+    reason="Core Team model doesn't have can_manage_social_media permission yet",
+)
+def test_nav_organizer_signal_with_social_media_permission(organizer, user):
+    team = Team.objects.create(
+        organizer=organizer,
+        name="Test Marketing Team",
+        can_manage_social_media=True,
+        all_events=True,
+    )
+    team.members.add(user)
+
+    class StubResolverMatch:
+        url_name = "organizer_accounts"
+        namespace = "plugins:socialmedia"
+
+    class MockRequest:
+        def __init__(self):
+            self.user = user
+            self.path_info = f"/social/organizer/{organizer.slug}/accounts/"
+            self.resolver_match = StubResolverMatch()
+            self.session = MagicMock()
+
+    request = MockRequest()
+    items = control_nav_organizer_socialmedia(organizer, request=request)
+    assert items != []
+    assert items[0]["label"] == "Social Media Accounts"
+
+
+@pytest.mark.django_db
+@pytest.mark.skipif(
+    not HAS_SOCIAL_MEDIA_PERM,
+    reason="Core Team model doesn't have can_manage_social_media permission yet",
+)
+def test_organizer_accounts_view_with_social_media_permission(
+    client, organizer, user, settings
+):
+    settings.SITE_URL = "https://testserver"
+    team = Team.objects.create(
+        organizer=organizer,
+        name="Test Marketing Team",
+        can_manage_social_media=True,
+        all_events=True,
+    )
+    team.members.add(user)
+    client.force_login(user)
+
+    url = reverse(
+        "plugins:socialmedia:organizer_accounts",
+        kwargs={"organizer": organizer.slug},
+    )
+    response = client.get(url, HTTP_HOST="testserver")
+    assert response.status_code == 200

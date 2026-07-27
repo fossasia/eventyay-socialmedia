@@ -820,6 +820,13 @@ def build_posts(event, request=None):
                                 )
                             else:
                                 spk_url = event_link
+                            # Retrieve the speaker's avatar URL
+                            media_url = (
+                                speaker.get_avatar_url(event=event)
+                                if hasattr(speaker, "get_avatar_url")
+                                else ""
+                            )
+
                             text, template_ctx = _get_template_for_offset(
                                 event, "speaker", spk_off
                             )
@@ -864,6 +871,7 @@ def build_posts(event, request=None):
                                         "post_time": trigger.strftime("%H:%M"),
                                         "post_text": text_formatted,
                                         "default_text": text_formatted,
+                                        "media_url": media_url,
                                         "reference_date": ref_date,
                                         "original_post_date": trigger.strftime(
                                             "%Y-%m-%d"
