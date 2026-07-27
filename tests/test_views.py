@@ -534,9 +534,11 @@ def test_build_posts_includes_speaker_avatar(organizer, event):
 @pytest.mark.django_db
 def test_sync_posts_to_db_saves_media_url(organizer, event):
     from unittest.mock import patch
+
     from django_scopes import scope
-    from eventyay.base.models.submission import Submission
     from eventyay.base.models.auth import User
+    from eventyay.base.models.submission import Submission
+
     try:
         from eventyay.base.models.type import SubmissionType
     except ImportError:
@@ -563,17 +565,19 @@ def test_sync_posts_to_db_saves_media_url(organizer, event):
         )
         sub.speakers.add(user)
 
-        with patch.object(User, "get_avatar_url", return_value="https://testserver/speaker.jpg"):
+        with patch.object(
+            User, "get_avatar_url", return_value="https://testserver/speaker.jpg"
+        ):
             sync_posts_to_db(event)
 
         db_posts = SocialMediaPost.objects.filter(event=event, post_type="speaker")
         assert db_posts.exists()
-        
+
         post = db_posts.first()
         assert post.media_url == "https://testserver/speaker.jpg"
-        
+
         post.error_message = "API Connection Timeout"
         post.save()
-        
+
         post.refresh_from_db()
         assert post.error_message == "API Connection Timeout"
