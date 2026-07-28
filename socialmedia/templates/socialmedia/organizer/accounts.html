@@ -46,6 +46,10 @@
                                                 <i class="fa fa-telegram"></i> Telegram
                                             {% elif account.provider == 'mastodon' %}
                                                 <i class="fa fa-share-alt-square"></i> Mastodon
+                                            {% elif account.provider == 'twitter' %}
+                                                <i class="fa fa-twitter"></i> Twitter / X
+                                            {% elif account.provider == 'linkedin' %}
+                                                <i class="fa fa-linkedin"></i> LinkedIn
                                             {% elif account.provider == 'postiz' %}
                                                 <i class="fa fa-clock-o"></i> Postiz
                                             {% elif account.provider == 'buffer' %}
@@ -90,7 +94,7 @@
         </div>
         <div class="panel-body">
             <div class="row">
-                <div class="col-sm-3 text-center">
+                <div class="col-sm-4 text-center">
                     <div class="well">
                         <h4><i class="fa fa-telegram fa-2x text-info"></i></h4>
                         <h5>Telegram</h5>
@@ -100,7 +104,7 @@
                         </a>
                     </div>
                 </div>
-                <div class="col-sm-3 text-center">
+                <div class="col-sm-4 text-center">
                     <div class="well">
                         <h4><i class="fa fa-share-alt-square fa-2x text-primary"></i></h4>
                         <h5>Mastodon</h5>
@@ -110,7 +114,29 @@
                         </a>
                     </div>
                 </div>
-                <div class="col-sm-3 text-center">
+                <div class="col-sm-4 text-center">
+                    <div class="well">
+                        <h4><i class="fa fa-twitter fa-2x text-info"></i></h4>
+                        <h5>Twitter / X</h5>
+                        <p class="text-muted"><small>{% trans "Publish tweets and media directly via Twitter API v2." %}</small></p>
+                        <a href="{% url 'plugins:socialmedia:organizer_account_add' organizer=organizer.slug %}?provider=twitter{% if request.GET.event %}&event={{ request.GET.event }}{% endif %}" class="btn btn-primary btn-sm btn-block">
+                            {% trans "Connect Twitter/X" %}
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm-4 text-center">
+                    <div class="well">
+                        <h4><i class="fa fa-linkedin fa-2x text-primary"></i></h4>
+                        <h5>LinkedIn</h5>
+                        <p class="text-muted"><small>{% trans "Publish updates to personal profile or company page." %}</small></p>
+                        <a href="{% url 'plugins:socialmedia:organizer_account_add' organizer=organizer.slug %}?provider=linkedin{% if request.GET.event %}&event={{ request.GET.event }}{% endif %}" class="btn btn-primary btn-sm btn-block">
+                            {% trans "Connect LinkedIn" %}
+                        </a>
+                    </div>
+                </div>
+                <div class="col-sm-4 text-center">
                     <div class="well">
                         <h4><i class="fa fa-clock-o fa-2x text-success"></i></h4>
                         <h5>Postiz</h5>
@@ -120,7 +146,7 @@
                         </a>
                     </div>
                 </div>
-                <div class="col-sm-3 text-center">
+                <div class="col-sm-4 text-center">
                     <div class="well">
                         <h4><i class="fa fa-refresh fa-2x text-warning"></i></h4>
                         <h5>Buffer</h5>

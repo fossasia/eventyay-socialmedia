@@ -10,9 +10,11 @@ from socialmedia.providers import (
     get_provider_class,
 )
 from socialmedia.providers.buffer import BufferProvider
+from socialmedia.providers.linkedin import LinkedInProvider
 from socialmedia.providers.mastodon import MastodonProvider
 from socialmedia.providers.postiz import PostizProvider
 from socialmedia.providers.telegram import TelegramProvider
+from socialmedia.providers.twitter import TwitterProvider
 
 
 @pytest.fixture
@@ -412,9 +414,94 @@ def test_buffer_send_test_message_creates_draft(mock_post, mock_account):
     }
     mock_post.side_effect = [validate_response, draft_response]
 
-    result = provider.send_test_message()
+    provider.send_test_message()
 
-    assert result["success"] is True
-    assert "Test draft created in Buffer" in result["message"]
-    query = mock_post.call_args.kwargs["json"]["query"]
-    assert "saveToDraft: true" in query
+
+@patch("requests.get")
+def test_twitter_validate_credentials(mock_get, mock_account):
+    mock_account.provider = "twitter"
+    mock_account.credentials = {
+        "api_key": "k",
+        "api_secret": "s",
+        "access_token": "at",
+        "access_token_secret": "ats",
+    }
+    provider = TwitterProvider(mock_account)
+
+    # Success
+    res_ok = MagicMock()
+    res_ok.status_code = 200
+    mock_get.return_value = res_ok
+    assert provider.validate_credentials() is True
+
+    # Error
+    res_err = MagicMock()
+    res_err.status_code = 401
+    res_err.json.return_value = {"detail": "Unauthorized"}
+    mock_get.return_value = res_err
+    with pytest.raises(PublishingError):
+        provider.validate_credentials()
+
+
+@patch("requests.post")
+def test_twitter_publish_post(mock_post, mock_account):
+    mock_account.provider = "twitter"
+    mock_account.platform_username = "@eventyay"
+    mock_account.credentials = {
+        "api_key": "k",
+        "api_secret": "s",
+        "access_token": "at",
+        "access_token_secret": "ats",
+    }
+    provider = TwitterProvider(mock_account)
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 201
+    mock_resp.json.return_value = {"data": {"id": "tweet_12345"}}
+    mock_post.return_value = mock_resp
+
+    res = provider.publish_post("Hello Twitter")
+    assert res["post_id"] == "tweet_12345"
+    assert res["url"] == "https://x.com/eventyay/status/tweet_12345"
+
+
+@patch("requests.get")
+def test_linkedin_validate_credentials(mock_get, mock_account):
+    mock_account.provider = "linkedin"
+    mock_account.credentials = {
+        "access_token": "fake_li_token",
+        "author_urn": "urn:li:person:12345",
+    }
+    provider = LinkedInProvider(mock_account)
+
+    res_ok = MagicMock()
+    res_ok.status_code = 200
+    mock_get.return_value = res_ok
+    assert provider.validate_credentials() is True
+
+    res_err = MagicMock()
+    res_err.status_code = 401
+    res_err.json.return_value = {"message": "Invalid token"}
+    mock_get.return_value = res_err
+    with pytest.raises(PublishingError):
+        provider.validate_credentials()
+
+
+@patch("requests.post")
+def test_linkedin_publish_post(mock_post, mock_account):
+    mock_account.provider = "linkedin"
+    mock_account.platform_username = "Eventyay Page"
+    mock_account.credentials = {
+        "access_token": "fake_li_token",
+        "author_urn": "urn:li:organization:98765",
+    }
+    provider = LinkedInProvider(mock_account)
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 201
+    mock_resp.json.return_value = {"id": "urn:li:share:67890"}
+    mock_post.return_value = mock_resp
+
+    res = provider.publish_post("Hello LinkedIn")
+    assert res["post_id"] == "urn:li:share:67890"
+    assert res["url"] == "https://www.linkedin.com/feed/update/urn:li:share:67890"

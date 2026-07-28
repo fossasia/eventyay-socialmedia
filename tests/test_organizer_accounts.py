@@ -146,6 +146,61 @@ def test_account_create_post(organizer_admin_client, organizer):
         assert account.is_active is True
 
 
+@pytest.mark.django_db
+def test_account_create_twitter(organizer_admin_client, organizer):
+    url = (
+        reverse(
+            "plugins:socialmedia:organizer_account_add",
+            kwargs={"organizer": organizer.slug},
+        )
+        + "?provider=twitter"
+    )
+
+    payload = {
+        "platform_username": "@eventyay",
+        "api_key": "my_api_key",
+        "api_secret": "my_api_secret",
+        "access_token": "my_access_token",
+        "access_token_secret": "my_access_token_secret",
+        "is_active": "on",
+    }
+    response = organizer_admin_client.post(url, data=payload)
+    assert response.status_code == 302
+
+    with scope(organizer=organizer):
+        account = SocialMediaAccount.objects.get(platform_username="@eventyay")
+        assert account.provider == "twitter"
+        assert account.credentials["api_key"] == "my_api_key"
+        assert account.is_active is True
+
+
+@pytest.mark.django_db
+def test_account_create_linkedin(organizer_admin_client, organizer):
+    url = (
+        reverse(
+            "plugins:socialmedia:organizer_account_add",
+            kwargs={"organizer": organizer.slug},
+        )
+        + "?provider=linkedin"
+    )
+
+    payload = {
+        "platform_username": "Eventyay Page",
+        "access_token": "my_linkedin_token",
+        "author_urn": "urn:li:organization:12345",
+        "is_active": "on",
+    }
+    response = organizer_admin_client.post(url, data=payload)
+    assert response.status_code == 302
+
+    with scope(organizer=organizer):
+        account = SocialMediaAccount.objects.get(platform_username="Eventyay Page")
+        assert account.provider == "linkedin"
+        assert account.credentials["access_token"] == "my_linkedin_token"
+        assert account.credentials["author_urn"] == "urn:li:organization:12345"
+        assert account.is_active is True
+
+
 def test_telegram_account_form_normalizes_public_tme_link():
     form = TelegramAccountForm(
         data={

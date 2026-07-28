@@ -651,9 +651,140 @@ class BufferAccountForm(forms.ModelForm):
         return instance
 
 
+class TwitterAccountForm(forms.ModelForm):
+    api_key = forms.CharField(
+        label=_("API Key (Consumer Key)"),
+        widget=forms.PasswordInput(render_value=True),
+        required=True,
+    )
+    api_secret = forms.CharField(
+        label=_("API Secret (Consumer Secret)"),
+        widget=forms.PasswordInput(render_value=True),
+        required=True,
+    )
+    access_token = forms.CharField(
+        label=_("Access Token"),
+        widget=forms.PasswordInput(render_value=True),
+        required=True,
+    )
+    access_token_secret = forms.CharField(
+        label=_("Access Token Secret"),
+        widget=forms.PasswordInput(render_value=True),
+        required=True,
+    )
+
+    class Meta:
+        model = SocialMediaAccount
+        fields = ["platform_username", "is_active"]
+        labels = {
+            "platform_username": _("Twitter/X Handle"),
+        }
+        help_texts = {
+            "platform_username": _("e.g. @eventyay"),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            creds = self.instance.credentials
+            fields = [
+                "api_key",
+                "api_secret",
+                "access_token",
+                "access_token_secret",
+            ]
+            for field_name in fields:
+                if creds.get(field_name):
+                    self.fields[field_name].initial = "••••••••"
+                    self.fields[field_name].required = False
+
+    def _clean_credential(self, field_name):
+        val = self.cleaned_data.get(field_name)
+        if (not val or val == "••••••••") and self.instance and self.instance.pk:
+            return self.instance.credentials.get(field_name)
+        return val.strip() if val else val
+
+    def clean_api_key(self):
+        return self._clean_credential("api_key")
+
+    def clean_api_secret(self):
+        return self._clean_credential("api_secret")
+
+    def clean_access_token(self):
+        return self._clean_credential("access_token")
+
+    def clean_access_token_secret(self):
+        return self._clean_credential("access_token_secret")
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.provider = "twitter"
+        instance.credentials = {
+            "api_key": self.cleaned_data.get("api_key"),
+            "api_secret": self.cleaned_data.get("api_secret"),
+            "access_token": self.cleaned_data.get("access_token"),
+            "access_token_secret": self.cleaned_data.get("access_token_secret"),
+        }
+        if commit:
+            instance.save()
+        return instance
+
+
+class LinkedInAccountForm(forms.ModelForm):
+    access_token = forms.CharField(
+        label=_("Access Token"),
+        widget=forms.PasswordInput(render_value=True),
+        required=True,
+    )
+    author_urn = forms.CharField(
+        label=_("Author URN"),
+        help_text=_("e.g. urn:li:person:XXXX or urn:li:organization:XXXX"),
+        required=False,
+    )
+
+    class Meta:
+        model = SocialMediaAccount
+        fields = ["platform_username", "is_active"]
+        labels = {
+            "platform_username": _("LinkedIn Profile/Page Name"),
+        }
+        help_texts = {
+            "platform_username": _("e.g. Eventyay Organization Page"),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            creds = self.instance.credentials
+            if creds.get("author_urn"):
+                self.fields["author_urn"].initial = creds.get("author_urn")
+            if creds.get("access_token"):
+                self.fields["access_token"].initial = "••••••••"
+                self.fields["access_token"].required = False
+
+    def clean_access_token(self):
+        token = self.cleaned_data.get("access_token")
+        if (not token or token == "••••••••") and self.instance and self.instance.pk:
+            return self.instance.credentials.get("access_token")
+        return token.strip() if token else token
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.provider = "linkedin"
+        instance.credentials = {
+            "access_token": self.cleaned_data.get("access_token"),
+            "author_urn": (self.cleaned_data.get("author_urn") or "").strip(),
+        }
+        if commit:
+            instance.save()
+        return instance
+
+
 PROVIDER_FORMS = {
     "telegram": TelegramAccountForm,
     "mastodon": MastodonAccountForm,
+    "twitter": TwitterAccountForm,
+    "linkedin": LinkedInAccountForm,
     "postiz": PostizAccountForm,
     "buffer": BufferAccountForm,
 }

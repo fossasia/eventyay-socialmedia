@@ -1,12 +1,16 @@
 from .base import BaseSocialProvider
 from .buffer import BufferProvider
+from .linkedin import LinkedInProvider
 from .mastodon import MastodonProvider
 from .postiz import PostizProvider
 from .telegram import TelegramProvider
+from .twitter import TwitterProvider
 
 _registry: dict[str, type[BaseSocialProvider]] = {
     "telegram": TelegramProvider,
     "mastodon": MastodonProvider,
+    "twitter": TwitterProvider,
+    "linkedin": LinkedInProvider,
     "postiz": PostizProvider,
     "buffer": BufferProvider,
 }
