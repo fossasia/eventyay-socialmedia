@@ -865,7 +865,7 @@ def publish_post_now(request, organizer, event):
 
         entity_id = db_post.entity_id or ""
         provider_name = None
-        for prov in ["telegram", "mastodon", "postiz", "buffer"]:
+        for prov in ["telegram", "mastodon", "twitter", "linkedin", "postiz", "buffer"]:
             if entity_id.endswith(f"_{prov}"):
                 provider_name = prov
                 break
@@ -883,7 +883,14 @@ def publish_post_now(request, organizer, event):
             active_accounts = list(
                 SocialMediaAccount.objects.filter(
                     organizer=request.event.organizer,
-                    provider__in=["telegram", "mastodon", "postiz", "buffer"],
+                    provider__in=[
+                        "telegram",
+                        "mastodon",
+                        "twitter",
+                        "linkedin",
+                        "postiz",
+                        "buffer",
+                    ],
                     is_active=True,
                 )
             )
