@@ -576,8 +576,39 @@ def test_sync_posts_to_db_saves_media_url(organizer, event):
         post = db_posts.first()
         assert post.media_url == "https://testserver/speaker.jpg"
 
-        post.error_message = "API Connection Timeout"
-        post.save()
+        # Verify re-syncing preserves existing media_url if payload omits it
+        with patch(
+            "socialmedia.export.build_posts",
+            return_value=[
+                {
+                    "id": sub.pk,
+                    "type": "speaker",
+                    "post_date": "2026-07-28",
+                    "post_time": "12:00",
+                    "post_text": "Updated Text",
+                    "offset_days": 0,
+                }
+            ],
+        ):
+            sync_posts_to_db(event)
 
+        post.refresh_from_db()
+        assert post.media_url == "https://testserver/speaker.jpg"
+
+
+@pytest.mark.django_db
+def test_post_error_message_persistence(organizer, event):
+    from django_scopes import scope
+
+    from socialmedia.models import SocialMediaPost
+
+    with scope(organizer=organizer, event=event):
+        post = SocialMediaPost.objects.create(
+            event=event,
+            post_type="general",
+            post_text="Test Post",
+            status="failed",
+            error_message="API Connection Timeout",
+        )
         post.refresh_from_db()
         assert post.error_message == "API Connection Timeout"
