@@ -986,6 +986,7 @@ def sync_posts_to_db(event, request=None):
             defaults={
                 "scheduled_at": scheduled_at,
                 "post_text": p["post_text"],
+                "media_url": p.get("media_url"),
                 "template_context": p.get("template_context", "announcement"),
                 "status": SocialMediaPostStatus.SCHEDULED,
             },
@@ -993,6 +994,8 @@ def sync_posts_to_db(event, request=None):
         if not created and not db_post.is_pinned:
             db_post.scheduled_at = scheduled_at
             db_post.post_text = p["post_text"]
+            if "media_url" in p and p["media_url"] is not None:
+                db_post.media_url = p["media_url"]
             db_post.template_context = p.get("template_context", "announcement")
             db_post.save()
 

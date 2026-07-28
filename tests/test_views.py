@@ -529,3 +529,86 @@ def test_build_posts_includes_speaker_avatar(organizer, event):
     speaker_posts = [p for p in posts if p["type"] == "speaker"]
     assert speaker_posts
     assert speaker_posts[0]["media_url"] == "https://testserver/speaker.jpg"
+
+
+@pytest.mark.django_db
+def test_sync_posts_to_db_saves_media_url(organizer, event):
+    from unittest.mock import patch
+
+    from django_scopes import scope
+    from eventyay.base.models.auth import User
+    from eventyay.base.models.submission import Submission
+
+    try:
+        from eventyay.base.models.type import SubmissionType
+    except ImportError:
+        from eventyay.base.models import SubmissionType
+    from socialmedia.export import sync_posts_to_db
+    from socialmedia.models import SocialMediaPost
+
+    with scope(organizer=organizer, event=event):
+        event = event.__class__.objects.get(pk=event.pk)
+        event.settings.set("socialmedia_speaker_enabled", True)
+        event.settings.flush()
+
+        sub_type = event.submission_types.first() or SubmissionType.objects.create(
+            event=event, name="Talk"
+        )
+
+        user = User.objects.create_user("speaker2@example.com", "password")
+
+        sub = Submission.objects.create(
+            event=event,
+            submission_type=sub_type,
+            title="Another Talk",
+            state="confirmed",
+        )
+        sub.speakers.add(user)
+
+        with patch.object(
+            User, "get_avatar_url", return_value="https://testserver/speaker.jpg"
+        ):
+            sync_posts_to_db(event)
+
+        db_posts = SocialMediaPost.objects.filter(event=event, post_type="speaker")
+        assert db_posts.exists()
+
+        post = db_posts.first()
+        assert post.media_url == "https://testserver/speaker.jpg"
+
+        # Verify re-syncing preserves existing media_url if payload omits it
+        with patch(
+            "socialmedia.export.build_posts",
+            return_value=[
+                {
+                    "id": sub.pk,
+                    "type": "speaker",
+                    "post_date": "2026-07-28",
+                    "post_time": "12:00",
+                    "post_text": "Updated Text",
+                    "offset_days": 0,
+                }
+            ],
+        ):
+            sync_posts_to_db(event)
+
+        post.refresh_from_db()
+        assert post.media_url == "https://testserver/speaker.jpg"
+
+
+@pytest.mark.django_db
+def test_post_error_message_persistence(organizer, event):
+    from django_scopes import scope
+
+    from socialmedia.models import SocialMediaPost
+
+    with scope(organizer=organizer, event=event):
+        post = SocialMediaPost.objects.create(
+            event=event,
+            post_type="general",
+            post_text="Test Post",
+            status="failed",
+            error_message="API Connection Timeout",
+        )
+        post.refresh_from_db()
+        assert post.error_message == "API Connection Timeout"
