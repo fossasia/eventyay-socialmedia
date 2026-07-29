@@ -60,6 +60,9 @@ class MastodonProvider(BaseSocialProvider):
                     import requests
 
                     if file_path.startswith(("http://", "https://")):
+                        from ..utils import validate_safe_url
+
+                        validate_safe_url(file_path)
                         r = requests.get(file_path, timeout=20)
                         r.raise_for_status()
                         with tempfile.NamedTemporaryFile(delete=False) as tmp:

@@ -547,6 +547,10 @@ def sync_to_schedulers(request, organizer, event):
             status=SocialMediaPostStatus.SCHEDULED,
             scheduled_at__gt=timezone.now(),
         )
+        direct_platforms = ["telegram", "mastodon", "twitter", "linkedin"]
+        for p in direct_platforms:
+            posts_to_sync = posts_to_sync.exclude(entity_id__endswith=f"_{p}")
+
         if not posts_to_sync.exists():
             return JsonResponse(
                 {"success": True, "message": _("No scheduled posts found to sync.")}
