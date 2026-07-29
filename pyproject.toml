@@ -38,8 +38,11 @@ include-package-data = true
 [tool.setuptools.package-data]
 socialmedia = [
     "templates/socialmedia/*.html",
+    "templates/socialmedia/*/*.html",
     "static/socialmedia/css/*.css",
+    "static/socialmedia/css/*/*.css",
     "static/socialmedia/js/*.js",
+    "static/socialmedia/js/*/*.js",
     "locale/*/LC_MESSAGES/*.po",
     "locale/*/LC_MESSAGES/*.mo",
 ]
