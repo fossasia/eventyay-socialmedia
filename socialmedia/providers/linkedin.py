@@ -30,25 +30,47 @@ class LinkedInProvider(BaseSocialProvider):
     def _get_author_urn(self) -> str:
         """Resolve LinkedIn Author URN (person or organization URN)."""
         author_urn = (
-            self.credentials.get("author_urn") or self.account.platform_username or ""
+            self.credentials.get("author_urn") or self.credentials.get("author") or ""
         )
-        if author_urn and not author_urn.startswith("urn:li:"):
-            author_urn = f"urn:li:person:{author_urn}"
-        if not author_urn:
-            headers = self._get_headers()
-            try:
-                resp = requests.get(self.USERINFO_API_URL, headers=headers, timeout=15)
-                if resp.status_code == 200:
-                    sub = resp.json().get("sub")
-                    if sub:
-                        return f"urn:li:person:{sub}"
-            except Exception:
-                pass
-            raise PublishingError(
-                "Missing LinkedIn Author URN. Please enter your Author URN "
-                "(e.g. urn:li:person:XXXX or urn:li:organization:XXXX)."
+        if author_urn:
+            if not author_urn.startswith("urn:li:"):
+                return f"urn:li:person:{author_urn}"
+            return author_urn
+
+        # Support URN or numeric member ID placed in account username field
+        uname = (self.account.platform_username or "").strip()
+        if uname.startswith("urn:li:"):
+            return uname
+        if uname.isdigit():
+            return f"urn:li:person:{uname}"
+
+        headers = self._get_headers()
+        # Try /v2/me first (returns numeric Person ID for ugcPosts API)
+        try:
+            resp = requests.get(
+                "https://api.linkedin.com/v2/me", headers=headers, timeout=15
             )
-        return author_urn
+            if resp.status_code == 200:
+                user_id = resp.json().get("id")
+                if user_id:
+                    return f"urn:li:person:{user_id}"
+        except Exception:
+            pass
+
+        # Try /v2/userinfo (OpenID Connect)
+        try:
+            resp = requests.get(self.USERINFO_API_URL, headers=headers, timeout=15)
+            if resp.status_code == 200:
+                sub = resp.json().get("sub")
+                if sub:
+                    return f"urn:li:person:{sub}"
+        except Exception:
+            pass
+
+        raise PublishingError(
+            "Missing LinkedIn Author URN. Please enter your Author URN "
+            "(e.g. urn:li:person:XXXX or urn:li:organization:XXXX)."
+        )
 
     def validate_credentials(self) -> bool:
         """Verify LinkedIn access token by querying userinfo API."""
@@ -174,7 +196,43 @@ class LinkedInProvider(BaseSocialProvider):
             "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"},
         }
 
+        rest_headers = dict(headers)
+        rest_headers["LinkedIn-Version"] = "202401"
+        rest_payload = {
+            "author": author_urn,
+            "commentary": text,
+            "visibility": "PUBLIC",
+            "distribution": {
+                "feedDistribution": "MAIN_FEED",
+                "targetEntities": [],
+                "thirdPartyDistributionChannels": [],
+            },
+            "lifecycleState": "PUBLISHED",
+        }
+
         try:
+            # 1. Try Versioned REST Posts API (202401 - supports OpenID tokens)
+            resp = requests.post(
+                "https://api.linkedin.com/rest/posts",
+                json=rest_payload,
+                headers=rest_headers,
+                timeout=20,
+            )
+            if resp.status_code in (200, 201):
+                post_id = None
+                try:
+                    data = resp.json()
+                    post_id = data.get("id") if isinstance(data, dict) else None
+                except Exception:
+                    pass
+                if not post_id and hasattr(resp.headers, "get"):
+                    post_id = resp.headers.get("x-restli-id")
+                post_url = (
+                    f"https://www.linkedin.com/feed/update/{post_id}" if post_id else ""
+                )
+                return {"post_id": post_id, "url": post_url}
+
+            # 2. Fallback to legacy ugcPosts API
             resp = requests.post(
                 self.UGC_POSTS_API_URL, json=payload, headers=headers, timeout=20
             )
