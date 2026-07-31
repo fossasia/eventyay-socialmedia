@@ -950,6 +950,10 @@ body .sm-toast i {
 .skeleton-bar.skeleton-col-actions { width: 30px; }
 
 /* ---- Status Badges & Actions ---- */
+.status-badge-wrap {
+  margin-top: 4px;
+}
+
 .status-badge {
   display: inline-block;
   padding: 3px 6px;
@@ -958,6 +962,12 @@ body .sm-toast i {
   border-radius: 4px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+.status-badge.has-error {
+  cursor: help;
+}
+.status-error-icon {
+  margin-left: 4px;
 }
 .status-badge.status-draft {
   background-color: #f1f3f5;

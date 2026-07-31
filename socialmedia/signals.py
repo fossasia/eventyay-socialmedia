@@ -156,7 +156,7 @@ def publish_scheduled_posts(sender, **kwargs):
                 continue
 
             # Mark as claimed before releasing DB lock to prevent race conditions
-            locked_post.status = SocialMediaPostStatus.PUBLISHED
+            locked_post.status = SocialMediaPostStatus.EXPORTED
             locked_post.save(update_fields=["status"])
             target_post = locked_post
 
@@ -165,8 +165,9 @@ def publish_scheduled_posts(sender, **kwargs):
             provider = get_provider(account)
             media = [target_post.media_url] if target_post.media_url else None
             provider.publish_post(text=target_post.post_text, media=media)
+            target_post.status = SocialMediaPostStatus.PUBLISHED
             target_post.error_message = ""
-            target_post.save(update_fields=["error_message"])
+            target_post.save(update_fields=["status", "error_message"])
         except Exception as e:
             target_post.status = SocialMediaPostStatus.FAILED
             target_post.error_message = str(e)

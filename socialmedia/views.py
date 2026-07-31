@@ -672,12 +672,17 @@ def publish_post_now(request, organizer, event):
 
         if errors:
             db_post.status = SocialMediaPostStatus.FAILED
-            db_post.error_message = "; ".join(errors)
+            err_details = "; ".join(errors)
+            if published_providers:
+                succ = ", ".join(published_providers)
+                db_post.error_message = f"Published to ({succ}). Errors: {err_details}"
+            else:
+                db_post.error_message = err_details
             db_post.save()
             return JsonResponse(
                 {
                     "success": False,
-                    "message": f"Publishing failed: {'; '.join(errors)}",
+                    "message": f"Publishing failed: {db_post.error_message}",
                     "status": db_post.status,
                 },
                 status=500,

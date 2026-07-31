@@ -337,52 +337,44 @@
         const tr = document.createElement("tr");
         const tdChk = document.createElement("td");
         const bChk = document.createElement("div");
-        bChk.className = "skeleton-bar";
-        bChk.style.width = "16px";
-        bChk.style.height = "16px";
-        bChk.style.borderRadius = "3px";
+        bChk.className = "skeleton-bar skeleton-col-check";
         tdChk.appendChild(bChk);
         tr.appendChild(tdChk);
 
         const tdType = document.createElement("td");
         const bType = document.createElement("div");
-        bType.className = "skeleton-bar";
-        bType.style.width = "60px";
+        bType.className = "skeleton-bar skeleton-col-type";
         tdType.appendChild(bType);
         tr.appendChild(tdType);
 
         // Platform column skeleton
         const tdPlat = document.createElement("td");
         const bPlat = document.createElement("div");
-        bPlat.className = "skeleton-bar";
-        bPlat.style.width = "80px";
+        bPlat.className = "skeleton-bar skeleton-col-platform";
         tdPlat.appendChild(bPlat);
         tr.appendChild(tdPlat);
 
         const tdSched = document.createElement("td");
         const bSched = document.createElement("div");
-        bSched.className = "skeleton-bar";
-        bSched.style.width = "110px";
+        bSched.className = "skeleton-bar skeleton-col-date";
         tdSched.appendChild(bSched);
         tr.appendChild(tdSched);
 
         const tdInput = document.createElement("td");
         const bInput = document.createElement("div");
-        bInput.className = "skeleton-bar";
-        bInput.style.width = "125px";
+        bInput.className = "skeleton-bar skeleton-col-postdate";
         tdInput.appendChild(bInput);
         tr.appendChild(tdInput);
 
         const tdText = document.createElement("td");
         const bText = document.createElement("div");
-        bText.className = "skeleton-bar";
+        bText.className = "skeleton-bar skeleton-col-content";
         tdText.appendChild(bText);
         tr.appendChild(tdText);
 
         const tdActions = document.createElement("td");
         const bActions = document.createElement("div");
-        bActions.className = "skeleton-bar";
-        bActions.style.width = "30px";
+        bActions.className = "skeleton-bar skeleton-col-actions";
         tdActions.appendChild(bActions);
         tr.appendChild(tdActions);
 

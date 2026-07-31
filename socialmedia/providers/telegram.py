@@ -5,7 +5,6 @@ import requests
 
 from socialmedia.telegram_utils import normalize_telegram_chat_id
 
-from ..utils import validate_safe_url
 from .base import BaseSocialProvider, PublishingError
 
 logger = logging.getLogger(__name__)
@@ -133,7 +132,6 @@ class TelegramProvider(BaseSocialProvider):
                 is_url = media_item.startswith(("http://", "https://"))
 
                 if is_url:
-                    validate_safe_url(media_item)
                     url = f"{self.base_url}sendPhoto"
                     payload.update(
                         {
