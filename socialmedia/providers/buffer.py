@@ -144,7 +144,7 @@ class BufferProvider(BaseSocialProvider):
     def sync_campaign(self, posts: list[Any]) -> list[Any]:
         results = []
         for post in posts:
-            res = self._create_post(post.post_text, save_to_draft=True)
+            res = self._create_post(post.post_text, save_to_draft=False)
             results.append(res)
         return results
 

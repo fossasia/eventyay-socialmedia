@@ -128,7 +128,6 @@ def publish_scheduled_posts(sender, **kwargs):
             continue
 
         account = None
-        target_post = None
 
         with transaction.atomic():
             locked_post = (
@@ -155,20 +154,14 @@ def publish_scheduled_posts(sender, **kwargs):
                 locked_post.save(update_fields=["status", "error_message"])
                 continue
 
-            # Mark as claimed before releasing DB lock to prevent race conditions
-            locked_post.status = SocialMediaPostStatus.EXPORTED
-            locked_post.save(update_fields=["status"])
-            target_post = locked_post
-
-        # Perform HTTP network publish request OUTSIDE of atomic transaction lock block
-        try:
-            provider = get_provider(account)
-            media = [target_post.media_url] if target_post.media_url else None
-            provider.publish_post(text=target_post.post_text, media=media)
-            target_post.status = SocialMediaPostStatus.PUBLISHED
-            target_post.error_message = ""
-            target_post.save(update_fields=["status", "error_message"])
-        except Exception as e:
-            target_post.status = SocialMediaPostStatus.FAILED
-            target_post.error_message = str(e)
-            target_post.save(update_fields=["status", "error_message"])
+            try:
+                provider = get_provider(account)
+                media = [locked_post.media_url] if locked_post.media_url else None
+                provider.publish_post(text=locked_post.post_text, media=media)
+                locked_post.status = SocialMediaPostStatus.PUBLISHED
+                locked_post.error_message = ""
+                locked_post.save(update_fields=["status", "error_message"])
+            except Exception as e:
+                locked_post.status = SocialMediaPostStatus.FAILED
+                locked_post.error_message = str(e)
+                locked_post.save(update_fields=["status", "error_message"])

@@ -569,16 +569,23 @@ def sync_to_schedulers(request, organizer, event):
             except Exception as e:
                 errors.append(f"{account.provider}: {str(e)}")
 
+        if synced_count > 0:
+            posts_to_sync.update(status=SocialMediaPostStatus.EXPORTED)
+
         if errors:
+            succ_msg = (
+                f" ({synced_count}/{len(scheduler_accounts)} succeeded)"
+                if synced_count > 0
+                else ""
+            )
+            err_str = ", ".join(errors)
             return JsonResponse(
                 {
                     "success": False,
-                    "message": f"Synchronization partially failed: {', '.join(errors)}",
+                    "message": f"Synchronization partially failed{succ_msg}: {err_str}",
                 },
                 status=500,
             )
-
-        posts_to_sync.update(status=SocialMediaPostStatus.EXPORTED)
 
         return JsonResponse(
             {
