@@ -147,13 +147,22 @@ class TwitterProvider(BaseSocialProvider):
             )
 
         media_ids = []
+        fallback_urls = []
         if media:
             for item in media:
                 if item:
-                    media_id = self._upload_media(item)
-                    media_ids.append(media_id)
+                    try:
+                        media_id = self._upload_media(item)
+                        media_ids.append(media_id)
+                    except Exception:
+                        if item.startswith(("http://", "https://")):
+                            fallback_urls.append(item)
 
-        payload: dict[str, Any] = {"text": text}
+        tweet_text = text
+        if fallback_urls and not media_ids:
+            tweet_text = f"{text}\n\n{' '.join(fallback_urls)}"
+
+        payload: dict[str, Any] = {"text": tweet_text}
         if media_ids:
             payload["media"] = {"media_ids": media_ids}
 

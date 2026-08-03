@@ -174,11 +174,20 @@ class LinkedInProvider(BaseSocialProvider):
         author_urn = self._get_author_urn()
 
         asset_urns = []
+        fallback_urls = []
         if media:
             for item in media:
                 if item:
-                    asset_urn = self._upload_media(item, author_urn)
-                    asset_urns.append(asset_urn)
+                    try:
+                        asset_urn = self._upload_media(item, author_urn)
+                        asset_urns.append(asset_urn)
+                    except Exception:
+                        if item.startswith(("http://", "https://")):
+                            fallback_urls.append(item)
+
+        commentary_text = text
+        if fallback_urls and not asset_urns:
+            commentary_text = f"{text}\n\n{' '.join(fallback_urls)}"
 
         media_category = "IMAGE" if asset_urns else "NONE"
         media_list = [{"status": "READY", "media": urn} for urn in asset_urns]
@@ -188,7 +197,7 @@ class LinkedInProvider(BaseSocialProvider):
             "lifecycleState": "PUBLISHED",
             "specificContent": {
                 "com.linkedin.ugc.ShareContent": {
-                    "shareCommentary": {"text": text},
+                    "shareCommentary": {"text": commentary_text},
                     "shareMediaCategory": media_category,
                     "media": media_list,
                 }
@@ -200,7 +209,7 @@ class LinkedInProvider(BaseSocialProvider):
         rest_headers["LinkedIn-Version"] = "202401"
         rest_payload = {
             "author": author_urn,
-            "commentary": text,
+            "commentary": commentary_text,
             "visibility": "PUBLIC",
             "distribution": {
                 "feedDistribution": "MAIN_FEED",
