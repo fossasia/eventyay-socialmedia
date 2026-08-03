@@ -223,7 +223,7 @@ class LinkedInProvider(BaseSocialProvider):
 
         rest_headers = dict(headers)
         rest_headers["LinkedIn-Version"] = "202401"
-        rest_payload = {
+        rest_payload: dict[str, Any] = {
             "author": author_urn,
             "commentary": commentary_text,
             "visibility": "PUBLIC",
@@ -234,9 +234,17 @@ class LinkedInProvider(BaseSocialProvider):
             },
             "lifecycleState": "PUBLISHED",
         }
+        if asset_urns:
+            if len(asset_urns) == 1:
+                rest_payload["content"] = {"media": {"id": asset_urns[0]}}
+            else:
+                rest_payload["content"] = {
+                    "multiImage": {"images": [{"id": urn} for urn in asset_urns]}
+                }
 
+        rest_err_msg = None
         try:
-            # 1. Try Versioned REST Posts API (202401 - supports OpenID tokens)
+            # 1. Try Versioned REST Posts API (202401)
             resp = requests.post(
                 "https://api.linkedin.com/rest/posts",
                 json=rest_payload,
@@ -257,6 +265,8 @@ class LinkedInProvider(BaseSocialProvider):
                 )
                 return {"post_id": post_id, "url": post_url}
 
+            rest_err_msg = resp.json().get("message") or resp.text
+
             # 2. Fallback to legacy ugcPosts API
             resp = requests.post(
                 self.UGC_POSTS_API_URL, json=payload, headers=headers, timeout=20
@@ -269,7 +279,7 @@ class LinkedInProvider(BaseSocialProvider):
                 )
                 return {"post_id": post_id, "url": post_url}
 
-            err_msg = resp.json().get("message") or resp.text
+            err_msg = rest_err_msg or resp.json().get("message") or resp.text
             raise PublishingError(
                 f"LinkedIn API returned error ({resp.status_code}): {err_msg}"
             )
