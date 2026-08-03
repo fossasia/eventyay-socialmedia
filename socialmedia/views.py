@@ -148,6 +148,7 @@ def preview_posts(request, organizer, event):
     _check_permission(request)
     _check_plugin_active(request)
     try:
+        sync_posts_to_db(request.event, request)
         raw_posts = build_posts(request.event, request)
         db_posts = {
             (p.post_type, p.entity_id, p.offset_days): p

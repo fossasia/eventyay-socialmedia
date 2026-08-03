@@ -602,11 +602,11 @@
         this.setWithIcon(restoreBtn, "", "fa fa-undo");
         tdActions.appendChild(restoreBtn);
       } else {
-        if (p.db_id && p.status !== "published" && p.status !== "exported") {
+        if (p.status !== "published" && p.status !== "exported") {
           const pubBtn = document.createElement("button");
           pubBtn.className = "btn-publish-now";
           pubBtn.dataset.postId = p.id;
-          pubBtn.dataset.dbId = p.db_id;
+          pubBtn.dataset.dbId = p.db_id || "";
           pubBtn.type = "button";
           pubBtn.title = p.status === "failed" ? "Retry publishing" : "Publish now";
           this.setWithIcon(pubBtn, "", "fa fa-paper-plane");
