@@ -1004,10 +1004,8 @@
 
     syncSchedulers() {
       const btn = document.getElementById("btn-sync-schedulers");
-      let originalHTML = "";
       if (btn) {
         btn.disabled = true;
-        originalHTML = btn.innerHTML;
         UI.setWithIcon(btn, "Syncing…", "fa fa-refresh fa-spin");
       }
 
@@ -1022,7 +1020,7 @@
         .finally(() => {
           if (btn) {
             btn.disabled = false;
-            btn.innerHTML = originalHTML;
+            UI.setWithIcon(btn, "Sync to Schedulers", "fa fa-refresh");
           }
         });
     },
