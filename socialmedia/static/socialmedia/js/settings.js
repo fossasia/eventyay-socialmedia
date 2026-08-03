@@ -318,13 +318,8 @@
 
       document.body.appendChild(toast);
       setTimeout(() => {
-        if (toast.parentNode) {
-          toast.style.transition = "opacity 0.5s ease";
-          toast.style.opacity = "0";
-          setTimeout(() => {
-            if (toast.parentNode) toast.remove();
-          }, 500);
-        }
+        toast.classList.add("toast-fade-out");
+        setTimeout(() => toast.remove(), 500);
       }, 5000);
     },
 
@@ -436,21 +431,19 @@
       // Add status badge
       const statusDiv = document.createElement("div");
       statusDiv.className = "status-badge-wrap";
-      statusDiv.style.marginTop = "4px";
 
       const statusVal = p.status || "draft";
       const statusBadge = document.createElement("span");
       statusBadge.className = `status-badge status-${statusVal}`;
-      
+
       let statusLabel = statusVal.charAt(0).toUpperCase() + statusVal.slice(1);
-      
+
       if (statusVal === "failed" && p.error_message) {
         statusBadge.title = p.error_message;
-        statusBadge.style.cursor = "help";
-        
+        statusBadge.classList.add("has-error");
+
         const errIcon = document.createElement("i");
-        errIcon.className = "fa fa-exclamation-circle";
-        errIcon.style.marginLeft = "4px";
+        errIcon.className = "fa fa-exclamation-circle status-error-icon";
         statusBadge.appendChild(document.createTextNode(statusLabel + " "));
         statusBadge.appendChild(errIcon);
       } else {
@@ -762,9 +755,9 @@
         alertDiv.appendChild(document.createTextNode(parts.join(", ") + ". Review highlighted rows before exporting."));
         alertContainer.textContent = "";
         alertContainer.appendChild(alertDiv);
-        alertContainer.style.display = "block";
+        alertContainer.classList.remove("hidden");
       } else {
-        alertContainer.style.display = "none";
+        alertContainer.classList.add("hidden");
         alertContainer.textContent = "";
       }
     },
@@ -778,7 +771,6 @@
       if (viewSpan && editArea) {
         viewSpan.classList.add("editing");
         editArea.classList.add("editing");
-        editArea.style.display = "block";
         editArea.focus();
         editArea.setSelectionRange(editArea.value.length, editArea.value.length);
       }
@@ -1125,7 +1117,7 @@
       const customInputs = document.getElementById("bulk-schedule-custom-inputs");
       if (presetSel && customInputs) {
         presetSel.addEventListener("change", function () {
-          customInputs.style.display = this.value === "custom" ? "flex" : "none";
+          customInputs.classList.toggle("hidden", this.value !== "custom");
         });
       }
 
@@ -1394,7 +1386,7 @@
       if (!checkbox || !tplBlock) return;
 
       const syncVisibility = () => {
-        tplBlock.style.display = checkbox.checked ? "block" : "none";
+        tplBlock.classList.toggle("hidden", !checkbox.checked);
       };
       syncVisibility();
       checkbox.addEventListener("change", syncVisibility);

@@ -723,6 +723,11 @@ body .sm-toast i {
   flex-shrink: 0;
 }
 
+.sm-toast.toast-fade-out {
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
 /* ---- Char count row below post text editor ---- */
 .char-count-wrap {
   font-size: 11px;
@@ -948,6 +953,10 @@ body .sm-toast i {
 .skeleton-bar.skeleton-col-postdate { width: 125px; }
 .skeleton-bar.skeleton-col-content { width: 100%; }
 .skeleton-bar.skeleton-col-actions { width: 30px; }
+
+.hidden {
+  display: none !important;
+}
 
 /* ---- Status Badges & Actions ---- */
 .status-badge-wrap {
