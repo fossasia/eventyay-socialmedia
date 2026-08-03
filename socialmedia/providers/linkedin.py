@@ -1,4 +1,5 @@
 import mimetypes
+import os
 from typing import Any
 
 import requests
@@ -136,9 +137,24 @@ class LinkedInProvider(BaseSocialProvider):
                 content = img_res.content
                 content_type = img_res.headers.get("Content-Type", "image/jpeg")
             else:
-                with open(media_item, "rb") as f:
+                file_path = media_item
+                if not os.path.exists(file_path):
+                    try:
+                        from django.conf import settings
+
+                        if hasattr(settings, "MEDIA_ROOT") and settings.MEDIA_ROOT:
+                            rel_path = media_item.lstrip("/")
+                            if rel_path.startswith("media/"):
+                                rel_path = rel_path[6:]
+                            possible_path = os.path.join(settings.MEDIA_ROOT, rel_path)
+                            if os.path.exists(possible_path):
+                                file_path = possible_path
+                    except Exception:
+                        pass
+
+                with open(file_path, "rb") as f:
                     content = f.read()
-                content_type, _ = mimetypes.guess_type(media_item)
+                content_type, _ = mimetypes.guess_type(file_path)
                 content_type = content_type or "image/jpeg"
 
             upload_headers = {

@@ -1,4 +1,5 @@
 import mimetypes
+import os
 import tempfile
 from typing import Any
 
@@ -98,9 +99,30 @@ class TwitterProvider(BaseSocialProvider):
                         timeout=30,
                     )
             else:
-                with open(media_item, "rb") as f:
-                    mime_type, _ = mimetypes.guess_type(media_item)
-                    files = {"media": (media_item, f, mime_type or "image/jpeg")}
+                file_path = media_item
+                if not os.path.exists(file_path):
+                    try:
+                        from django.conf import settings
+
+                        if hasattr(settings, "MEDIA_ROOT") and settings.MEDIA_ROOT:
+                            rel_path = media_item.lstrip("/")
+                            if rel_path.startswith("media/"):
+                                rel_path = rel_path[6:]
+                            possible_path = os.path.join(settings.MEDIA_ROOT, rel_path)
+                            if os.path.exists(possible_path):
+                                file_path = possible_path
+                    except Exception:
+                        pass
+
+                with open(file_path, "rb") as f:
+                    mime_type, _ = mimetypes.guess_type(file_path)
+                    files = {
+                        "media": (
+                            os.path.basename(file_path),
+                            f,
+                            mime_type or "image/jpeg",
+                        )
+                    }
                     resp = requests.post(
                         self.MEDIA_UPLOAD_URL,
                         files=files,
