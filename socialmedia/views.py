@@ -140,10 +140,8 @@ class SocialMediaSettingsView(DecoupleMixin, FormView):
 def preview_posts(request, organizer, event):
     """AJAX GET — returns JSON list of generated posts merged with DB state.
 
-    This is a read-only view: it calls build_posts() for generation and merges
-    in any existing DB state (pinned text, custom schedule, status).  Writes
-    and cleanup are deliberately deferred to the sync endpoint so that simply
-    loading the preview page cannot mutate or delete persistent records.
+    Syncs generated schedule posts to DB via sync_posts_to_db() and returns
+    full preview metadata (status badges, media URLs, custom schedule text).
     """
     _check_permission(request)
     _check_plugin_active(request)

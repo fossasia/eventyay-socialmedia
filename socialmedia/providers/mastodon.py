@@ -1,8 +1,12 @@
 import logging
+import os
+import tempfile
 from typing import Any
 
+import requests
 from mastodon import Mastodon
 
+from ..utils import validate_safe_url
 from .base import BaseSocialProvider, PublishingError
 
 logger = logging.getLogger(__name__)
@@ -54,14 +58,7 @@ class MastodonProvider(BaseSocialProvider):
             media_ids = []
             if media:
                 for file_path in media:
-                    import os
-                    import tempfile
-
-                    import requests
-
                     if file_path.startswith(("http://", "https://")):
-                        from ..utils import validate_safe_url
-
                         validate_safe_url(file_path)
                         r = requests.get(file_path, timeout=20)
                         r.raise_for_status()
