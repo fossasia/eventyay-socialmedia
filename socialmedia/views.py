@@ -624,6 +624,29 @@ def publish_post_now(request, organizer, event):
                 {"success": False, "message": _("Post not found.")}, status=404
             )
 
+        with transaction.atomic():
+            locked_post = (
+                SocialMediaPost.objects.filter(pk=db_post.pk)
+                .select_for_update(skip_locked=True)
+                .first()
+            )
+            if not locked_post:
+                return JsonResponse(
+                    {
+                        "success": False,
+                        "message": _(
+                            "Post is currently being processed by another worker."
+                        ),
+                    },
+                    status=409,
+                )
+            db_post = locked_post
+            db_post.status = SocialMediaPostStatus.EXPORTED
+            db_post.error_message = ""
+            db_post.save(update_fields=["status", "error_message"])
+
+        from .providers.registry import get_provider
+
         entity_id = db_post.entity_id or ""
         provider_name = None
         for prov in ["telegram", "mastodon", "postiz", "buffer"]:
@@ -661,8 +684,6 @@ def publish_post_now(request, organizer, event):
                 },
                 status=400,
             )
-
-        from .providers.registry import get_provider
 
         errors = []
         published_providers = []

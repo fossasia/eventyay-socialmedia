@@ -70,16 +70,23 @@ class PostizProvider(BaseSocialProvider):
         except Exception as e:
             return {"success": False, "message": str(e)}
 
-    def publish_post(self, text: str, media: list[str] | None = None) -> dict[str, Any]:
+    def publish_post(
+        self,
+        text: str,
+        media: list[str] | None = None,
+        scheduled_at: str | None = None,
+    ) -> dict[str, Any]:
         if not self.api_url or not self.api_key:
             raise PublishingError("Missing Postiz API URL or API key.")
 
         url = f"{self.api_url.rstrip('/')}/v1/posts"
-        payload = {
+        payload: dict[str, Any] = {
             "content": text,
         }
         if media:
             payload["media"] = media
+        if scheduled_at:
+            payload["postAt"] = scheduled_at
 
         try:
             response = requests.post(
@@ -116,7 +123,14 @@ class PostizProvider(BaseSocialProvider):
         results = []
         for post in posts:
             media = [post.media_url] if post.media_url else None
-            res = self.publish_post(post.post_text, media=media)
+            sched_time = (
+                post.scheduled_at.isoformat()
+                if getattr(post, "scheduled_at", None)
+                else None
+            )
+            res = self.publish_post(
+                post.post_text, media=media, scheduled_at=sched_time
+            )
             results.append(res)
         return results
 

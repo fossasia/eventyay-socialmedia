@@ -105,7 +105,49 @@ def control_dashboard_socialmedia(sender, request=None, **kwargs):
     )
 
 
-@receiver(periodic_task, dispatch_uid="socialmedia_periodic_publishing")
+def claim_post_for_publishing(post_pk, provider_name):
+    """Atomically claim a scheduled or failed post for publishing.
+
+    Transitions status to EXPORTED while holding select_for_update row lock,
+    releasing the lock immediately upon commit before HTTP network calls.
+    Returns (claimed_post, account) or (None, None) if unavailable.
+    """
+    with transaction.atomic():
+        locked_post = (
+            SocialMediaPost.objects.filter(
+                pk=post_pk,
+                status__in=[
+                    SocialMediaPostStatus.SCHEDULED,
+                    SocialMediaPostStatus.FAILED,
+                ],
+            )
+            .select_for_update(skip_locked=True)
+            .first()
+        )
+        if not locked_post:
+            return None, None
+
+        account = SocialMediaAccount.objects.filter(
+            organizer=locked_post.event.organizer,
+            provider=provider_name,
+            is_active=True,
+        ).first()
+
+        if not account:
+            locked_post.status = SocialMediaPostStatus.FAILED
+            locked_post.error_message = (
+                f"No active {provider_name} account found for organizer."
+            )
+            locked_post.save(update_fields=["status", "error_message"])
+            return None, None
+
+        locked_post.status = SocialMediaPostStatus.EXPORTED
+        locked_post.error_message = ""
+        locked_post.save(update_fields=["status", "error_message"])
+        return locked_post, account
+
+
+@receiver(periodic_task, dispatch_uid="socialmedia_publish_scheduled_posts")
 @scopes_disabled()
 def publish_scheduled_posts(sender, **kwargs):
     """Periodic task to publish scheduled social media posts
@@ -127,41 +169,19 @@ def publish_scheduled_posts(sender, **kwargs):
         if not provider_name:
             continue
 
-        account = None
+        claimed_post, account = claim_post_for_publishing(post.pk, provider_name)
+        if not claimed_post or not account:
+            continue
 
-        with transaction.atomic():
-            locked_post = (
-                SocialMediaPost.objects.filter(
-                    pk=post.pk, status=SocialMediaPostStatus.SCHEDULED
-                )
-                .select_for_update(skip_locked=True)
-                .first()
-            )
-            if not locked_post:
-                continue
-
-            account = SocialMediaAccount.objects.filter(
-                organizer=locked_post.event.organizer,
-                provider=provider_name,
-                is_active=True,
-            ).first()
-
-            if not account:
-                locked_post.status = SocialMediaPostStatus.FAILED
-                locked_post.error_message = (
-                    f"No active {provider_name} account found for organizer."
-                )
-                locked_post.save(update_fields=["status", "error_message"])
-                continue
-
-            try:
-                provider = get_provider(account)
-                media = [locked_post.media_url] if locked_post.media_url else None
-                provider.publish_post(text=locked_post.post_text, media=media)
-                locked_post.status = SocialMediaPostStatus.PUBLISHED
-                locked_post.error_message = ""
-                locked_post.save(update_fields=["status", "error_message"])
-            except Exception as e:
-                locked_post.status = SocialMediaPostStatus.FAILED
-                locked_post.error_message = str(e)
-                locked_post.save(update_fields=["status", "error_message"])
+        # Execute HTTP network publishing OUTSIDE of database transaction lock
+        try:
+            provider = get_provider(account)
+            media = [claimed_post.media_url] if claimed_post.media_url else None
+            provider.publish_post(text=claimed_post.post_text, media=media)
+            claimed_post.status = SocialMediaPostStatus.PUBLISHED
+            claimed_post.error_message = ""
+            claimed_post.save(update_fields=["status", "error_message"])
+        except Exception as e:
+            claimed_post.status = SocialMediaPostStatus.FAILED
+            claimed_post.error_message = str(e)
+            claimed_post.save(update_fields=["status", "error_message"])
