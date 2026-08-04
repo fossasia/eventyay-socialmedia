@@ -226,18 +226,40 @@ class TwitterProvider(BaseSocialProvider):
     @classmethod
     def get_setup_instructions(cls) -> list[str]:
         return [
-            "Go to Twitter Developer Portal (https://developer.x.com) and log in.",
-            "Create a new Project and App under your Developer Account.",
             (
-                "Set User Authentication Settings to 'Read and write' permissions "
-                "and App Type to 'Web App' or 'Automated App'."
+                "1. Go to https://developer.x.com and log in with your "
+                "Twitter/X account."
             ),
             (
-                "Generate your API Key, API Secret, User Access Token, and User "
-                "Access Token Secret from the 'Keys and Tokens' tab."
+                "2. If you don't have a developer account, click 'Sign up' and "
+                "agree to the developer terms. Free tier supports basic posting."
             ),
             (
-                "Enter your 4 API credentials into the Eventyay Social Media "
-                "Account settings form."
+                "3. Create a new Project (if you don't have one) → then create "
+                "an App under that project."
+            ),
+            (
+                "4. In your App settings, go to 'User authentication settings' → "
+                "click 'Edit'. Set:\n"
+                "   • App permissions: 'Read and write'\n"
+                "   • Type of App: 'Web App, Automated App or Bot'\n"
+                "   • Callback URL: https://localhost\n"
+                "   • Website URL: https://localhost\n"
+                "   Click 'Save'."
+            ),
+            (
+                "5. Go to 'Keys and tokens' tab. Under 'Consumer Keys', click "
+                "'Regenerate' to get your API Key and API Secret. Under "
+                "'Authentication Tokens', click 'Generate' under 'Access Token "
+                "and Secret' to get your Access Token and Access Token Secret. "
+                "Make sure the token shows 'Read and write' permissions."
+            ),
+            (
+                "6. Enter all 4 credentials below:\n"
+                "   • API Key (Consumer Key)\n"
+                "   • API Secret (Consumer Secret)\n"
+                "   • Access Token\n"
+                "   • Access Token Secret\n"
+                "   Also enter your Twitter/X handle (e.g. @eventyay)."
             ),
         ]

@@ -162,7 +162,27 @@ class BufferProvider(BaseSocialProvider):
     @classmethod
     def get_setup_instructions(cls) -> list[str]:
         return [
-            "Access the Buffer Developer Portal (https://publish.buffer.com/developers).",
-            "Register a new developer application to generate an Access Token.",
-            "Copy the Access Token and input it above.",
+            (
+                "1. Go to https://publish.buffer.com/developers and log in "
+                "with your Buffer account."
+            ),
+            (
+                "2. Click 'Create Application'. Fill in:\n"
+                "   • Name: Eventyay Social Media\n"
+                "   • Description: Social media posting integration\n"
+                "   • Callback URL: https://localhost\n"
+                "   Click 'Create'."
+            ),
+            (
+                "3. After creating the app, go to the 'Authentication' tab. "
+                "Generate an Access Token by clicking 'Generate Token'."
+            ),
+            (
+                "4. Enter below:\n"
+                "   • Access Token: the token from step 3\n"
+                "   • Channel ID: the Buffer channel/posting profile ID you "
+                "want to post to. You can find this in Buffer's URL when you "
+                "select a channel (e.g. https://publish.buffer.com/channels/"
+                "5f8a1b2c3d4e5f6a7b8c9d0e → channel ID is 5f8a1b2c3d4e5f6a7b8c9d0e)."
+            ),
         ]

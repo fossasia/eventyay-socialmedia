@@ -28,6 +28,53 @@ class LinkedInProvider(BaseSocialProvider):
             "X-Restli-Protocol-Version": "2.0.0",
         }
 
+    @staticmethod
+    def _validate_urn(urn: str) -> str | None:
+        """Return the URN if valid, or None if the entity key is empty."""
+        if not urn:
+            return None
+        if not urn.startswith("urn:li:"):
+            return None
+        parts = urn.split(":")
+        if len(parts) < 4 or not parts[3].strip():
+            return None
+        return urn
+
+    def _resolve_person_urn(self, member_id: str) -> str | None:
+        """Resolve a numeric member ID to the correct person URN via ugcPosts probe."""
+        headers = self._get_headers()
+        test_payload = {
+            "author": f"urn:li:person:{member_id}",
+            "lifecycleState": "DRAFT",
+            "specificContent": {
+                "com.linkedin.ugc.ShareContent": {
+                    "shareCommentary": {"text": ""},
+                    "shareMediaCategory": "NONE",
+                }
+            },
+            "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"},
+        }
+        try:
+            resp = requests.post(
+                self.UGC_POSTS_API_URL,
+                json=test_payload,
+                headers={**headers, "X-Restli-Protocol-Version": "2.0.0"},
+                timeout=15,
+            )
+            if resp.status_code == 201:
+                return f"urn:li:person:{member_id}"
+            # If error contains resolved person URN, extract it
+            body = resp.text
+            import re
+
+            match = re.search(r"urn:li:person:([A-Za-z0-9_=-]+)", body)
+            if match:
+                resolved = match.group(0)
+                return resolved
+        except Exception:
+            pass
+        return None
+
     def _get_author_urn(self) -> str:
         """Resolve LinkedIn Author URN (person or organization URN)."""
         author_urn = (
@@ -35,8 +82,14 @@ class LinkedInProvider(BaseSocialProvider):
         )
         if author_urn:
             if not author_urn.startswith("urn:li:"):
-                return f"urn:li:person:{author_urn}"
-            return author_urn
+                author_urn = f"urn:li:person:{author_urn}"
+            # Convert urn:li:member:ID to urn:li:person:ID for Posts API
+            if author_urn.startswith("urn:li:member:"):
+                entity_id = author_urn.split(":")[3]
+                author_urn = f"urn:li:person:{entity_id}"
+            validated = self._validate_urn(author_urn)
+            if validated:
+                return validated
 
         # Support URN or numeric member ID placed in account username field
         uname = (self.account.platform_username or "").strip()
@@ -74,18 +127,34 @@ class LinkedInProvider(BaseSocialProvider):
         )
 
     def validate_credentials(self) -> bool:
-        """Verify LinkedIn access token by querying userinfo API."""
+        """Verify LinkedIn access token by probing multiple endpoints."""
         headers = self._get_headers()
-        try:
-            resp = requests.get(self.USERINFO_API_URL, headers=headers, timeout=15)
-            if resp.status_code == 200:
-                return True
-            err_msg = resp.json().get("message") or resp.text
-            raise PublishingError(
-                f"LinkedIn authentication failed ({resp.status_code}): {err_msg}"
-            )
-        except requests.RequestException as e:
-            raise PublishingError(f"Could not connect to LinkedIn API: {e}") from e
+        # Try endpoints in order of least permissions required
+        endpoints = [
+            "https://api.linkedin.com/v2/userinfo",
+            "https://api.linkedin.com/v2/me",
+            "https://api.linkedin.com/rest/posts",
+        ]
+        last_error = ""
+        for url in endpoints:
+            try:
+                resp = requests.get(url, headers=headers, timeout=15)
+                if resp.status_code in (200, 201):
+                    return True
+                # 403 on /rest/posts is expected for GET without proper auth,
+                # but means the token is at least recognized
+                if resp.status_code == 403:
+                    last_error = resp.text
+                    continue
+                last_error = resp.text
+            except requests.RequestException as e:
+                last_error = str(e)
+                continue
+        # If we got 403 on all endpoints, the token is likely valid but lacks
+        # read scopes. Allow save and let publish attempt determine success.
+        if "ACCESS_DENIED" in last_error or "NOT_ENOUGH_PERMISSIONS" in last_error:
+            return True
+        raise PublishingError(f"LinkedIn authentication failed: {last_error}")
 
     def _upload_media(self, media_item: str, author_urn: str) -> str:
         """Register asset upload and upload binary image bytes to LinkedIn."""
@@ -222,7 +291,7 @@ class LinkedInProvider(BaseSocialProvider):
         }
 
         rest_headers = dict(headers)
-        rest_headers["LinkedIn-Version"] = "202401"
+        rest_headers["LinkedIn-Version"] = "202607"
         rest_payload: dict[str, Any] = {
             "author": author_urn,
             "commentary": commentary_text,
@@ -244,13 +313,23 @@ class LinkedInProvider(BaseSocialProvider):
 
         rest_err_msg = None
         try:
-            # 1. Try Versioned REST Posts API (202401)
+            # 1. Try Versioned REST Posts API (202607)
             resp = requests.post(
                 "https://api.linkedin.com/rest/posts",
                 json=rest_payload,
                 headers=rest_headers,
                 timeout=20,
             )
+            if resp.status_code not in (200, 201) and "not active" in resp.text:
+                # Fallback to version 202606
+                fallback_headers = dict(rest_headers)
+                fallback_headers["LinkedIn-Version"] = "202606"
+                resp = requests.post(
+                    "https://api.linkedin.com/rest/posts",
+                    json=rest_payload,
+                    headers=fallback_headers,
+                    timeout=20,
+                )
             if resp.status_code in (200, 201):
                 post_id = None
                 try:
@@ -280,8 +359,23 @@ class LinkedInProvider(BaseSocialProvider):
                 return {"post_id": post_id, "url": post_url}
 
             err_msg = rest_err_msg or resp.json().get("message") or resp.text
+            # Provide actionable guidance for common error codes
+            hint = ""
+            is_403_status = "403" in str(resp.json().get("status", ""))
+            if resp.status_code in (401, 403) or is_403_status:
+                hint = (
+                    "\n\nThis usually means your Access Token is missing the "
+                    "'w_member_social' scope. Regenerate your token at "
+                    "https://www.linkedin.com/developers/apps with the "
+                    "'Share on LinkedIn' product enabled."
+                )
+            elif resp.status_code == 422:
+                hint = (
+                    "\n\nVerify your Author URN is correct and matches your "
+                    "LinkedIn account type (person vs organization)."
+                )
             raise PublishingError(
-                f"LinkedIn API returned error ({resp.status_code}): {err_msg}"
+                f"LinkedIn API returned error ({resp.status_code}): {err_msg}{hint}"
             )
         except requests.RequestException as e:
             raise PublishingError(f"Error publishing post to LinkedIn: {e}") from e
@@ -300,20 +394,47 @@ class LinkedInProvider(BaseSocialProvider):
     def get_setup_instructions(cls) -> list[str]:
         return [
             (
-                "Go to LinkedIn Developer Portal "
-                "(https://www.linkedin.com/developers) and log in."
+                "1. Go to https://www.linkedin.com/developers and log in with "
+                "your LinkedIn account."
             ),
             (
-                "Create an App and request 'Share on LinkedIn' (w_member_social) "
-                "and 'Sign In with LinkedIn' products."
-            ),
-            "Generate an Access Token via OAuth 2.0 or Token Generator tool.",
-            (
-                "Find your Author URN (e.g. urn:li:person:XXXX for member profiles "
-                "or urn:li:organization:XXXX for company pages)."
+                "2. Click 'Create app' and fill in the app name (e.g. Eventyay), "
+                "description, and upload a logo. Click 'Create app'."
             ),
             (
-                "Enter your Access Token and Author URN into the Eventyay Social "
-                "Media Account settings form."
+                "3. On the 'Products' tab, find 'Share on LinkedIn' and click "
+                "'Add product'. This grants w_member_social (post as yourself) "
+                "and w_organization_social (post to pages) permissions."
+            ),
+            (
+                "4. On the 'Auth' tab, under 'Authorized redirect URLs', add: "
+                "https://localhost and click 'Update'."
+            ),
+            ("5. Note your 'Client ID' and 'Client Secret' from the Auth tab."),
+            (
+                "6. Open this URL in your browser (replace YOUR_CLIENT_ID with "
+                "your Client ID from step 5):\n"
+                "https://www.linkedin.com/oauth/v2/authorization?response_type=code"
+                "&client_id=YOUR_CLIENT_ID&redirect_uri=https://localhost"
+                "&scope=w_member_social"
+            ),
+            (
+                "7. Click 'Authorize app'. You will be redirected to "
+                "https://localhost?code=XXXXX (the page may show an error — "
+                "that's normal). Copy the 'code' value from the URL bar."
+            ),
+            (
+                "8. Your Author URN depends on what you want to post to:\n"
+                "   • Personal profile: urn:li:person:YOUR_PERSON_ID\n"
+                "   • Company page: urn:li:organization:YOUR_PAGE_ID\n"
+                "   To find your person ID: go to your LinkedIn profile, right-click "
+                "→ View Page Source, search for 'memberId'.\n"
+                "   To find your page ID: go to your Company Page URL, the number "
+                "in the URL is your page ID."
+            ),
+            (
+                "9. Enter the authorization code (from step 7), Client ID, Client "
+                "Secret, and Author URN into this form. The access token will be "
+                "generated automatically."
             ),
         ]

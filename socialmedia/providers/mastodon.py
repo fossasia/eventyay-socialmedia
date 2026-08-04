@@ -119,11 +119,28 @@ class MastodonProvider(BaseSocialProvider):
     @classmethod
     def get_setup_instructions(cls) -> list[str]:
         return [
-            "Log in to your Mastodon instance page.",
-            "Navigate to Preferences -> Development -> New Application.",
             (
-                "Give the application a name and ensure it has "
-                "'write:statuses' or 'write' scope permissions authorized."
+                "1. Log in to your Mastodon instance (e.g. https://mastodon.social "
+                "or your self-hosted instance)."
             ),
-            "Click Save, click on your new application, and copy the Access Token.",
+            ("2. Go to Preferences → Development → Applications → 'New application'."),
+            (
+                "3. Fill in:\n"
+                "   • Name: Eventyay Social Media\n"
+                "   • Scopes: check 'write:statuses' (for posting) and "
+                "'read:accounts' (for validation)\n"
+                "   • Redirect URI: leave as default\n"
+                "   Click 'Submit'."
+            ),
+            (
+                "4. Your application will be created. Click on its name to view "
+                "details. Copy the 'Access token' value."
+            ),
+            (
+                "5. Enter below:\n"
+                "   • Instance URL: your Mastodon instance URL "
+                "(e.g. https://mastodon.social)\n"
+                "   • Access Token: the token from step 4\n"
+                "   • Username: your full handle (e.g. @myuser@mastodon.social)"
+            ),
         ]

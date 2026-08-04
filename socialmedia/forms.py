@@ -734,11 +734,42 @@ class LinkedInAccountForm(forms.ModelForm):
     access_token = forms.CharField(
         label=_("Access Token"),
         widget=forms.PasswordInput(render_value=True),
-        required=True,
+        required=False,
+        help_text=_(
+            "Paste your LinkedIn access token here, OR fill in Client ID, "
+            "Client Secret, and Authorization Code below to generate one."
+        ),
+    )
+    client_id = forms.CharField(
+        label=_("Client ID"),
+        required=False,
+        help_text=_(
+            "From LinkedIn Developer Portal → Auth tab → Application credentials"
+        ),
+    )
+    client_secret = forms.CharField(
+        label=_("Client Secret"),
+        widget=forms.PasswordInput(render_value=True),
+        required=False,
+        help_text=_(
+            "From LinkedIn Developer Portal → Auth tab → Application credentials"
+        ),
+    )
+    authorization_code = forms.CharField(
+        label=_("Authorization Code"),
+        required=False,
+        help_text=_(
+            "The code from the OAuth redirect URL after authorizing your app. "
+            "See setup instructions for details."
+        ),
     )
     author_urn = forms.CharField(
         label=_("Author URN"),
-        help_text=_("e.g. urn:li:person:XXXX or urn:li:organization:XXXX"),
+        help_text=_(
+            "e.g. urn:li:person:XXXX for posting to your profile, or "
+            "urn:li:organization:XXXX for posting to a company page. "
+            "See setup instructions for how to find this."
+        ),
         required=False,
     )
 
@@ -760,7 +791,66 @@ class LinkedInAccountForm(forms.ModelForm):
                 self.fields["author_urn"].initial = creds.get("author_urn")
             if creds.get("access_token"):
                 self.fields["access_token"].initial = "••••••••"
-                self.fields["access_token"].required = False
+                self.fields["client_id"].initial = creds.get("client_id", "")
+                # Don't show client_secret
+
+    def clean(self):
+        cleaned_data = super().clean()
+        access_token = cleaned_data.get("access_token")
+        client_id = cleaned_data.get("client_id")
+        client_secret = cleaned_data.get("client_secret")
+        auth_code = cleaned_data.get("authorization_code")
+
+        # If token is masked and no OAuth credentials provided, keep existing
+        if (
+            (not access_token or access_token == "••••••••")
+            and self.instance
+            and self.instance.pk
+        ):
+            existing_token = self.instance.credentials.get("access_token")
+            if existing_token:
+                cleaned_data["access_token"] = existing_token
+
+        # Exchange authorization code for access token
+        if auth_code and client_id and client_secret:
+            import requests as http_requests
+
+            try:
+                resp = http_requests.post(
+                    "https://www.linkedin.com/oauth/v2/accessToken",
+                    data={
+                        "grant_type": "authorization_code",
+                        "code": auth_code,
+                        "redirect_uri": "https://localhost",
+                        "client_id": client_id,
+                        "client_secret": client_secret,
+                    },
+                    timeout=15,
+                )
+                if resp.status_code == 200:
+                    token_data = resp.json()
+                    cleaned_data["access_token"] = token_data.get("access_token")
+                else:
+                    error_msg = resp.json().get("error_description", resp.text)
+                    raise forms.ValidationError(
+                        _("LinkedIn token exchange failed: %(error)s"),
+                        error="error_msg",
+                        params={"error": error_msg},
+                    )
+            except http_requests.RequestException as e:
+                raise forms.ValidationError(
+                    _("Could not connect to LinkedIn: %(error)s"),
+                    params={"error": str(e)},
+                ) from e
+        elif auth_code and (not client_id or not client_secret):
+            raise forms.ValidationError(
+                _(
+                    "Client ID and Client Secret are required when using "
+                    "Authorization Code."
+                )
+            )
+
+        return cleaned_data
 
     def clean_access_token(self):
         token = self.cleaned_data.get("access_token")
@@ -774,6 +864,7 @@ class LinkedInAccountForm(forms.ModelForm):
         instance.credentials = {
             "access_token": self.cleaned_data.get("access_token"),
             "author_urn": (self.cleaned_data.get("author_urn") or "").strip(),
+            "client_id": (self.cleaned_data.get("client_id") or "").strip(),
         }
         if commit:
             instance.save()
