@@ -430,9 +430,9 @@ def test_no_platforms_fallback(organizer, event):
         posts = build_posts(event)
 
     for post in posts:
-        assert post.get("platform") is None, (
-            f"Expected no platform on post {post['id']}, got {post['platform']!r}"
-        )
+        assert (
+            post.get("platform") is None
+        ), f"Expected no platform on post {post['id']}, got {post['platform']!r}"
 
 
 @pytest.mark.django_db
@@ -703,7 +703,7 @@ def test_sync_to_schedulers_filters_per_provider(
     from socialmedia.providers.postiz import PostizProvider
 
     url = reverse(
-        "plugins:socialmedia:sync_to_schedulers",
+        "plugins:socialmedia:sync",
         kwargs={"organizer": organizer.slug, "event": event.slug},
     )
 
