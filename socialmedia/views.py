@@ -23,6 +23,7 @@ from eventyay.control.views.organizer_views.organizer_detail_view_mixin import (
 from .export import build_posts, generate_csv_from_posts, sync_posts_to_db
 from .forms import PROVIDER_FORMS, SocialMediaSettingsForm
 from .models import SocialMediaAccount, SocialMediaPost, SocialMediaPostStatus
+from .providers.registry import get_provider, get_provider_class
 
 HAS_SOCIAL_MEDIA_PERM = hasattr(Team, "can_manage_social_media")
 
@@ -304,8 +305,6 @@ class OrganizerAccountCreateView(
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        from .providers.registry import get_provider_class
-
         try:
             provider_cls = get_provider_class(self.provider)
             ctx["setup_instructions"] = provider_cls.get_setup_instructions()
@@ -324,9 +323,8 @@ class OrganizerAccountCreateView(
         return response
 
     def _validate_connection(self, form):
-        from .providers.registry import get_provider
-
         try:
+            account = form.save(commit=False)
             account = form.save(commit=False)
             account.organizer = self.request.organizer
             provider = get_provider(account)
@@ -366,8 +364,6 @@ class OrganizerAccountUpdateView(
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         provider = self.get_object().provider
-        from .providers.registry import get_provider_class
-
         try:
             provider_cls = get_provider_class(provider)
             ctx["setup_instructions"] = provider_cls.get_setup_instructions()
@@ -389,9 +385,8 @@ class OrganizerAccountUpdateView(
         return response
 
     def _validate_connection(self, form):
-        from .providers.registry import get_provider
-
         try:
+            account = form.save(commit=False)
             account = form.save(commit=False)
             account.organizer = self.request.organizer
             provider = get_provider(account)
@@ -510,8 +505,6 @@ def test_connection(request, organizer, pk):
         )
 
     try:
-        from .providers.registry import get_provider
-
         provider = get_provider(account)
         result = provider.send_test_message()
         return JsonResponse(result)
@@ -555,21 +548,49 @@ def sync_to_schedulers(request, organizer, event):
                 {"success": True, "message": _("No scheduled posts found to sync.")}
             )
 
-        from .providers.registry import get_provider
-
         synced_count = 0
         errors = []
+        all_synced_post_pks = set()
+
+        all_posts_list = list(posts_to_sync)
 
         for account in scheduler_accounts:
             try:
+                other_platforms = [
+                    p
+                    for p in [
+                        "telegram",
+                        "mastodon",
+                        "twitter",
+                        "linkedin",
+                        "postiz",
+                        "buffer",
+                    ]
+                    if p != account.provider
+                ]
+                account_posts = [
+                    post
+                    for post in all_posts_list
+                    if not any(
+                        (post.entity_id or "").endswith(f"_{other_p}")
+                        for other_p in other_platforms
+                    )
+                ]
+
+                if not account_posts:
+                    continue
+
                 provider = get_provider(account)
-                provider.sync_campaign(list(posts_to_sync))
+                provider.sync_campaign(account_posts)
                 synced_count += 1
+                all_synced_post_pks.update(p.pk for p in account_posts)
             except Exception as e:
                 errors.append(f"{account.provider}: {str(e)}")
 
-        if synced_count > 0:
-            posts_to_sync.update(status=SocialMediaPostStatus.EXPORTED)
+        if all_synced_post_pks:
+            SocialMediaPost.objects.filter(pk__in=all_synced_post_pks).update(
+                status=SocialMediaPostStatus.EXPORTED
+            )
 
         if errors:
             succ_msg = (
@@ -645,8 +666,6 @@ def publish_post_now(request, organizer, event):
             db_post.error_message = ""
             db_post.save(update_fields=["status", "error_message"])
 
-        from .providers.registry import get_provider
-
         entity_id = db_post.entity_id or ""
         provider_name = None
         for prov in ["telegram", "mastodon", "postiz", "buffer"]:
@@ -678,8 +697,7 @@ def publish_post_now(request, organizer, event):
                 {
                     "success": False,
                     "message": (
-                        f"No active {expected_prov} account found to "
-                        "publish this post."
+                        f"No active {expected_prov} account found to publish this post."
                     ),
                 },
                 status=400,

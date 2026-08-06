@@ -2,12 +2,39 @@ import ipaddress
 import socket
 from urllib.parse import urlparse
 
+import requests
+
 from .providers.base import PublishingError
 
 
-def validate_safe_url(url: str) -> str:
+class DNSResolverContext:
+    """Context manager that pins socket.getaddrinfo to resolve a specific hostname
+    strictly to a pre-validated IP address during HTTP requests.
+    Prevents Time of Check to Time of Use (TOCTOU) DNS Rebinding SSRF attacks.
+    """
+
+    def __init__(self, hostname: str, target_ip: str):
+        self.hostname = hostname.lower()
+        self.target_ip = target_ip
+        self.orig_getaddrinfo = socket.getaddrinfo
+
+    def __enter__(self):
+        def patched_getaddrinfo(host, port, *args, **kwargs):
+            if host and isinstance(host, str) and host.lower() == self.hostname:
+                return self.orig_getaddrinfo(self.target_ip, port, *args, **kwargs)
+            return self.orig_getaddrinfo(host, port, *args, **kwargs)
+
+        socket.getaddrinfo = patched_getaddrinfo
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        socket.getaddrinfo = self.orig_getaddrinfo
+
+
+def validate_safe_url(url: str) -> tuple[str, str]:
     """Validates that a URL uses http/https scheme and does not target
     private, loopback, or cloud metadata IP addresses (SSRF prevention).
+    Returns (url, first_valid_ip).
     """
     if not url or not isinstance(url, str):
         raise PublishingError("Invalid media URL provided.")
@@ -27,6 +54,7 @@ def validate_safe_url(url: str) -> str:
     if hostname.lower() in ("localhost", "localhost.localdomain", "127.0.0.1", "::1"):
         raise PublishingError("Media URL points to a forbidden local address.")
 
+    first_ip = None
     try:
         # Resolve hostname to IP addresses
         resolved_ips = socket.getaddrinfo(hostname, None)
@@ -43,9 +71,22 @@ def validate_safe_url(url: str) -> str:
                 raise PublishingError(
                     f"Media URL host '{hostname}' resolved to forbidden IP '{ip}'."
                 )
+            if not first_ip:
+                first_ip = ip_str
     except socket.gaierror as e:
         raise PublishingError(
             f"Failed to resolve media URL hostname '{hostname}': {e}"
         ) from e
 
-    return url
+    return url, first_ip or hostname
+
+
+def safe_fetch_url(url: str, timeout: int = 20) -> requests.Response:
+    """Safely fetches a remote URL with SSRF validation and DNS pinning
+    to prevent DNS Rebinding (TOCTOU) attacks.
+    """
+    url, safe_ip = validate_safe_url(url)
+    hostname = urlparse(url).hostname
+
+    with DNSResolverContext(hostname, safe_ip):
+        return requests.get(url, timeout=timeout)

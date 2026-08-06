@@ -3,10 +3,9 @@ import os
 import tempfile
 from typing import Any
 
-import requests
 from mastodon import Mastodon
 
-from ..utils import validate_safe_url
+from ..utils import safe_fetch_url
 from .base import BaseSocialProvider, PublishingError
 
 logger = logging.getLogger(__name__)
@@ -59,8 +58,7 @@ class MastodonProvider(BaseSocialProvider):
             if media:
                 for file_path in media:
                     if file_path.startswith(("http://", "https://")):
-                        validate_safe_url(file_path)
-                        r = requests.get(file_path, timeout=20)
+                        r = safe_fetch_url(file_path, timeout=20)
                         r.raise_for_status()
                         with tempfile.NamedTemporaryFile(delete=False) as tmp:
                             tmp.write(r.content)

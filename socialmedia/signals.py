@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import transaction
 from django.dispatch import receiver
 from django.template.loader import render_to_string
@@ -15,7 +16,6 @@ from eventyay.control.signals import (
 )
 
 from .models import SocialMediaAccount, SocialMediaPost, SocialMediaPostStatus
-from .providers.registry import get_provider
 
 HAS_SOCIAL_MEDIA_PERM = hasattr(Team, "can_manage_social_media")
 
@@ -150,9 +150,12 @@ def claim_post_for_publishing(post_pk, provider_name):
 @receiver(periodic_task, dispatch_uid="socialmedia_publish_scheduled_posts")
 @scopes_disabled()
 def publish_scheduled_posts(sender, **kwargs):
-    """Periodic task to publish scheduled social media posts
+    """Periodic task dispatcher to publish scheduled social media posts
     for direct integrations (Telegram, Mastodon).
+    Dispatches execution to dedicated Celery tasks off the main beat worker.
     """
+    from .tasks import publish_single_post
+
     due_posts = SocialMediaPost.objects.filter(
         status=SocialMediaPostStatus.SCHEDULED,
         scheduled_at__lte=now(),
@@ -169,19 +172,9 @@ def publish_scheduled_posts(sender, **kwargs):
         if not provider_name:
             continue
 
-        claimed_post, account = claim_post_for_publishing(post.pk, provider_name)
-        if not claimed_post or not account:
-            continue
-
-        # Execute HTTP network publishing OUTSIDE of database transaction lock
-        try:
-            provider = get_provider(account)
-            media = [claimed_post.media_url] if claimed_post.media_url else None
-            provider.publish_post(text=claimed_post.post_text, media=media)
-            claimed_post.status = SocialMediaPostStatus.PUBLISHED
-            claimed_post.error_message = ""
-            claimed_post.save(update_fields=["status", "error_message"])
-        except Exception as e:
-            claimed_post.status = SocialMediaPostStatus.FAILED
-            claimed_post.error_message = str(e)
-            claimed_post.save(update_fields=["status", "error_message"])
+        if getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False) or getattr(
+            settings, "CELERY_ALWAYS_EAGER", False
+        ):
+            publish_single_post(post.pk, provider_name)
+        else:
+            publish_single_post.apply_async(args=[post.pk, provider_name])
