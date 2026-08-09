@@ -18,6 +18,8 @@ from eventyay.control.signals import (
 from .models import SocialMediaAccount, SocialMediaPost, SocialMediaPostStatus
 
 HAS_SOCIAL_MEDIA_PERM = hasattr(Team, "can_manage_social_media")
+DIRECT_PUBLISH_PROVIDERS = ["telegram", "mastodon"]
+SCHEDULER_PROVIDERS = ["postiz", "buffer"]
 
 ORGANIZER_PERMISSION = (
     ("can_change_organizer_settings", "can_manage_social_media")
@@ -158,23 +160,38 @@ def publish_scheduled_posts(sender, **kwargs):
 
     due_posts = SocialMediaPost.objects.filter(
         status=SocialMediaPostStatus.SCHEDULED,
+        is_pinned=True,
         scheduled_at__lte=now(),
     ).order_by("scheduled_at", "pk")
 
     for post in due_posts:
         entity_id = post.entity_id or ""
-        provider_name = None
-        for prov in ["telegram", "mastodon"]:
-            if entity_id.endswith(f"_{prov}"):
-                provider_name = prov
-                break
-
-        if not provider_name:
+        provider_names = []
+        if any(entity_id.endswith(f"_{prov}") for prov in SCHEDULER_PROVIDERS):
             continue
 
-        if getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False) or getattr(
-            settings, "CELERY_ALWAYS_EAGER", False
-        ):
-            publish_single_post(post.pk, provider_name)
-        else:
-            publish_single_post.apply_async(args=[post.pk, provider_name])
+        for prov in DIRECT_PUBLISH_PROVIDERS:
+            if entity_id.endswith(f"_{prov}"):
+                provider_names = [prov]
+                break
+
+        if not provider_names:
+            # Fallback: check which direct integrations are active for this organizer
+            active_provs = list(
+                SocialMediaAccount.objects.filter(
+                    organizer=post.event.organizer,
+                    provider__in=DIRECT_PUBLISH_PROVIDERS,
+                    is_active=True,
+                )
+                .values_list("provider", flat=True)
+                .distinct()
+            )
+            provider_names = active_provs
+
+        for provider_name in provider_names:
+            if getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False) or getattr(
+                settings, "CELERY_ALWAYS_EAGER", False
+            ):
+                publish_single_post(post.pk, provider_name)
+            else:
+                publish_single_post.apply_async(args=[post.pk, provider_name])

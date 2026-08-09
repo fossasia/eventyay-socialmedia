@@ -134,6 +134,55 @@ def test_update_post_view(logged_in_organizer_client, organizer, event, settings
 
 
 @pytest.mark.django_db
+def test_update_post_reschedule_future_requeues_for_publishing(
+    logged_in_organizer_client, organizer, event, settings
+):
+    settings.SITE_URL = "https://testserver"
+    from datetime import timedelta
+
+    import pytz
+    from django.utils import timezone
+
+    from socialmedia.models import SocialMediaPost, SocialMediaPostStatus
+
+    event_tz = pytz.timezone(getattr(event, "timezone", None) or "UTC")
+    future_dt = timezone.now().astimezone(event_tz) + timedelta(minutes=2)
+
+    with scope(organizer=organizer, event=event):
+        post = SocialMediaPost.objects.create(
+            event=event,
+            post_type="custom",
+            entity_id="custom_reschedule_1",
+            scheduled_at=timezone.now() - timedelta(days=1),
+            post_text="Reschedule me",
+            status=SocialMediaPostStatus.EXPORTED,
+            is_pinned=False,
+        )
+
+    url = reverse(
+        "plugins:socialmedia:update",
+        kwargs={"organizer": organizer.slug, "event": event.slug},
+    )
+    payload = {
+        "db_id": post.pk,
+        "post_date": future_dt.strftime("%Y-%m-%d"),
+        "post_time": future_dt.strftime("%H:%M"),
+    }
+    response = logged_in_organizer_client.post(
+        url, data=json.dumps(payload), content_type="application/json"
+    )
+
+    assert response.status_code == 200
+    assert response.json()["post_status"] == SocialMediaPostStatus.SCHEDULED
+
+    with scope(organizer=organizer, event=event):
+        post.refresh_from_db()
+        assert post.status == SocialMediaPostStatus.SCHEDULED
+        assert post.is_pinned is True
+        assert post.error_message == ""
+
+
+@pytest.mark.django_db
 def test_preview_posts_view(logged_in_organizer_client, organizer, event, settings):
     settings.SITE_URL = "https://testserver"
     url = reverse(

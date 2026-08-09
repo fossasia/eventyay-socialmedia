@@ -48,8 +48,11 @@ def _check_plugin_active(request):
 
 
 def _check_permission(request):
+    organizer = getattr(request, "organizer", None) or (
+        request.event.organizer if hasattr(request, "event") else None
+    )
     if not request.user.has_event_permission(
-        request.organizer,
+        organizer,
         request.event,
         EVENT_PERMISSION,
         request=request,
@@ -222,7 +225,28 @@ def update_post(request, organizer, event):
             tz = pytz.timezone(getattr(request.event, "timezone", None) or "UTC")
             dt_str = f"{post_date} {post_time}"
             naive_dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
-            db_post.scheduled_at = tz.localize(naive_dt)
+            new_scheduled_at = tz.localize(naive_dt)
+            db_post.scheduled_at = new_scheduled_at
+
+            # When the organizer moves a post to a future time, reset any terminal
+            # or done status back to SCHEDULED so Celery Beat picks it up again.
+            _terminal_statuses = (
+                SocialMediaPostStatus.PUBLISHED,
+                SocialMediaPostStatus.EXPORTED,
+                SocialMediaPostStatus.FAILED,
+                SocialMediaPostStatus.EXCLUDED,
+            )
+            if (
+                new_scheduled_at > timezone.now()
+                and db_post.status in _terminal_statuses
+            ):
+                db_post.status = SocialMediaPostStatus.SCHEDULED
+                db_post.error_message = ""
+                logger.info(
+                    "Post %s rescheduled to %s — status reset to SCHEDULED.",
+                    db_post.pk,
+                    new_scheduled_at,
+                )
 
         if is_pinned is not None:
             db_post.is_pinned = is_pinned
@@ -230,8 +254,19 @@ def update_post(request, organizer, event):
             # Auto-pin when the organizer explicitly edits text or reschedules a post
             db_post.is_pinned = True
         db_post.save()
+
+        # Return the authoritative post state so the frontend can update the UI
+        tz_name = getattr(request.event, "timezone", None) or "UTC"
+        event_tz = pytz.timezone(tz_name)
+        local_scheduled_at = db_post.scheduled_at.astimezone(event_tz)
         return JsonResponse(
-            {"status": "ok", "db_id": db_post.pk, "is_pinned": db_post.is_pinned}
+            {
+                "status": "ok",
+                "db_id": db_post.pk,
+                "is_pinned": db_post.is_pinned,
+                "post_status": db_post.status,
+                "scheduled_at": local_scheduled_at.strftime("%Y-%m-%d %H:%M"),
+            }
         )
     except (json.JSONDecodeError, ValueError) as exc:
         return JsonResponse({"error": str(exc)}, status=400)
@@ -521,7 +556,7 @@ def sync_to_schedulers(request, organizer, event):
     _check_plugin_active(request)
     try:
         scheduler_accounts = SocialMediaAccount.objects.filter(
-            organizer=request.organizer,
+            organizer=request.event.organizer,
             provider__in=["postiz", "buffer"],
             is_active=True,
         )
@@ -676,7 +711,7 @@ def publish_post_now(request, organizer, event):
         active_accounts = []
         if provider_name:
             account = SocialMediaAccount.objects.filter(
-                organizer=request.organizer,
+                organizer=request.event.organizer,
                 provider=provider_name,
                 is_active=True,
             ).first()
@@ -685,7 +720,7 @@ def publish_post_now(request, organizer, event):
         else:
             active_accounts = list(
                 SocialMediaAccount.objects.filter(
-                    organizer=request.organizer,
+                    organizer=request.event.organizer,
                     provider__in=["telegram", "mastodon", "postiz", "buffer"],
                     is_active=True,
                 )
