@@ -134,6 +134,55 @@ def test_update_post_view(logged_in_organizer_client, organizer, event, settings
 
 
 @pytest.mark.django_db
+def test_update_post_reschedule_future_requeues_for_publishing(
+    logged_in_organizer_client, organizer, event, settings
+):
+    settings.SITE_URL = "https://testserver"
+    from datetime import timedelta
+
+    import pytz
+    from django.utils import timezone
+
+    from socialmedia.models import SocialMediaPost, SocialMediaPostStatus
+
+    event_tz = pytz.timezone(getattr(event, "timezone", None) or "UTC")
+    future_dt = timezone.now().astimezone(event_tz) + timedelta(minutes=2)
+
+    with scope(organizer=organizer, event=event):
+        post = SocialMediaPost.objects.create(
+            event=event,
+            post_type="custom",
+            entity_id="custom_reschedule_1",
+            scheduled_at=timezone.now() - timedelta(days=1),
+            post_text="Reschedule me",
+            status=SocialMediaPostStatus.EXPORTED,
+            is_pinned=False,
+        )
+
+    url = reverse(
+        "plugins:socialmedia:update",
+        kwargs={"organizer": organizer.slug, "event": event.slug},
+    )
+    payload = {
+        "db_id": post.pk,
+        "post_date": future_dt.strftime("%Y-%m-%d"),
+        "post_time": future_dt.strftime("%H:%M"),
+    }
+    response = logged_in_organizer_client.post(
+        url, data=json.dumps(payload), content_type="application/json"
+    )
+
+    assert response.status_code == 200
+    assert response.json()["post_status"] == SocialMediaPostStatus.SCHEDULED
+
+    with scope(organizer=organizer, event=event):
+        post.refresh_from_db()
+        assert post.status == SocialMediaPostStatus.SCHEDULED
+        assert post.is_pinned is True
+        assert post.error_message == ""
+
+
+@pytest.mark.django_db
 def test_preview_posts_view(logged_in_organizer_client, organizer, event, settings):
     settings.SITE_URL = "https://testserver"
     url = reverse(
@@ -565,8 +614,19 @@ def test_sync_posts_to_db_saves_media_url(organizer, event):
         )
         sub.speakers.add(user)
 
-        with patch.object(
-            User, "get_avatar_url", return_value="https://testserver/speaker.jpg"
+        with patch(
+            "socialmedia.export.build_posts",
+            return_value=[
+                {
+                    "id": sub.pk,
+                    "type": "speaker",
+                    "post_date": "2026-07-28",
+                    "post_time": "12:00",
+                    "post_text": "Talk by speaker2",
+                    "offset_days": 0,
+                    "media_url": "https://testserver/speaker.jpg",
+                }
+            ],
         ):
             sync_posts_to_db(event)
 
@@ -598,6 +658,7 @@ def test_sync_posts_to_db_saves_media_url(organizer, event):
 
 @pytest.mark.django_db
 def test_post_error_message_persistence(organizer, event):
+    from django.utils.timezone import now
     from django_scopes import scope
 
     from socialmedia.models import SocialMediaPost
@@ -606,9 +667,245 @@ def test_post_error_message_persistence(organizer, event):
         post = SocialMediaPost.objects.create(
             event=event,
             post_type="general",
+            scheduled_at=now(),
             post_text="Test Post",
             status="failed",
             error_message="API Connection Timeout",
         )
         post.refresh_from_db()
         assert post.error_message == "API Connection Timeout"
+
+
+@pytest.mark.django_db
+def test_sync_to_schedulers_view(
+    logged_in_organizer_client, organizer, event, settings
+):
+    settings.SITE_URL = "https://testserver"
+    from datetime import timedelta
+    from unittest.mock import patch
+
+    from django.utils.timezone import now
+    from django_scopes import scope
+
+    from socialmedia.models import (
+        SocialMediaAccount,
+        SocialMediaPost,
+        SocialMediaPostStatus,
+    )
+    from socialmedia.providers.buffer import BufferProvider
+
+    url = reverse(
+        "plugins:socialmedia:sync",
+        kwargs={"organizer": organizer.slug, "event": event.slug},
+    )
+
+    response = logged_in_organizer_client.post(url)
+    assert response.status_code == 400
+    assert "No active scheduler accounts" in response.json()["message"]
+
+    account = SocialMediaAccount.objects.create(
+        organizer=organizer,
+        provider="buffer",
+        platform_username="buffer_chan",
+        is_active=True,
+    )
+    account.credentials = {"access_token": "fake"}
+    account.save()
+
+    with scope(organizer=organizer, event=event):
+        post = SocialMediaPost.objects.create(
+            event=event,
+            post_type="cfp",
+            entity_id="cfp_1_buffer",
+            scheduled_at=now() + timedelta(days=5),
+            post_text="Sync this!",
+            status=SocialMediaPostStatus.SCHEDULED,
+        )
+
+    with patch.object(BufferProvider, "sync_campaign") as mock_sync:
+        response = logged_in_organizer_client.post(url)
+        assert response.status_code == 200
+        assert "Successfully synchronized" in response.json()["message"]
+        mock_sync.assert_called_once()
+
+    with scope(organizer=organizer, event=event):
+        post.refresh_from_db()
+        assert post.status == SocialMediaPostStatus.EXPORTED
+
+
+@pytest.mark.django_db
+def test_sync_to_schedulers_filters_per_provider(
+    logged_in_organizer_client, organizer, event, settings
+):
+    settings.SITE_URL = "https://testserver"
+    from datetime import timedelta
+    from unittest.mock import patch
+
+    from django.utils.timezone import now
+
+    from socialmedia.models import (
+        SocialMediaAccount,
+        SocialMediaPost,
+        SocialMediaPostStatus,
+    )
+    from socialmedia.providers.buffer import BufferProvider
+    from socialmedia.providers.postiz import PostizProvider
+
+    url = reverse(
+        "plugins:socialmedia:sync",
+        kwargs={"organizer": organizer.slug, "event": event.slug},
+    )
+
+    acc_buffer = SocialMediaAccount.objects.create(
+        organizer=organizer,
+        provider="buffer",
+        platform_username="buffer_chan",
+        is_active=True,
+    )
+    acc_buffer.credentials = {"access_token": "buf_token"}
+    acc_buffer.save()
+
+    acc_postiz = SocialMediaAccount.objects.create(
+        organizer=organizer,
+        provider="postiz",
+        platform_username="postiz_chan",
+        is_active=True,
+    )
+    acc_postiz.credentials = {"api_url": "https://postiz.com/api", "api_key": "pz_key"}
+    acc_postiz.save()
+
+    with scope(organizer=organizer, event=event):
+        p_buf = SocialMediaPost.objects.create(
+            event=event,
+            post_type="cfp",
+            entity_id="cfp_1_buffer",
+            scheduled_at=now() + timedelta(days=5),
+            post_text="Buffer specific",
+            status=SocialMediaPostStatus.SCHEDULED,
+        )
+        p_pz = SocialMediaPost.objects.create(
+            event=event,
+            post_type="cfp",
+            entity_id="cfp_2_postiz",
+            scheduled_at=now() + timedelta(days=5),
+            post_text="Postiz specific",
+            status=SocialMediaPostStatus.SCHEDULED,
+        )
+        p_gen = SocialMediaPost.objects.create(
+            event=event,
+            post_type="cfp",
+            entity_id="cfp_3_generic",
+            scheduled_at=now() + timedelta(days=5),
+            post_text="Generic scheduled post",
+            status=SocialMediaPostStatus.SCHEDULED,
+        )
+
+    with (
+        patch.object(BufferProvider, "sync_campaign") as mock_buf_sync,
+        patch.object(PostizProvider, "sync_campaign") as mock_pz_sync,
+    ):
+        response = logged_in_organizer_client.post(url)
+        assert response.status_code == 200
+        assert "Successfully synchronized" in response.json()["message"]
+
+        assert mock_buf_sync.call_count == 1
+        buf_synced_posts = mock_buf_sync.call_args[0][0]
+        buf_pks = {p.pk for p in buf_synced_posts}
+        assert p_buf.pk in buf_pks
+        assert p_gen.pk in buf_pks
+        assert p_pz.pk not in buf_pks
+
+        assert mock_pz_sync.call_count == 1
+        pz_synced_posts = mock_pz_sync.call_args[0][0]
+        pz_pks = {p.pk for p in pz_synced_posts}
+        assert p_pz.pk in pz_pks
+        assert p_gen.pk in pz_pks
+        assert p_buf.pk not in pz_pks
+
+    with scope(organizer=organizer, event=event):
+        p_buf.refresh_from_db()
+        p_pz.refresh_from_db()
+        p_gen.refresh_from_db()
+        assert p_buf.status == SocialMediaPostStatus.EXPORTED
+        assert p_pz.status == SocialMediaPostStatus.EXPORTED
+        assert p_gen.status == SocialMediaPostStatus.EXPORTED
+
+
+@pytest.mark.django_db
+def test_publish_post_now_view(logged_in_organizer_client, organizer, event, settings):
+    settings.SITE_URL = "https://testserver"
+    from unittest.mock import patch
+
+    from django.utils.timezone import now
+    from django_scopes import scope
+
+    from socialmedia.models import (
+        SocialMediaAccount,
+        SocialMediaPost,
+        SocialMediaPostStatus,
+    )
+    from socialmedia.providers.telegram import TelegramProvider
+
+    url = reverse(
+        "plugins:socialmedia:publish_now",
+        kwargs={"organizer": organizer.slug, "event": event.slug},
+    )
+
+    with scope(organizer=organizer, event=event):
+        post = SocialMediaPost.objects.create(
+            event=event,
+            post_type="cfp",
+            entity_id="cfp_1_telegram",
+            scheduled_at=now(),
+            post_text="Publish now!",
+            status=SocialMediaPostStatus.SCHEDULED,
+        )
+
+    payload = {"db_id": post.pk}
+    response = logged_in_organizer_client.post(
+        url, data=json.dumps(payload), content_type="application/json"
+    )
+    assert response.status_code == 400
+    assert "No active telegram account found" in response.json()["message"]
+
+    account = SocialMediaAccount.objects.create(
+        organizer=organizer,
+        provider="telegram",
+        platform_username="telegram_chan",
+        is_active=True,
+    )
+    account.credentials = {"bot_token": "fake"}
+    account.save()
+
+    with patch.object(TelegramProvider, "publish_post") as mock_publish:
+        response = logged_in_organizer_client.post(
+            url, data=json.dumps(payload), content_type="application/json"
+        )
+        assert response.status_code == 200
+        assert "successfully published" in response.json()["message"].lower()
+        mock_publish.assert_called_once_with(text="Publish now!", media=None)
+
+    with scope(organizer=organizer, event=event):
+        post.refresh_from_db()
+        assert post.status == SocialMediaPostStatus.PUBLISHED
+
+    post.status = SocialMediaPostStatus.SCHEDULED
+    with scope(organizer=organizer, event=event):
+        post.save()
+
+    from socialmedia.providers.base import PublishingError
+
+    with patch.object(
+        TelegramProvider, "publish_post", side_effect=PublishingError("Rate limited")
+    ) as mock_publish:
+        response = logged_in_organizer_client.post(
+            url, data=json.dumps(payload), content_type="application/json"
+        )
+        assert response.status_code == 500
+        assert "Publishing failed:" in response.json()["message"]
+        assert "Rate limited" in response.json()["message"]
+
+    with scope(organizer=organizer, event=event):
+        post.refresh_from_db()
+        assert post.status == SocialMediaPostStatus.FAILED
+        assert "Rate limited" in post.error_message

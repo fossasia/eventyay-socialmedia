@@ -59,21 +59,27 @@ class BufferProvider(BaseSocialProvider):
             logger.error(f"Buffer credentials validation failed: {e}")
             return False
 
-    def _create_post(self, text: str, *, save_to_draft: bool) -> dict[str, str]:
+    def _create_post(
+        self, text: str, *, save_to_draft: bool, due_at: str | None = None
+    ) -> dict[str, str]:
         if not self.channel_id:
             raise PublishingError("Missing Buffer channel ID.")
 
         text_value = json.dumps(text)
         channel_id = json.dumps(self.channel_id)
         draft_value = "true" if save_to_draft else "false"
+
+        scheduling_type = "custom" if due_at else "automatic"
+        due_at_field = f", dueAt: {json.dumps(due_at)}" if due_at else ""
+
         query = f"""
             mutation CreateEventyayBufferPost {{
               createPost(input: {{
                 text: {text_value},
                 channelId: {channel_id},
-                schedulingType: automatic,
+                schedulingType: {scheduling_type},
                 mode: addToQueue,
-                saveToDraft: {draft_value}
+                saveToDraft: {draft_value}{due_at_field}
               }}) {{
                 ... on PostActionSuccess {{
                   post {{
@@ -140,6 +146,18 @@ class BufferProvider(BaseSocialProvider):
             ) from e
         except Exception as e:
             raise PublishingError(f"Error publishing to Buffer: {e}") from e
+
+    def sync_campaign(self, posts: list[Any]) -> list[Any]:
+        results = []
+        for post in posts:
+            due_at = (
+                post.scheduled_at.isoformat()
+                if getattr(post, "scheduled_at", None)
+                else None
+            )
+            res = self._create_post(post.post_text, save_to_draft=False, due_at=due_at)
+            results.append(res)
+        return results
 
     @classmethod
     def get_setup_instructions(cls) -> list[str]:

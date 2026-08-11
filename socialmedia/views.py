@@ -23,6 +23,7 @@ from eventyay.control.views.organizer_views.organizer_detail_view_mixin import (
 from .export import build_posts, generate_csv_from_posts, sync_posts_to_db
 from .forms import PROVIDER_FORMS, SocialMediaSettingsForm
 from .models import SocialMediaAccount, SocialMediaPost, SocialMediaPostStatus
+from .providers.registry import get_provider, get_provider_class
 
 HAS_SOCIAL_MEDIA_PERM = hasattr(Team, "can_manage_social_media")
 
@@ -47,8 +48,11 @@ def _check_plugin_active(request):
 
 
 def _check_permission(request):
+    organizer = getattr(request, "organizer", None) or (
+        request.event.organizer if hasattr(request, "event") else None
+    )
     if not request.user.has_event_permission(
-        request.organizer,
+        organizer,
         request.event,
         EVENT_PERMISSION,
         request=request,
@@ -140,14 +144,13 @@ class SocialMediaSettingsView(DecoupleMixin, FormView):
 def preview_posts(request, organizer, event):
     """AJAX GET — returns JSON list of generated posts merged with DB state.
 
-    This is a read-only view: it calls build_posts() for generation and merges
-    in any existing DB state (pinned text, custom schedule, status).  Writes
-    and cleanup are deliberately deferred to the sync endpoint so that simply
-    loading the preview page cannot mutate or delete persistent records.
+    Syncs generated schedule posts to DB via sync_posts_to_db() and returns
+    full preview metadata (status badges, media URLs, custom schedule text).
     """
     _check_permission(request)
     _check_plugin_active(request)
     try:
+        sync_posts_to_db(request.event, request)
         raw_posts = build_posts(request.event, request)
         db_posts = {
             (p.post_type, p.entity_id, p.offset_days): p
@@ -163,11 +166,17 @@ def preview_posts(request, organizer, event):
                 p["status"] = db_p.status
                 p["is_pinned"] = db_p.is_pinned
                 p["post_text"] = db_p.post_text
+                p["media_url"] = db_p.media_url or p.get("media_url") or ""
+                p["error_message"] = db_p.error_message or ""
 
                 tz = pytz.timezone(getattr(request.event, "timezone", None) or "UTC")
                 local_dt = db_p.scheduled_at.astimezone(tz)
                 p["post_date"] = local_dt.strftime("%Y-%m-%d")
                 p["post_time"] = local_dt.strftime("%H:%M")
+            else:
+                p["status"] = "scheduled"
+                p["error_message"] = ""
+                p["media_url"] = p.get("media_url") or ""
             posts.append(p)
     except Exception:  # pragma: no cover
         return JsonResponse({"error": "Internal server error"}, status=500)
@@ -216,7 +225,28 @@ def update_post(request, organizer, event):
             tz = pytz.timezone(getattr(request.event, "timezone", None) or "UTC")
             dt_str = f"{post_date} {post_time}"
             naive_dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
-            db_post.scheduled_at = tz.localize(naive_dt)
+            new_scheduled_at = tz.localize(naive_dt)
+            db_post.scheduled_at = new_scheduled_at
+
+            # When the organizer moves a post to a future time, reset any terminal
+            # or done status back to SCHEDULED so Celery Beat picks it up again.
+            _terminal_statuses = (
+                SocialMediaPostStatus.PUBLISHED,
+                SocialMediaPostStatus.EXPORTED,
+                SocialMediaPostStatus.FAILED,
+                SocialMediaPostStatus.EXCLUDED,
+            )
+            if (
+                new_scheduled_at > timezone.now()
+                and db_post.status in _terminal_statuses
+            ):
+                db_post.status = SocialMediaPostStatus.SCHEDULED
+                db_post.error_message = ""
+                logger.info(
+                    "Post %s rescheduled to %s — status reset to SCHEDULED.",
+                    db_post.pk,
+                    new_scheduled_at,
+                )
 
         if is_pinned is not None:
             db_post.is_pinned = is_pinned
@@ -224,8 +254,19 @@ def update_post(request, organizer, event):
             # Auto-pin when the organizer explicitly edits text or reschedules a post
             db_post.is_pinned = True
         db_post.save()
+
+        # Return the authoritative post state so the frontend can update the UI
+        tz_name = getattr(request.event, "timezone", None) or "UTC"
+        event_tz = pytz.timezone(tz_name)
+        local_scheduled_at = db_post.scheduled_at.astimezone(event_tz)
         return JsonResponse(
-            {"status": "ok", "db_id": db_post.pk, "is_pinned": db_post.is_pinned}
+            {
+                "status": "ok",
+                "db_id": db_post.pk,
+                "is_pinned": db_post.is_pinned,
+                "post_status": db_post.status,
+                "scheduled_at": local_scheduled_at.strftime("%Y-%m-%d %H:%M"),
+            }
         )
     except (json.JSONDecodeError, ValueError) as exc:
         return JsonResponse({"error": str(exc)}, status=400)
@@ -299,8 +340,6 @@ class OrganizerAccountCreateView(
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        from .providers.registry import get_provider_class
-
         try:
             provider_cls = get_provider_class(self.provider)
             ctx["setup_instructions"] = provider_cls.get_setup_instructions()
@@ -319,9 +358,8 @@ class OrganizerAccountCreateView(
         return response
 
     def _validate_connection(self, form):
-        from .providers.registry import get_provider
-
         try:
+            account = form.save(commit=False)
             account = form.save(commit=False)
             account.organizer = self.request.organizer
             provider = get_provider(account)
@@ -361,8 +399,6 @@ class OrganizerAccountUpdateView(
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         provider = self.get_object().provider
-        from .providers.registry import get_provider_class
-
         try:
             provider_cls = get_provider_class(provider)
             ctx["setup_instructions"] = provider_cls.get_setup_instructions()
@@ -384,9 +420,8 @@ class OrganizerAccountUpdateView(
         return response
 
     def _validate_connection(self, form):
-        from .providers.registry import get_provider
-
         try:
+            account = form.save(commit=False)
             account = form.save(commit=False)
             account.organizer = self.request.organizer
             provider = get_provider(account)
@@ -505,10 +540,252 @@ def test_connection(request, organizer, pk):
         )
 
     try:
-        from .providers.registry import get_provider
-
         provider = get_provider(account)
         result = provider.send_test_message()
         return JsonResponse(result)
+    except Exception as e:
+        return JsonResponse({"success": False, "message": str(e)}, status=500)
+
+
+@require_POST
+def sync_to_schedulers(request, organizer, event):
+    """AJAX POST — trigger synchronization of active scheduled posts
+    to Postiz or Buffer scheduler accounts.
+    """
+    _check_permission(request)
+    _check_plugin_active(request)
+    try:
+        scheduler_accounts = SocialMediaAccount.objects.filter(
+            organizer=request.event.organizer,
+            provider__in=["postiz", "buffer"],
+            is_active=True,
+        )
+        if not scheduler_accounts.exists():
+            return JsonResponse(
+                {
+                    "success": False,
+                    "message": _("No active scheduler accounts connected."),
+                },
+                status=400,
+            )
+
+        posts_to_sync = SocialMediaPost.objects.filter(
+            event=request.event,
+            status=SocialMediaPostStatus.SCHEDULED,
+            scheduled_at__gt=timezone.now(),
+        )
+        direct_platforms = ["telegram", "mastodon", "twitter", "linkedin"]
+        for p in direct_platforms:
+            posts_to_sync = posts_to_sync.exclude(entity_id__endswith=f"_{p}")
+
+        if not posts_to_sync.exists():
+            return JsonResponse(
+                {"success": True, "message": _("No scheduled posts found to sync.")}
+            )
+
+        synced_count = 0
+        errors = []
+        all_synced_post_pks = set()
+
+        all_posts_list = list(posts_to_sync)
+
+        for account in scheduler_accounts:
+            try:
+                other_platforms = [
+                    p
+                    for p in [
+                        "telegram",
+                        "mastodon",
+                        "twitter",
+                        "linkedin",
+                        "postiz",
+                        "buffer",
+                    ]
+                    if p != account.provider
+                ]
+                account_posts = [
+                    post
+                    for post in all_posts_list
+                    if not any(
+                        (post.entity_id or "").endswith(f"_{other_p}")
+                        for other_p in other_platforms
+                    )
+                ]
+
+                if not account_posts:
+                    continue
+
+                provider = get_provider(account)
+                provider.sync_campaign(account_posts)
+                synced_count += 1
+                all_synced_post_pks.update(p.pk for p in account_posts)
+            except Exception as e:
+                errors.append(f"{account.provider}: {str(e)}")
+
+        if all_synced_post_pks:
+            SocialMediaPost.objects.filter(pk__in=all_synced_post_pks).update(
+                status=SocialMediaPostStatus.EXPORTED
+            )
+
+        if errors:
+            succ_msg = (
+                f" ({synced_count}/{len(scheduler_accounts)} succeeded)"
+                if synced_count > 0
+                else ""
+            )
+            err_str = ", ".join(errors)
+            return JsonResponse(
+                {
+                    "success": False,
+                    "message": f"Synchronization partially failed{succ_msg}: {err_str}",
+                },
+                status=500,
+            )
+
+        return JsonResponse(
+            {
+                "success": True,
+                "message": (
+                    f"Successfully synchronized posts to {synced_count} "
+                    "scheduler platform(s)."
+                ),
+            }
+        )
+    except Exception as e:
+        return JsonResponse({"success": False, "message": str(e)}, status=500)
+
+
+@require_POST
+def publish_post_now(request, organizer, event):
+    """AJAX POST — manual retry or immediate publishing for a specific post."""
+    _check_permission(request)
+    _check_plugin_active(request)
+    try:
+        data = json.loads(request.body)
+        db_id = data.get("db_id")
+        post_id = data.get("post_id")
+
+        db_post = None
+        if db_id:
+            db_post = SocialMediaPost.objects.filter(
+                pk=db_id, event=request.event
+            ).first()
+        if not db_post and post_id:
+            db_post = SocialMediaPost.objects.filter(
+                entity_id=str(post_id), event=request.event
+            ).first()
+
+        if not db_post:
+            return JsonResponse(
+                {"success": False, "message": _("Post not found.")}, status=404
+            )
+
+        with transaction.atomic():
+            locked_post = (
+                SocialMediaPost.objects.filter(pk=db_post.pk)
+                .select_for_update(skip_locked=True)
+                .first()
+            )
+            if not locked_post:
+                return JsonResponse(
+                    {
+                        "success": False,
+                        "message": _(
+                            "Post is currently being processed by another worker."
+                        ),
+                    },
+                    status=409,
+                )
+            db_post = locked_post
+            db_post.status = SocialMediaPostStatus.EXPORTED
+            db_post.error_message = ""
+            db_post.save(update_fields=["status", "error_message"])
+
+        entity_id = db_post.entity_id or ""
+        provider_name = None
+        for prov in ["telegram", "mastodon", "postiz", "buffer"]:
+            if entity_id.endswith(f"_{prov}"):
+                provider_name = prov
+                break
+
+        active_accounts = []
+        if provider_name:
+            account = SocialMediaAccount.objects.filter(
+                organizer=request.event.organizer,
+                provider=provider_name,
+                is_active=True,
+            ).first()
+            if account:
+                active_accounts.append(account)
+        else:
+            active_accounts = list(
+                SocialMediaAccount.objects.filter(
+                    organizer=request.event.organizer,
+                    provider__in=["telegram", "mastodon", "postiz", "buffer"],
+                    is_active=True,
+                )
+            )
+
+        if not active_accounts:
+            expected_prov = provider_name or "corresponding"
+            return JsonResponse(
+                {
+                    "success": False,
+                    "message": (
+                        f"No active {expected_prov} account found to publish this post."
+                    ),
+                },
+                status=400,
+            )
+
+        errors = []
+        published_providers = []
+
+        for account in active_accounts:
+            try:
+                provider = get_provider(account)
+                media = [db_post.media_url] if db_post.media_url else None
+                provider.publish_post(text=db_post.post_text, media=media)
+                published_providers.append(account.provider)
+            except Exception as e:
+                errors.append(f"{account.provider}: {str(e)}")
+
+        if errors:
+            db_post.status = SocialMediaPostStatus.FAILED
+            err_details = "; ".join(errors)
+            if published_providers:
+                succ = ", ".join(published_providers)
+                db_post.error_message = f"Published to ({succ}). Errors: {err_details}"
+            else:
+                db_post.error_message = err_details
+            db_post.save()
+            return JsonResponse(
+                {
+                    "success": False,
+                    "message": f"Publishing failed: {db_post.error_message}",
+                    "status": db_post.status,
+                },
+                status=500,
+            )
+
+        is_scheduler = all(p in ["postiz", "buffer"] for p in published_providers)
+        db_post.status = (
+            SocialMediaPostStatus.EXPORTED
+            if is_scheduler
+            else SocialMediaPostStatus.PUBLISHED
+        )
+        db_post.error_message = ""
+        db_post.save()
+
+        return JsonResponse(
+            {
+                "success": True,
+                "message": _("Post successfully published/synced!"),
+                "status": db_post.status,
+            }
+        )
+
+    except (json.JSONDecodeError, ValueError) as exc:
+        return JsonResponse({"success": False, "message": str(exc)}, status=400)
     except Exception as e:
         return JsonResponse({"success": False, "message": str(e)}, status=500)

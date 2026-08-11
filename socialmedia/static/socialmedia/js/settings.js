@@ -9,6 +9,8 @@
       PREVIEW_URL: config.previewUrl,
       EXPORT_URL: config.exportUrl,
       UPDATE_URL: config.updateUrl,
+      SYNC_URL: config.syncUrl,
+      PUBLISH_NOW_URL: config.publishNowUrl || (config.updateUrl ? config.updateUrl.replace(/\/update\/?$/, "/publish-now/") : null),
       CSRF_TOKEN: config.csrfToken,
       TRANS_CLICK_TO_EDIT: config.transClickToEdit || "Click to edit · Ctrl+Enter to save",
       TRANS_SELECT_AT_LEAST_ONE: config.transSelectAtLeastOne || "Please select at least one post to export.",
@@ -19,10 +21,10 @@
 
   // ---- Platform metadata ----
   const PLATFORM_META = {
-    twitter:  { label: "X / Twitter", iconClass: "fa fa-twitter",   colorClass: "plat-twitter" },
-    mastodon: { label: "Mastodon",    iconClass: "fa fa-globe",      colorClass: "plat-mastodon" },
-    telegram: { label: "Telegram",    iconClass: "fa fa-paper-plane", colorClass: "plat-telegram" },
-    linkedin: { label: "LinkedIn",    iconClass: "fa fa-linkedin",   colorClass: "plat-linkedin" },
+    twitter: { label: "X / Twitter", iconClass: "fa fa-twitter", colorClass: "plat-twitter" },
+    mastodon: { label: "Mastodon", iconClass: "fa fa-globe", colorClass: "plat-mastodon" },
+    telegram: { label: "Telegram", iconClass: "fa fa-paper-plane", colorClass: "plat-telegram" },
+    linkedin: { label: "LinkedIn", iconClass: "fa fa-linkedin", colorClass: "plat-linkedin" },
   };
 
   const PLATFORM_LIMITS = {
@@ -181,11 +183,15 @@
         if (!r.ok) throw new Error(`Export failed: ${r.status}`);
         return r.blob();
       });
-    },    savePostToDB(post) {
+    }, savePostToDB(post, button = null) {
       if (!Config.UPDATE_URL || !post) return Promise.resolve();
+      if (button) {
+        button.disabled = true;
+        UI.setWithIcon(button, "Saving…", "fa fa-spinner fa-spin");
+      }
       const isPinned = (post.post_text !== post.default_text) ||
-                       (post.post_date !== post.original_post_date) ||
-                       (post.post_time !== post.original_post_time);
+        (post.post_date !== post.original_post_date) ||
+        (post.post_time !== post.original_post_time);
       return fetch(Config.UPDATE_URL, {
         method: "POST",
         headers: {
@@ -210,9 +216,30 @@
         .then(res => {
           if (res.db_id) post.db_id = res.db_id;
           post.is_pinned = res.is_pinned;
+          post.is_saved = true;
+          post.last_saved_date = post.post_date;
+          post.last_saved_time = post.post_time;
+          if (res.post_status) {
+            post.status = res.post_status;
+            post.error_message = "";
+          }
+
+          // Unconditionally refresh row state so Save button disappears and status badge updates
+          UI.updateRow(post.id);
+
+          if (res.scheduled_at) {
+            UI.showToast(`Schedule saved (${res.scheduled_at}). Status updated to Scheduled!`, "success");
+          }
           return res;
         })
-        .catch(err => console.error("Failed to save post to DB:", err));
+        .catch(err => {
+          console.error("Failed to save post to DB:", err);
+          UI.showToast("Failed to save schedule update: " + err.message, "warning");
+          if (button) {
+            button.disabled = false;
+            UI.setWithIcon(button, "Save Schedule", "fa fa-check");
+          }
+        });
     },
 
     updatePostStatus(post, status) {
@@ -241,6 +268,49 @@
           return res;
         })
         .catch(err => console.error("Failed to update post status:", err));
+    },
+
+    syncSchedulers() {
+      if (!Config.SYNC_URL) return Promise.reject(new Error("Sync URL not configured"));
+      return fetch(Config.SYNC_URL, {
+        method: "POST",
+        headers: {
+          "X-CSRFToken": Config.CSRF_TOKEN,
+          "X-Requested-With": "XMLHttpRequest",
+        }
+      }).then(r => {
+        return r.json().then(data => {
+          if (!r.ok) throw new Error(data.message || `HTTP error ${r.status}`);
+          return data;
+        });
+      });
+    },
+
+    publishPostNow(dbId, postId) {
+      if (!Config.PUBLISH_NOW_URL) return Promise.reject(new Error("Publish URL not configured"));
+      return fetch(Config.PUBLISH_NOW_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": Config.CSRF_TOKEN,
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: JSON.stringify({ db_id: dbId, post_id: postId })
+      }).then(async r => {
+        const text = await r.text();
+        let data = {};
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          if (!r.ok) {
+            throw new Error(`Server returned HTTP ${r.status}`);
+          }
+        }
+        if (!r.ok) {
+          throw new Error(data.message || data.error || `HTTP error ${r.status}`);
+        }
+        return data;
+      });
     }
   };
 
@@ -282,13 +352,8 @@
 
       document.body.appendChild(toast);
       setTimeout(() => {
-        if (toast.parentNode) {
-          toast.style.transition = "opacity 0.5s ease";
-          toast.style.opacity = "0";
-          setTimeout(() => {
-            if (toast.parentNode) toast.remove();
-          }, 500);
-        }
+        toast.classList.add("toast-fade-out");
+        setTimeout(() => toast.remove(), 500);
       }, 5000);
     },
 
@@ -301,52 +366,44 @@
         const tr = document.createElement("tr");
         const tdChk = document.createElement("td");
         const bChk = document.createElement("div");
-        bChk.className = "skeleton-bar";
-        bChk.style.width = "16px";
-        bChk.style.height = "16px";
-        bChk.style.borderRadius = "3px";
+        bChk.className = "skeleton-bar skeleton-col-check";
         tdChk.appendChild(bChk);
         tr.appendChild(tdChk);
 
         const tdType = document.createElement("td");
         const bType = document.createElement("div");
-        bType.className = "skeleton-bar";
-        bType.style.width = "60px";
+        bType.className = "skeleton-bar skeleton-col-type";
         tdType.appendChild(bType);
         tr.appendChild(tdType);
 
         // Platform column skeleton
         const tdPlat = document.createElement("td");
         const bPlat = document.createElement("div");
-        bPlat.className = "skeleton-bar";
-        bPlat.style.width = "80px";
+        bPlat.className = "skeleton-bar skeleton-col-platform";
         tdPlat.appendChild(bPlat);
         tr.appendChild(tdPlat);
 
         const tdSched = document.createElement("td");
         const bSched = document.createElement("div");
-        bSched.className = "skeleton-bar";
-        bSched.style.width = "110px";
+        bSched.className = "skeleton-bar skeleton-col-date";
         tdSched.appendChild(bSched);
         tr.appendChild(tdSched);
 
         const tdInput = document.createElement("td");
         const bInput = document.createElement("div");
-        bInput.className = "skeleton-bar";
-        bInput.style.width = "125px";
+        bInput.className = "skeleton-bar skeleton-col-postdate";
         tdInput.appendChild(bInput);
         tr.appendChild(tdInput);
 
         const tdText = document.createElement("td");
         const bText = document.createElement("div");
-        bText.className = "skeleton-bar";
+        bText.className = "skeleton-bar skeleton-col-content";
         tdText.appendChild(bText);
         tr.appendChild(tdText);
 
         const tdActions = document.createElement("td");
         const bActions = document.createElement("div");
-        bActions.className = "skeleton-bar";
-        bActions.style.width = "30px";
+        bActions.className = "skeleton-bar skeleton-col-actions";
         tdActions.appendChild(bActions);
         tr.appendChild(tdActions);
 
@@ -404,6 +461,32 @@
         naSpan.textContent = "Generic";
         tdPlat.appendChild(naSpan);
       }
+
+      // Add status badge
+      const statusDiv = document.createElement("div");
+      statusDiv.className = "status-badge-wrap";
+
+      const statusVal = p.status || "draft";
+      const statusBadge = document.createElement("span");
+      statusBadge.className = `status-badge status-${statusVal}`;
+
+      let statusLabel = statusVal.charAt(0).toUpperCase() + statusVal.slice(1);
+
+      if (statusVal === "failed" && p.error_message) {
+        statusBadge.title = p.error_message;
+        statusBadge.classList.add("has-error");
+
+        const errIcon = document.createElement("i");
+        errIcon.className = "fa fa-exclamation-circle status-error-icon";
+        statusBadge.appendChild(document.createTextNode(statusLabel + " "));
+        statusBadge.appendChild(errIcon);
+      } else {
+        statusBadge.textContent = statusLabel;
+      }
+
+      statusDiv.appendChild(statusBadge);
+      tdPlat.appendChild(statusDiv);
+
       tr.appendChild(tdPlat);
 
       const tdSched = document.createElement("td");
@@ -467,19 +550,33 @@
       timeIn.value = p.post_time;
       wrap.appendChild(timeIn);
 
-      if (isDateModified || isTimeModified) {
+      const isUnsaved = p.is_saved === false;
+
+      if (isDateModified || isTimeModified || isUnsaved) {
         const mod = document.createElement("div");
         mod.className = "is-modified-label";
-        mod.textContent = "Modified";
+        mod.textContent = isUnsaved ? "Unsaved changes" : "Modified";
         wrap.appendChild(mod);
 
-        const revTime = document.createElement("button");
-        revTime.className = "btn-revert-time";
-        revTime.dataset.postId = p.id;
-        revTime.type = "button";
-        revTime.title = "Revert to default timing";
-        this.setWithIcon(revTime, "", "fa fa-undo");
-        wrap.appendChild(revTime);
+        if (isUnsaved) {
+          const saveTime = document.createElement("button");
+          saveTime.className = "btn-save-time";
+          saveTime.dataset.postId = p.id;
+          saveTime.type = "button";
+          saveTime.title = "Save schedule time to database";
+          this.setWithIcon(saveTime, "Save Schedule", "fa fa-check");
+          wrap.appendChild(saveTime);
+        }
+
+        if (isDateModified || isTimeModified) {
+          const revTime = document.createElement("button");
+          revTime.className = "btn-revert-time";
+          revTime.dataset.postId = p.id;
+          revTime.type = "button";
+          revTime.title = "Revert to default timing";
+          this.setWithIcon(revTime, "", "fa fa-undo");
+          wrap.appendChild(revTime);
+        }
       }
 
       if (isPast) {
@@ -508,7 +605,7 @@
       editArea.className = `post-text-edit${hasPlaceholder ? ' has-warning' : ''}${exceedsLimit ? ' has-error' : ''}`;
       editArea.dataset.postId = p.id;
       editArea.value = p.post_text;
-      
+
       const cWrap = document.createElement("div");
       cWrap.className = "char-count-wrap";
       const charSpan = document.createElement("span");
@@ -553,6 +650,17 @@
         this.setWithIcon(restoreBtn, "", "fa fa-undo");
         tdActions.appendChild(restoreBtn);
       } else {
+        if (p.status !== "published" && p.status !== "exported") {
+          const pubBtn = document.createElement("button");
+          pubBtn.className = "btn-publish-now";
+          pubBtn.dataset.postId = p.id;
+          pubBtn.dataset.dbId = p.db_id || "";
+          pubBtn.type = "button";
+          pubBtn.title = p.status === "failed" ? "Retry publishing" : "Publish now";
+          this.setWithIcon(pubBtn, "", "fa fa-paper-plane");
+          tdActions.appendChild(pubBtn);
+        }
+
         const delBtn = document.createElement("button");
         delBtn.className = "btn-delete-post";
         delBtn.dataset.postId = p.id;
@@ -586,7 +694,7 @@
 
         const emptyDiv = document.createElement("div");
         emptyDiv.className = "sm-empty";
-        
+
         const icon = document.createElement("i");
         icon.className = "fa fa-share-alt";
         emptyDiv.appendChild(icon);
@@ -617,7 +725,7 @@
       this.updateSelectedCount();
     },
 
-     updateCounts() {
+    updateCounts() {
       const allPosts = PostState.getAll();
       const activePosts = allPosts.filter(p => p.status !== "excluded");
       const excludedPosts = allPosts.filter(p => p.status === "excluded");
@@ -695,9 +803,9 @@
         alertDiv.appendChild(document.createTextNode(parts.join(", ") + ". Review highlighted rows before exporting."));
         alertContainer.textContent = "";
         alertContainer.appendChild(alertDiv);
-        alertContainer.style.display = "block";
+        alertContainer.classList.remove("hidden");
       } else {
-        alertContainer.style.display = "none";
+        alertContainer.classList.add("hidden");
         alertContainer.textContent = "";
       }
     },
@@ -711,7 +819,6 @@
       if (viewSpan && editArea) {
         viewSpan.classList.add("editing");
         editArea.classList.add("editing");
-        editArea.style.display = "block";
         editArea.focus();
         editArea.setSelectionRange(editArea.value.length, editArea.value.length);
       }
@@ -739,12 +846,76 @@
       if (post) {
         PostState.update(id, {
           post_date: post.original_post_date,
-          post_time: post.original_post_time
+          post_time: post.original_post_time,
+          is_saved: false
         });
         this.updateRow(id);
         AppController.triggerValidation();
         APIClient.savePostToDB(post);
         this.showToast("Reverted post timing to default.", "success");
+      }
+    },
+
+    ensureScheduleControls(id) {
+      const row = document.querySelector(`tr[data-post-id="${id}"]`);
+      if (!row) return;
+      const wrap = row.querySelector(".post-schedule-cell-wrap");
+      if (!wrap) return;
+
+      const post = PostState.get(id);
+      if (!post) return;
+
+      const isDateModified = post.post_date !== post.original_post_date;
+      const isTimeModified = post.post_time !== post.original_post_time;
+      const isUnsaved = post.is_saved === false;
+
+      let modLabel = wrap.querySelector(".is-modified-label");
+      let saveBtn = wrap.querySelector(".btn-save-time");
+      let revBtn = wrap.querySelector(".btn-revert-time");
+
+      if (isDateModified || isTimeModified || isUnsaved) {
+        if (!modLabel) {
+          modLabel = document.createElement("div");
+          modLabel.className = "is-modified-label";
+          wrap.appendChild(modLabel);
+        }
+        modLabel.textContent = isUnsaved ? "Unsaved changes" : "Modified";
+
+        if (isUnsaved) {
+          if (!saveBtn) {
+            saveBtn = document.createElement("button");
+            saveBtn.className = "btn-save-time";
+            saveBtn.dataset.postId = id;
+            saveBtn.type = "button";
+            saveBtn.title = "Save schedule time to database";
+            this.setWithIcon(saveBtn, "Save Schedule", "fa fa-check");
+            if (revBtn) {
+              wrap.insertBefore(saveBtn, revBtn);
+            } else {
+              wrap.appendChild(saveBtn);
+            }
+          }
+        } else {
+          if (saveBtn) saveBtn.remove();
+        }
+
+        if (isDateModified || isTimeModified) {
+          if (!revBtn) {
+            revBtn = document.createElement("button");
+            revBtn.className = "btn-revert-time";
+            revBtn.dataset.postId = id;
+            revBtn.type = "button";
+            revBtn.title = "Revert to default timing";
+            this.setWithIcon(revBtn, "", "fa fa-undo");
+            wrap.appendChild(revBtn);
+          }
+        } else {
+          if (revBtn) revBtn.remove();
+        }
+      } else {
+        if (modLabel) modLabel.remove();
+        if (saveBtn) saveBtn.remove();
+        if (revBtn) revBtn.remove();
       }
     },
 
@@ -821,7 +992,7 @@
 
             const emptyDiv = document.createElement("div");
             emptyDiv.className = "sm-empty";
-            
+
             const icon = document.createElement("i");
             icon.className = "fa fa-exclamation-triangle";
             emptyDiv.appendChild(icon);
@@ -943,6 +1114,68 @@
         .catch(err => UI.showToast(`Export error: ${err.message}`, "warning"));
     },
 
+    syncSchedulers() {
+      const btn = document.getElementById("btn-sync-schedulers");
+      if (btn) {
+        btn.disabled = true;
+        UI.setWithIcon(btn, "Syncing…", "fa fa-refresh fa-spin");
+      }
+
+      APIClient.syncSchedulers()
+        .then(res => {
+          UI.showToast(res.message || "Successfully synchronized scheduler platforms.", "success");
+          this.loadInitialData();
+        })
+        .catch(err => {
+          UI.showToast(`Sync failed: ${err.message}`, "warning");
+        })
+        .finally(() => {
+          if (btn) {
+            btn.disabled = false;
+            UI.setWithIcon(btn, "Sync to Schedulers", "fa fa-refresh");
+          }
+        });
+    },
+
+    publishPostNow(postId, dbId, button) {
+      if (button) {
+        button.disabled = true;
+        button.title = "Publishing...";
+        const icon = button.querySelector("i");
+        if (icon) {
+          icon.className = "fa fa-spinner fa-spin";
+        }
+      }
+
+      APIClient.publishPostNow(dbId, postId)
+        .then(res => {
+          UI.showToast(res.message || "Post published successfully!", "success");
+          PostState.update(postId, {
+            status: res.status || "published",
+            error_message: ""
+          });
+          UI.renderTable(PostState.getAll(), PostState.getFilter());
+        })
+        .catch(err => {
+          UI.showToast(`Publishing failed: ${err.message}`, "warning");
+          PostState.update(postId, {
+            status: "failed",
+            error_message: err.message
+          });
+          UI.renderTable(PostState.getAll(), PostState.getFilter());
+        })
+        .finally(() => {
+          if (button) {
+            button.disabled = false;
+            button.title = "Publish now";
+            const icon = button.querySelector("i");
+            if (icon) {
+              icon.className = "fa fa-paper-plane";
+            }
+          }
+        });
+    },
+
     bindEvents() {
       const btnRegen = document.getElementById("btn-regenerate");
       if (btnRegen) btnRegen.addEventListener("click", () => this.loadInitialData());
@@ -984,6 +1217,9 @@
       const btnExport = document.getElementById("btn-export");
       if (btnExport) btnExport.addEventListener("click", () => this.exportCSV());
 
+      const btnSync = document.getElementById("btn-sync-schedulers");
+      if (btnSync) btnSync.addEventListener("click", () => this.syncSchedulers());
+
       const advToggle = document.getElementById("adv-toggle");
       if (advToggle) advToggle.addEventListener("click", () => UI.toggleAdv());
 
@@ -991,7 +1227,7 @@
       const customInputs = document.getElementById("bulk-schedule-custom-inputs");
       if (presetSel && customInputs) {
         presetSel.addEventListener("change", function () {
-          customInputs.style.display = this.value === "custom" ? "flex" : "none";
+          customInputs.classList.toggle("hidden", this.value !== "custom");
         });
       }
 
@@ -1007,6 +1243,12 @@
 
           if (e.target.classList.contains("post-text-view")) {
             UI.startEdit(postId);
+          } else if (e.target.closest(".btn-save-time")) {
+            const btn = e.target.closest(".btn-save-time");
+            const post = PostState.get(postId);
+            if (post) {
+              APIClient.savePostToDB(post, btn);
+            }
           } else if (e.target.closest(".btn-revert-text")) {
             UI.revertPostText(postId);
           } else if (e.target.closest(".btn-revert-time")) {
@@ -1040,6 +1282,10 @@
               APIClient.updatePostStatus(post, "scheduled");
               UI.showToast("Post restored to preview.", "success");
             }
+          } else if (e.target.closest(".btn-publish-now")) {
+            const btn = e.target.closest(".btn-publish-now");
+            const dbId = btn.dataset.dbId;
+            this.publishPostNow(postId, dbId, btn);
           }
         });
 
@@ -1050,15 +1296,15 @@
           if (e.target.classList.contains("row-chk")) {
             UI.toggleRow(postId, e.target.checked);
           } else if (e.target.classList.contains("sm-date-input")) {
-            PostState.update(postId, { post_date: e.target.value });
-            UI.updateRow(postId);
+            PostState.update(postId, { post_date: e.target.value, is_saved: false });
+            e.target.classList.add("is-modified");
+            UI.ensureScheduleControls(postId);
             this.triggerValidation();
-            APIClient.savePostToDB(PostState.get(postId));
           } else if (e.target.classList.contains("sm-time-input")) {
-            PostState.update(postId, { post_time: e.target.value });
-            UI.updateRow(postId);
+            PostState.update(postId, { post_time: e.target.value, is_saved: false });
+            e.target.classList.add("is-modified");
+            UI.ensureScheduleControls(postId);
             this.triggerValidation();
-            APIClient.savePostToDB(PostState.get(postId));
           }
         });
 
@@ -1146,7 +1392,7 @@
     const value = input.value;
 
     input.value = value.substring(0, startPos) + token + value.substring(endPos);
-    
+
     input.focus();
     input.selectionStart = startPos + token.length;
     input.selectionEnd = startPos + token.length;
@@ -1247,7 +1493,7 @@
       if (!checkbox || !tplBlock) return;
 
       const syncVisibility = () => {
-        tplBlock.style.display = checkbox.checked ? "block" : "none";
+        tplBlock.classList.toggle("hidden", !checkbox.checked);
       };
       syncVisibility();
       checkbox.addEventListener("change", syncVisibility);

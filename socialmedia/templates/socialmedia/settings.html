@@ -127,6 +127,9 @@
       <button id="btn-export" class="btn btn-primary btn-export">
         <i class="fa fa-download"></i> {% trans "Export CSV" %}
       </button>
+      <button id="btn-sync-schedulers" class="btn btn-success" type="button">
+        <i class="fa fa-refresh"></i> {% trans "Sync to Schedulers" %}
+      </button>
     </div>
   </div>
 
@@ -442,6 +445,8 @@
     "previewUrl": "{{ preview_url }}",
     "exportUrl": "{{ export_url }}",
     "updateUrl": "{{ update_url }}",
+    "syncUrl": "{% url 'plugins:socialmedia:sync' organizer=event.organizer.slug event=event.slug %}",
+    "publishNowUrl": "{% url 'plugins:socialmedia:publish_now' organizer=event.organizer.slug event=event.slug %}",
     "csrfToken": "{{ csrf_token }}",
     "transSelectAtLeastOne": "{% trans 'Please select at least one post to export.' %}",
     "transClickToEdit": "{% trans 'Click to edit · Ctrl+Enter to save' %}"
