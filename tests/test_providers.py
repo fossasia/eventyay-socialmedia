@@ -126,6 +126,30 @@ def test_telegram_publish_post_with_local_media(mock_post, mock_file, mock_accou
     assert "sendPhoto" in mock_post.call_args[0][0]
 
 
+@patch("builtins.open", new_callable=mock_open, read_data=b"image_data")
+@patch("requests.post")
+def test_telegram_publish_post_local_media_markdown_retry(
+    mock_post, mock_file, mock_account
+):
+    provider = TelegramProvider(mock_account)
+    err_response = MagicMock()
+    err_response.status_code = 400
+    err_response.text = "Bad Request: can't parse entities"
+
+    ok_response = MagicMock()
+    ok_response.status_code = 200
+    ok_response.json.return_value = {"ok": True, "result": {"message_id": 999}}
+
+    mock_post.side_effect = [err_response, ok_response]
+
+    res = provider.publish_post("hello *bad markdown*", media=["/path/to/img.png"])
+    assert res["post_id"] == "999"
+    assert mock_post.call_count == 2
+    retry_call = mock_post.call_args_list[1]
+    assert "files" in retry_call[1]
+    assert "parse_mode" not in retry_call[1]["data"]
+
+
 @patch("requests.post")
 def test_telegram_publish_post_with_remote_media(mock_post, mock_account):
     provider = TelegramProvider(mock_account)

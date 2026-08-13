@@ -751,20 +751,9 @@
 
       const avatar = document.createElement("div");
       avatar.className = "sm-preview-avatar";
-      if (post.media_url) {
-        const img = document.createElement("img");
-        img.src = post.media_url;
-        img.alt = "Attachment Preview";
-        img.style.width = "100%";
-        img.style.height = "100%";
-        img.style.borderRadius = "50%";
-        img.style.objectFit = "cover";
-        avatar.appendChild(img);
-      } else {
-        const icon = document.createElement("i");
-        icon.className = meta.iconClass || "fa fa-user";
-        avatar.appendChild(icon);
-      }
+      const icon = document.createElement("i");
+      icon.className = meta.iconClass || "fa fa-user";
+      avatar.appendChild(icon);
       header.appendChild(avatar);
 
       const authorBox = document.createElement("div");
