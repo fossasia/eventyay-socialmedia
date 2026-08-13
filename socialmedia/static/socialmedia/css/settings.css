@@ -1163,3 +1163,47 @@ body .sm-toast i {
   font-size: 12px;
   color: #6c757d;
 }
+
+/* Bulk schedule & export helpers */
+#bulk-schedule-custom-inputs {
+  display: none;
+}
+
+#bulk-schedule-custom-date {
+  width: 130px;
+  display: inline-block;
+}
+
+#bulk-schedule-custom-time {
+  width: 100px;
+  display: inline-block;
+}
+
+#validation-alert-container {
+  display: none;
+  margin-bottom: 12px;
+}
+
+.sm-export-preset-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#export-preset-select {
+  width: 150px;
+  display: inline-block;
+}
+
+.sm-preset-hint {
+  font-size: 12px;
+  font-weight: 400;
+  color: #aaa;
+}
+
+.sm-preview-actions {
+  padding-top: 10px;
+  border-top: 1px solid #eee;
+  display: flex;
+  gap: 10px;
+}

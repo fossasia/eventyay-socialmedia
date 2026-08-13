@@ -1,23 +1,26 @@
 {% extends "eventyay_common/base.html" %}
 {% load i18n %}
+{% load static %}
 {% block title %}{% trans "Social Media Dashboard" %} :: {{ event.name }}{% endblock %}
 
 {% block content %}
-    <div style="margin-bottom: 25px;">
-        <h1 style="font-size: 28px; margin-top: 10px; margin-bottom: 5px; font-weight: 700; color: #333;">
+    <link rel="stylesheet" type="text/css" href="{% static 'socialmedia/css/dashboard.css' %}">
+
+    <div class="sm-dashboard-header">
+        <h1 class="sm-dashboard-title">
             {% trans "Social Media Dashboard" %}
-            <small style="font-size: 16px; color: #777; font-weight: normal; margin-left: 5px;">{{ event.name }}</small>
+            <small class="sm-dashboard-subtitle">{{ event.name }}</small>
         </h1>
-        <p style="font-size: 14px; color: #666; margin-bottom: 0;">
+        <p class="sm-dashboard-description">
             {% trans "Social Media automation plugin is successfully enabled for this event." %}
         </p>
     </div>
 
-    <div class="panel panel-default" style="border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-        <div class="panel-body" style="padding: 30px; text-align: center;">
-            <i class="fa fa-share-alt fa-5x text-info" style="margin-bottom: 15px;"></i>
+    <div class="panel panel-default sm-dashboard-card">
+        <div class="panel-body sm-dashboard-card-body">
+            <i class="fa fa-share-alt fa-5x text-info sm-dashboard-icon"></i>
             <h3>{% trans "Social Media Plugin Active" %}</h3>
-            <p class="text-muted" style="max-width: 500px; margin: 0 auto 20px;">
+            <p class="text-muted sm-dashboard-text">
                 {% trans "The plugin foundation is set up. You can now configure this plugin or proceed with further development of social account connections and announcement scheduling." %}
             </p>
         </div>
