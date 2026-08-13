@@ -5,6 +5,7 @@ from datetime import datetime
 import pytz
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
+from django.core.paginator import Paginator
 from django.db import transaction
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect
@@ -62,14 +63,14 @@ def _check_permission(request):
 
 class SocialMediaSettingsView(DecoupleMixin, FormView):
     """
-    Plugin settings + live post preview page.
+    Posts table page — the main Social Media section landing page.
 
     Deliberately does NOT inherit from EventSettingsViewMixin (control panel)
     so that the common-sidebar layout is preserved.
     """
 
     form_class = SocialMediaSettingsForm
-    template_name = "socialmedia/settings.html"
+    template_name = "socialmedia/posts.html"
 
     def dispatch(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
@@ -96,6 +97,7 @@ class SocialMediaSettingsView(DecoupleMixin, FormView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["event"] = self.request.event
+        ctx["organizer"] = self.request.event.organizer
         ctx["preview_url"] = reverse(
             "plugins:socialmedia:preview",
             kwargs={
@@ -139,6 +141,155 @@ class SocialMediaSettingsView(DecoupleMixin, FormView):
             _("We could not save your changes. See below for details."),
         )
         return super().form_invalid(form)
+
+
+class SocialMediaPostSettingsView(DecoupleMixin, FormView):
+    """
+    Dedicated Settings page — platform toggles, templates, offsets, hashtags.
+    Lives at /social/event/<org>/<event>/settings/
+    """
+
+    form_class = SocialMediaSettingsForm
+    template_name = "socialmedia/settings_form.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            raise PermissionDenied()
+        _check_plugin_active(request)
+        _check_permission(request)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["obj"] = self.request.event
+        return kwargs
+
+    def get_success_url(self):
+        return reverse(
+            "plugins:socialmedia:plugin_settings",
+            kwargs={
+                "organizer": self.request.event.organizer.slug,
+                "event": self.request.event.slug,
+            },
+        )
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["event"] = self.request.event
+        ctx["organizer"] = self.request.event.organizer
+        return ctx
+
+    @transaction.atomic
+    def form_valid(self, form):
+        self._save_decoupled(form)
+        form.save()
+        if form.has_changed():
+            self.request.event.log_action(
+                "eventyay.event.settings",
+                user=self.request.user,
+                data={k: form.cleaned_data.get(k) for k in form.changed_data},
+            )
+        sync_posts_to_db(self.request.event, self.request)
+        messages.success(self.request, _("Your changes have been saved."))
+
+        if self.request.POST.get("action") == "save_and_preview":
+            return redirect(
+                reverse(
+                    "plugins:socialmedia:posts",
+                    kwargs={
+                        "organizer": self.request.event.organizer.slug,
+                        "event": self.request.event.slug,
+                    },
+                )
+            )
+        return super().form_valid(form)
+
+    def form_invalid(self, form):
+        messages.error(
+            self.request,
+            _("We could not save your changes. See below for details."),
+        )
+        return super().form_invalid(form)
+
+
+class PublishingLogView(DecoupleMixin, FormView):
+    """
+    Publishing history log page.
+    Shows all SocialMediaPost records that are not in draft state,
+    ordered by most recently updated, with status filtering and pagination.
+    Lives at /social/event/<org>/<event>/log/
+    """
+
+    form_class = SocialMediaSettingsForm  # needed by DecoupleMixin
+    template_name = "socialmedia/log.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            raise PermissionDenied()
+        _check_plugin_active(request)
+        _check_permission(request)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["obj"] = self.request.event
+        return kwargs
+
+    def get(self, request, *args, **kwargs):
+        from django_scopes import scope
+
+        status_filter = request.GET.get("status", "")
+        valid_statuses = ["published", "exported", "failed", "scheduled", "draft"]
+
+        with scope(event=request.event):
+            qs = (
+                SocialMediaPost.objects.filter(
+                    event=request.event,
+                )
+                .exclude(
+                    status=SocialMediaPostStatus.DRAFT,
+                )
+                .order_by("-updated_at")
+            )
+
+            if status_filter in valid_statuses:
+                qs = qs.filter(status=status_filter)
+
+            # Count per status for tab badges
+            all_qs = SocialMediaPost.objects.filter(event=request.event).exclude(
+                status=SocialMediaPostStatus.DRAFT
+            )
+            counts = {
+                "total": all_qs.count(),
+                "published": all_qs.filter(
+                    status=SocialMediaPostStatus.PUBLISHED
+                ).count(),
+                "exported": all_qs.filter(
+                    status=SocialMediaPostStatus.EXPORTED
+                ).count(),
+                "failed": all_qs.filter(status=SocialMediaPostStatus.FAILED).count(),
+                "scheduled": all_qs.filter(
+                    status=SocialMediaPostStatus.SCHEDULED
+                ).count(),
+            }
+
+            paginator = Paginator(qs, 50)
+            page_number = request.GET.get("page", 1)
+            page_obj = paginator.get_page(page_number)
+
+        return self.render_to_response(
+            self.get_context_data(
+                posts=page_obj,
+                status_filter=status_filter,
+                total_count=counts["total"],
+                published_count=counts["published"],
+                exported_count=counts["exported"],
+                failed_count=counts["failed"],
+                scheduled_count=counts["scheduled"],
+                platforms=["telegram", "mastodon", "twitter", "linkedin"],
+                event=request.event,
+            )
+        )
 
 
 def preview_posts(request, organizer, event):
@@ -674,6 +825,17 @@ def publish_post_now(request, organizer, event):
             db_post = SocialMediaPost.objects.filter(
                 entity_id=str(post_id), event=request.event
             ).first()
+
+        if not db_post:
+            sync_posts_to_db(request.event, request)
+            if db_id:
+                db_post = SocialMediaPost.objects.filter(
+                    pk=db_id, event=request.event
+                ).first()
+            if not db_post and post_id:
+                db_post = SocialMediaPost.objects.filter(
+                    entity_id=str(post_id), event=request.event
+                ).first()
 
         if not db_post:
             return JsonResponse(

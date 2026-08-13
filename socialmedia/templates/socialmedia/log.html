@@ -1,0 +1,151 @@
+{% extends "eventyay_common/event/base.html" %}
+{% load i18n %}
+{% load static %}
+
+{% block title %}{% trans "Social Media — Publishing Log" %} :: {{ event.name }}{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" type="text/css" href="{% static 'socialmedia/css/settings.css' %}">
+
+<div class="sm-page">
+  <div class="sm-toolbar">
+    <h1>
+      {% trans "Publishing Log" %}
+      <small>{{ event.name }}</small>
+    </h1>
+  </div>
+
+  <!-- Status filter tabs -->
+  <div class="sm-filters" id="log-filter-pills">
+    <a href="?status=" class="sm-filter-btn {% if not status_filter %}active{% endif %}">
+      {% trans "All" %} <span class="count">{{ total_count }}</span>
+    </a>
+    <a href="?status=published" class="sm-filter-btn {% if status_filter == 'published' %}active{% endif %}">
+      {% trans "Published" %} <span class="count">{{ published_count }}</span>
+    </a>
+    <a href="?status=exported" class="sm-filter-btn {% if status_filter == 'exported' %}active{% endif %}">
+      {% trans "Exported" %} <span class="count">{{ exported_count }}</span>
+    </a>
+    <a href="?status=failed" class="sm-filter-btn {% if status_filter == 'failed' %}active{% endif %}">
+      {% trans "Failed" %} <span class="count">{{ failed_count }}</span>
+    </a>
+    <a href="?status=scheduled" class="sm-filter-btn {% if status_filter == 'scheduled' %}active{% endif %}">
+      {% trans "Scheduled" %} <span class="count">{{ scheduled_count }}</span>
+    </a>
+  </div>
+
+  <!-- Log table -->
+  <div class="sm-table-wrap">
+    <table class="sm-table">
+      <thead>
+        <tr>
+          <th>{% trans "Type" %}</th>
+          <th>{% trans "Platform" %}</th>
+          <th>{% trans "Content Preview" %}</th>
+          <th>{% trans "Scheduled At" %}</th>
+          <th>{% trans "Last Updated" %}</th>
+          <th>{% trans "Status" %}</th>
+          <th>{% trans "Error" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for post in posts %}
+        <tr>
+          <td>
+            <span class="sm-type-badge sm-type-{{ post.post_type|lower }}">
+              {{ post.get_post_type_display|default:post.post_type|capfirst }}
+            </span>
+          </td>
+          <td>
+            {% if post.entity_id %}
+              {% for platform in platforms %}
+                {% if platform in post.entity_id %}
+                  <span class="sm-platform-badge sm-platform-{{ platform }}">
+                    {% if platform == "telegram" %}<i class="fa fa-paper-plane"></i>{% endif %}
+                    {% if platform == "mastodon" %}<i class="fa fa-bullhorn"></i>{% endif %}
+                    {% if platform == "twitter" %}<i class="fa fa-twitter"></i>{% endif %}
+                    {% if platform == "linkedin" %}<i class="fa fa-linkedin"></i>{% endif %}
+                    {{ platform|capfirst }}
+                  </span>
+                {% endif %}
+              {% endfor %}
+            {% else %}
+              <span class="sm-platform-badge">{% trans "Generic" %}</span>
+            {% endif %}
+          </td>
+          <td class="sm-log-content">
+            {{ post.post_text|truncatechars:80 }}
+          </td>
+          <td>
+            {% if post.scheduled_at %}
+              {{ post.scheduled_at|date:"M d, Y" }}<br>
+              <small class="text-muted">{{ post.scheduled_at|date:"H:i" }}</small>
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {{ post.updated_at|date:"M d, Y" }}<br>
+            <small class="text-muted">{{ post.updated_at|date:"H:i" }}</small>
+          </td>
+          <td>
+            <span class="sm-status-badge sm-status-{{ post.status }}">
+              {% if post.status == "published" %}
+                <i class="fa fa-check-circle"></i> {% trans "Published" %}
+              {% elif post.status == "exported" %}
+                <i class="fa fa-cloud-upload"></i> {% trans "Exported" %}
+              {% elif post.status == "failed" %}
+                <i class="fa fa-times-circle"></i> {% trans "Failed" %}
+              {% elif post.status == "scheduled" %}
+                <i class="fa fa-clock-o"></i> {% trans "Scheduled" %}
+              {% elif post.status == "draft" %}
+                <i class="fa fa-pencil"></i> {% trans "Draft" %}
+              {% else %}
+                {{ post.status|capfirst }}
+              {% endif %}
+            </span>
+          </td>
+          <td>
+            {% if post.error_message %}
+              <span class="sm-error-tooltip" title="{{ post.error_message }}">
+                <i class="fa fa-exclamation-triangle text-danger"></i>
+                <span class="sm-error-text">{{ post.error_message|truncatechars:60 }}</span>
+              </span>
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" class="text-center text-muted" style="padding: 40px;">
+            <i class="fa fa-inbox fa-2x" style="display:block;margin-bottom:8px;opacity:0.4;"></i>
+            {% trans "No posts found for this filter." %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  {% if posts.has_other_pages %}
+  <div style="text-align:center; margin-top: 20px;">
+    <ul class="pagination">
+      {% if posts.has_previous %}
+        <li><a href="?page={{ posts.previous_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}">&laquo;</a></li>
+      {% endif %}
+      {% for num in posts.paginator.page_range %}
+        <li {% if posts.number == num %}class="active"{% endif %}>
+          <a href="?page={{ num }}{% if status_filter %}&status={{ status_filter }}{% endif %}">{{ num }}</a>
+        </li>
+      {% endfor %}
+      {% if posts.has_next %}
+        <li><a href="?page={{ posts.next_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}">&raquo;</a></li>
+      {% endif %}
+    </ul>
+  </div>
+  {% endif %}
+
+</div><!-- /sm-page -->
+{% endblock %}

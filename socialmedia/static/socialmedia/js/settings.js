@@ -650,6 +650,14 @@
         this.setWithIcon(restoreBtn, "", "fa fa-undo");
         tdActions.appendChild(restoreBtn);
       } else {
+        const prevBtn = document.createElement("button");
+        prevBtn.className = "btn-preview-post";
+        prevBtn.dataset.postId = p.id;
+        prevBtn.type = "button";
+        prevBtn.title = "Preview post live card";
+        this.setWithIcon(prevBtn, "", "fa fa-eye");
+        tdActions.appendChild(prevBtn);
+
         if (p.status !== "published" && p.status !== "exported") {
           const pubBtn = document.createElement("button");
           pubBtn.className = "btn-publish-now";
@@ -723,6 +731,116 @@
       tbody.appendChild(fragment);
 
       this.updateSelectedCount();
+    },
+
+    openPreviewModal(post) {
+      const container = document.getElementById("sm-card-preview-container");
+      if (!container || !post) return;
+      container.textContent = "";
+
+      const platformKey = post.platform || "generic";
+      const meta = PLATFORM_META[platformKey] || { label: "Generic Post", iconClass: "fa fa-share-alt", colorClass: "plat-generic" };
+      const limit = PLATFORM_LIMITS[platformKey] || null;
+
+      const previewBox = document.createElement("div");
+      previewBox.className = "sm-card-preview";
+
+      // Header
+      const header = document.createElement("div");
+      header.className = "sm-preview-header";
+
+      const avatar = document.createElement("div");
+      avatar.className = "sm-preview-avatar";
+      const icon = document.createElement("i");
+      icon.className = meta.iconClass || "fa fa-user";
+      avatar.appendChild(icon);
+      header.appendChild(avatar);
+
+      const authorBox = document.createElement("div");
+      const nameDiv = document.createElement("div");
+      nameDiv.className = "sm-preview-author";
+      nameDiv.textContent = post.event_name || "Event Official";
+      const handleDiv = document.createElement("div");
+      handleDiv.className = "sm-preview-handle";
+      handleDiv.textContent = `@eventyay_${platformKey}`;
+      authorBox.appendChild(nameDiv);
+      authorBox.appendChild(handleDiv);
+      header.appendChild(authorBox);
+
+      const tag = document.createElement("span");
+      tag.className = `sm-preview-platform-tag platform-badge ${meta.colorClass || ''}`;
+      tag.textContent = meta.label;
+      header.appendChild(tag);
+
+      previewBox.appendChild(header);
+
+      // Body Text
+      const textDiv = document.createElement("div");
+      textDiv.className = "sm-preview-text";
+      textDiv.textContent = post.post_text;
+      previewBox.appendChild(textDiv);
+
+      // Media Attachment (if media_url exists)
+      if (post.media_url) {
+        const mediaBox = document.createElement("div");
+        mediaBox.className = "sm-preview-media";
+        const mediaImg = document.createElement("img");
+        mediaImg.src = post.media_url;
+        mediaImg.alt = "Post Media Attachment";
+        mediaBox.appendChild(mediaImg);
+        previewBox.appendChild(mediaBox);
+      }
+
+      // Footer / Char Counter
+      const footer = document.createElement("div");
+      footer.className = "sm-preview-footer";
+
+      const timeSpan = document.createElement("span");
+      timeSpan.textContent = `Scheduled: ${post.post_date} at ${post.post_time}`;
+      footer.appendChild(timeSpan);
+
+      const charSpan = document.createElement("span");
+      const exceeds = limit && post.post_text.length > limit;
+      charSpan.className = exceeds ? "char-count over-limit" : "char-count";
+      charSpan.textContent = limit ? `${post.post_text.length} / ${limit} chars` : `${post.post_text.length} chars`;
+      footer.appendChild(charSpan);
+
+      previewBox.appendChild(footer);
+      container.appendChild(previewBox);
+
+      // Bind modal publish now button
+      const modalPubBtn = document.getElementById("btn-modal-publish-now");
+      const modalEl = document.getElementById("sm-preview-modal");
+      
+      const hideModal = () => {
+        const $jq = window.$ || window.jQuery;
+        if ($jq && typeof $jq.fn.modal === "function") {
+          $jq("#sm-preview-modal").modal("hide");
+        } else if (modalEl) {
+          modalEl.style.display = "none";
+          modalEl.classList.remove("in");
+        }
+      };
+
+      if (modalPubBtn) {
+        if (post.db_id && post.status !== "published" && post.status !== "exported") {
+          modalPubBtn.style.display = "inline-block";
+          modalPubBtn.onclick = () => {
+            hideModal();
+            AppController.publishPostNow(post.id, post.db_id, null);
+          };
+        } else {
+          modalPubBtn.style.display = "none";
+        }
+      }
+
+      const $jq = window.$ || window.jQuery;
+      if ($jq && typeof $jq.fn.modal === "function") {
+        $jq("#sm-preview-modal").modal("show");
+      } else if (modalEl) {
+        modalEl.style.display = "block";
+        modalEl.classList.add("in");
+      }
     },
 
     updateCounts() {
@@ -1180,9 +1298,6 @@
       const btnRegen = document.getElementById("btn-regenerate");
       if (btnRegen) btnRegen.addEventListener("click", () => this.loadInitialData());
 
-      const btnSaveRegen = document.getElementById("btn-save-regenerate");
-      if (btnSaveRegen) btnSaveRegen.addEventListener("click", (e) => this.saveAndRegenerate(e));
-
       const filterPills = document.getElementById("filter-pills");
       if (filterPills) {
         filterPills.addEventListener("click", (e) => {
@@ -1281,6 +1396,11 @@
 
               APIClient.updatePostStatus(post, "scheduled");
               UI.showToast("Post restored to preview.", "success");
+            }
+          } else if (e.target.closest(".btn-preview-post")) {
+            const post = PostState.get(postId);
+            if (post) {
+              UI.openPreviewModal(post);
             }
           } else if (e.target.closest(".btn-publish-now")) {
             const btn = e.target.closest(".btn-publish-now");

@@ -80,20 +80,44 @@ def control_nav_event_common_socialmedia(sender, request=None, **kwargs):
     ):
         return []
     url = resolve(request.path_info)
+    in_sm = url.namespace == "plugins:socialmedia"
+
+    posts_url = reverse(
+        "plugins:socialmedia:posts",
+        kwargs={"organizer": sender.organizer.slug, "event": sender.slug},
+    )
+    settings_url = reverse(
+        "plugins:socialmedia:plugin_settings",
+        kwargs={"organizer": sender.organizer.slug, "event": sender.slug},
+    )
+    log_url = reverse(
+        "plugins:socialmedia:log",
+        kwargs={"organizer": sender.organizer.slug, "event": sender.slug},
+    )
+
     return [
         {
             "label": str(_("Social Media")),
-            "url": reverse(
-                "plugins:socialmedia:index",
-                kwargs={
-                    "organizer": sender.organizer.slug,
-                    "event": sender.slug,
-                },
-            ),
+            "url": posts_url,
             "icon": "share-alt",
-            "active": (
-                url.namespace == "plugins:socialmedia" and url.url_name == "index"
-            ),
+            "active": in_sm and url.url_name in ("index", "posts"),
+            "children": [
+                {
+                    "label": _("Posts"),
+                    "url": posts_url,
+                    "active": in_sm and url.url_name in ("index", "posts"),
+                },
+                {
+                    "label": _("Settings"),
+                    "url": settings_url,
+                    "active": in_sm and url.url_name == "plugin_settings",
+                },
+                {
+                    "label": _("Publishing Log"),
+                    "url": log_url,
+                    "active": in_sm and url.url_name == "log",
+                },
+            ],
         }
     ]
 

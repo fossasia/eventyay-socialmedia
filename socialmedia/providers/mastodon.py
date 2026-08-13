@@ -60,11 +60,35 @@ class MastodonProvider(BaseSocialProvider):
                     if file_path.startswith(("http://", "https://")):
                         r = safe_fetch_url(file_path, timeout=20)
                         r.raise_for_status()
-                        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+
+                        content_type = r.headers.get("content-type", "")
+                        ext = ".jpg"
+                        if "png" in content_type or file_path.lower().endswith(".png"):
+                            ext = ".png"
+                        elif "gif" in content_type or file_path.lower().endswith(
+                            ".gif"
+                        ):
+                            ext = ".gif"
+                        elif "webp" in content_type or file_path.lower().endswith(
+                            ".webp"
+                        ):
+                            ext = ".webp"
+                        elif (
+                            "jpeg" in content_type
+                            or "jpg" in content_type
+                            or file_path.lower().endswith((".jpg", ".jpeg"))
+                        ):
+                            ext = ".jpg"
+
+                        with tempfile.NamedTemporaryFile(
+                            suffix=ext, delete=False
+                        ) as tmp:
                             tmp.write(r.content)
                             tmp_path = tmp.name
                         try:
-                            res = self.client.media_post(tmp_path)
+                            res = self.client.media_post(
+                                tmp_path, mime_type=content_type or None
+                            )
                             media_ids.append(res["id"])
                         finally:
                             if os.path.exists(tmp_path):
