@@ -329,8 +329,9 @@ def preview_posts(request, organizer, event):
                 p["error_message"] = ""
                 p["media_url"] = p.get("media_url") or ""
             posts.append(p)
-    except Exception:  # pragma: no cover
-        return JsonResponse({"error": "Internal server error"}, status=500)
+    except Exception as exc:  # pragma: no cover
+        logger.exception("Error generating preview posts: %s", exc)
+        return JsonResponse({"error": str(exc)}, status=500)
     return JsonResponse({"posts": posts})
 
 

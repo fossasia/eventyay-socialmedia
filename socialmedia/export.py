@@ -32,30 +32,30 @@ DEFAULT_TEMPLATES = {
     },
     "speaker": {
         "announcement": (
-            "🎤 Meet our speaker {speaker_name} at {event_name}! "
+            "🎤 Meet our speaker {speaker_name} ({speaker_social_handle}) at {event_name}! "
             "They'll be presenting '{talk_title}'. "
             "Learn more: {speaker_link} {hashtags}"
         ),
         "reminder": (
-            "🗓 Don't miss {speaker_name} speaking on '{talk_title}' "
+            "🗓 Don't miss {speaker_name} ({speaker_social_handle}) speaking on '{talk_title}' "
             "at {event_name}! Check session details: {speaker_link} {hashtags}"
         ),
         "final_call": (
-            "🔥 Spotlight on {speaker_name} presenting '{talk_title}' at "
+            "🔥 Spotlight on {speaker_name} ({speaker_social_handle}) presenting '{talk_title}' at "
             "{event_name}! Catch them live: {speaker_link} {hashtags}"
         ),
     },
     "session": {
         "announcement": (
-            "🗓 Coming up at {event_name}: '{talk_title}' by {speaker_names} "
+            "🗓 Coming up at {event_name}: '{talk_title}' by {speaker_names} ({speaker_social_handles}) "
             "in {talk_room} at {talk_start_time}. Don't miss it! {talk_link} {hashtags}"
         ),
         "reminder": (
-            "⏰ Session starting soon! '{talk_title}' by {speaker_names} "
+            "⏰ Session starting soon! '{talk_title}' by {speaker_names} ({speaker_social_handles}) "
             "begins at {talk_start_time} in {talk_room}. {talk_link} {hashtags}"
         ),
         "final_call": (
-            "🔥 Starting now! '{talk_title}' by {speaker_names} "
+            "🔥 Starting now! '{talk_title}' by {speaker_names} ({speaker_social_handles}) "
             "in {talk_room}. Join live: {talk_link} {hashtags}"
         ),
     },
@@ -119,25 +119,25 @@ PLATFORM_DEFAULT_TEMPLATES = {
         },
         "speaker": {
             "announcement": (
-                "🎤 Meet our speaker {speaker_name} at {event_name}! "
+                "🎤 Meet our speaker {speaker_name} ({speaker_social_handle}) at {event_name}! "
                 "'{talk_title}' {speaker_link} {hashtags}"
             ),
             "reminder": (
-                "🗓 Don't miss {speaker_name} on '{talk_title}' at {event_name}! "
+                "🗓 Don't miss {speaker_name} ({speaker_social_handle}) on '{talk_title}' at {event_name}! "
                 "{speaker_link} {hashtags}"
             ),
             "final_call": (
-                "🔥 {speaker_name} presenting '{talk_title}' at {event_name}. "
+                "🔥 {speaker_name} ({speaker_social_handle}) presenting '{talk_title}' at {event_name}. "
                 "Live soon! {speaker_link} {hashtags}"
             ),
         },
         "session": {
             "announcement": (
-                "🗓 Coming up: '{talk_title}' by {speaker_names} at {event_name}. "
+                "🗓 Coming up: '{talk_title}' by {speaker_names} ({speaker_social_handles}) at {event_name}. "
                 "{talk_link} {hashtags}"
             ),
             "reminder": (
-                "⏰ Starting soon: '{talk_title}' at {talk_start_time}. "
+                "⏰ Starting soon: '{talk_title}' by {speaker_names} ({speaker_social_handles}) at {talk_start_time}. "
                 "{talk_link} {hashtags}"
             ),
             "final_call": (
@@ -185,16 +185,16 @@ PLATFORM_DEFAULT_TEMPLATES = {
         "speaker": {
             "announcement": (
                 "🎤 Speaker announcement for {event_name}!\n"
-                "{speaker_name} will present '{talk_title}'.\n"
+                "{speaker_name} ({speaker_social_handle}) will present '{talk_title}'.\n"
                 "Learn more: {speaker_link}\n{hashtags}"
             ),
             "reminder": (
-                "🗓 Reminder: {speaker_name} is presenting '{talk_title}' "
+                "🗓 Reminder: {speaker_name} ({speaker_social_handle}) is presenting '{talk_title}' "
                 "at {event_name}!\n"
                 "Details: {speaker_link}\n{hashtags}"
             ),
             "final_call": (
-                "🔥 Starting soon! Catch {speaker_name} presenting "
+                "🔥 Starting soon! Catch {speaker_name} ({speaker_social_handle}) presenting "
                 "'{talk_title}' at {event_name}.\n"
                 "{speaker_link}\n{hashtags}"
             ),
@@ -202,17 +202,17 @@ PLATFORM_DEFAULT_TEMPLATES = {
         "session": {
             "announcement": (
                 "🗓 Upcoming session at {event_name}:\n"
-                "'{talk_title}' by {speaker_names}\n"
+                "'{talk_title}' by {speaker_names} ({speaker_social_handles})\n"
                 "Room: {talk_room} | Time: {talk_start_time}\n"
                 "Full info: {talk_link}\n{hashtags}"
             ),
             "reminder": (
                 "⏰ Session starting soon at {event_name}:\n"
-                "'{talk_title}' by {speaker_names} at {talk_start_time}\n"
+                "'{talk_title}' by {speaker_names} ({speaker_social_handles}) at {talk_start_time}\n"
                 "{talk_link}\n{hashtags}"
             ),
             "final_call": (
-                "🔥 Starting now! '{talk_title}' by {speaker_names} "
+                "🔥 Starting now! '{talk_title}' by {speaker_names} ({speaker_social_handles}) "
                 "in {talk_room}.\n"
                 "Join: {talk_link}\n{hashtags}"
             ),
@@ -262,33 +262,33 @@ PLATFORM_DEFAULT_TEMPLATES = {
         "speaker": {
             "announcement": (
                 "🎤 *Speaker Spotlight* — {event_name}\n"
-                "*{speaker_name}* will present *'{talk_title}'*\n"
+                "*{speaker_name}* ({speaker_social_handle}) will present *'{talk_title}'*\n"
                 "More info: {speaker_link}\n{hashtags}"
             ),
             "reminder": (
-                "🗓 *Don't miss* {speaker_name} presenting "
+                "🗓 *Don't miss* {speaker_name} ({speaker_social_handle}) presenting "
                 "*'{talk_title}'* at {event_name}!\n"
                 "{speaker_link}\n{hashtags}"
             ),
             "final_call": (
-                "🔥 *Live soon!* {speaker_name} — *'{talk_title}'* at {event_name}\n"
+                "🔥 *Live soon!* {speaker_name} ({speaker_social_handle}) — *'{talk_title}'* at {event_name}\n"
                 "{speaker_link}\n{hashtags}"
             ),
         },
         "session": {
             "announcement": (
                 "🗓 *Upcoming Session* — {event_name}\n"
-                "*'{talk_title}'* by {speaker_names}\n"
+                "*'{talk_title}'* by {speaker_names} ({speaker_social_handles})\n"
                 "Room: {talk_room} | Time: {talk_start_time}\n"
                 "{talk_link}\n{hashtags}"
             ),
             "reminder": (
                 "⏰ *Session Starting Soon* — {event_name}\n"
-                "*'{talk_title}'* by {speaker_names} at {talk_start_time}\n"
+                "*'{talk_title}'* by {speaker_names} ({speaker_social_handles}) at {talk_start_time}\n"
                 "{talk_link}\n{hashtags}"
             ),
             "final_call": (
-                "🔥 *Starting Now!* *'{talk_title}'* by {speaker_names} "
+                "🔥 *Starting Now!* *'{talk_title}'* by {speaker_names} ({speaker_social_handles}) "
                 "in {talk_room}\n"
                 "Join: {talk_link}\n{hashtags}"
             ),
@@ -339,29 +339,29 @@ PLATFORM_DEFAULT_TEMPLATES = {
         },
         "speaker": {
             "announcement": (
-                "We're thrilled to feature {speaker_name} at {event_name}! "
+                "We're thrilled to feature {speaker_name} ({speaker_social_handle}) at {event_name}! "
                 "Join us for their talk: '{talk_title}'. "
                 "Learn more about this session: {speaker_link} {hashtags}"
             ),
             "reminder": (
-                "Don't miss {speaker_name} presenting '{talk_title}' at {event_name}. "
+                "Don't miss {speaker_name} ({speaker_social_handle}) presenting '{talk_title}' at {event_name}. "
                 "A session not to be missed! Details: {speaker_link} {hashtags}"
             ),
             "final_call": (
-                "Spotlight: {speaker_name} will be presenting '{talk_title}' "
+                "Spotlight: {speaker_name} ({speaker_social_handle}) will be presenting '{talk_title}' "
                 "at {event_name}. "
                 "Join us live! {speaker_link} {hashtags}"
             ),
         },
         "session": {
             "announcement": (
-                "Mark your calendars! '{talk_title}' by {speaker_names} is "
+                "Mark your calendars! '{talk_title}' by {speaker_names} ({speaker_social_handles}) is "
                 "coming up at {event_name}. "
                 "Room: {talk_room} | Time: {talk_start_time}. "
                 "Full details: {talk_link} {hashtags}"
             ),
             "reminder": (
-                "Session starting soon: '{talk_title}' by {speaker_names} "
+                "Session starting soon: '{talk_title}' by {speaker_names} ({speaker_social_handles}) "
                 "at {talk_start_time} in {talk_room} during {event_name}. "
                 "Don't miss it: {talk_link} {hashtags}"
             ),
@@ -462,14 +462,143 @@ TYPE_LABELS = {
 # ---------------------------------------------------------------------------
 
 
+def _extract_speaker_social_info(speaker, event=None, target_platform=None):
+    """
+    Extract social media handles and profile links from a speaker (User or SpeakerProfile instance).
+    Returns:
+        social_info: dict with keys for placeholders (e.g. speaker_social_handle, speaker_twitter, etc.)
+        serialized_links: list of dicts [{'network': ..., 'url': ..., 'handle': ...}]
+    """
+    social_info = {
+        "speaker_social_handle": "",
+        "speaker_social_link": "",
+        "speaker_twitter": "",
+        "speaker_x": "",
+        "speaker_linkedin": "",
+        "speaker_github": "",
+        "speaker_mastodon": "",
+        "speaker_telegram": "",
+        "speaker_instagram": "",
+        "speaker_website": "",
+    }
+    serialized_links = []
+
+    if not speaker:
+        return social_info, serialized_links
+
+    profile = None
+    if event and hasattr(speaker, "event_profile") and callable(getattr(speaker, "event_profile")):
+        try:
+            profile = speaker.event_profile(event)
+        except Exception:
+            profile = None
+
+    if not profile and hasattr(speaker, "social_links"):
+        profile = speaker
+
+    if not profile and hasattr(speaker, "profiles"):
+        try:
+            profiles = list(speaker.profiles.all())
+            if event:
+                profiles = [
+                    p for p in profiles if getattr(p, "event_id", None) == getattr(event, "pk", None)
+                ]
+            if profiles:
+                profile = profiles[0]
+        except Exception:
+            profile = None
+
+    raw_links = []
+    if profile and hasattr(profile, "social_links"):
+        try:
+            raw_links = list(profile.social_links.all())
+        except Exception:
+            raw_links = []
+
+    by_network = {}
+    for link in raw_links:
+        net = getattr(link, "network", "").lower()
+        url = getattr(link, "url", "") or ""
+        if not url:
+            continue
+
+        path = getattr(link, "path", "")
+        if not path and "/" in url:
+            cleaned_url = url.rstrip("/")
+            path = cleaned_url.split("/")[-1]
+            if path.startswith("@"):
+                path = path[1:]
+
+        handle = path
+        if net in ("twitter", "x", "mastodon", "telegram", "instagram") and handle:
+            if not handle.startswith("@"):
+                handle = f"@{handle}"
+
+        item = {
+            "network": net,
+            "url": url,
+            "handle": handle or url,
+        }
+        serialized_links.append(item)
+        if net not in by_network:
+            by_network[net] = item
+
+    if "twitter" in by_network or "x" in by_network:
+        tw = by_network.get("twitter") or by_network.get("x")
+        social_info["speaker_twitter"] = tw["handle"]
+        social_info["speaker_x"] = tw["handle"]
+    if "linkedin" in by_network:
+        social_info["speaker_linkedin"] = by_network["linkedin"]["url"]
+    if "github" in by_network:
+        social_info["speaker_github"] = by_network["github"]["handle"]
+    if "mastodon" in by_network:
+        social_info["speaker_mastodon"] = by_network["mastodon"]["handle"]
+    if "telegram" in by_network:
+        social_info["speaker_telegram"] = by_network["telegram"]["handle"]
+    if "instagram" in by_network:
+        social_info["speaker_instagram"] = by_network["instagram"]["handle"]
+    if "website" in by_network:
+        social_info["speaker_website"] = by_network["website"]["url"]
+
+    primary_link = ""
+    primary_handle = ""
+
+    if target_platform and target_platform.lower() in by_network:
+        target_info = by_network[target_platform.lower()]
+        primary_link = target_info["url"]
+        primary_handle = target_info["handle"]
+    elif "twitter" in by_network or "x" in by_network:
+        tw = by_network.get("twitter") or by_network.get("x")
+        primary_link = tw["url"]
+        primary_handle = tw["handle"]
+    elif "mastodon" in by_network:
+        primary_link = by_network["mastodon"]["url"]
+        primary_handle = by_network["mastodon"]["handle"]
+    elif serialized_links:
+        first = serialized_links[0]
+        primary_link = first["url"]
+        primary_handle = first["handle"]
+
+    social_info["speaker_social_handle"] = primary_handle
+    social_info["speaker_social_link"] = primary_link
+
+    return social_info, serialized_links
+
+
 def safe_format(template, **kwargs):
     """Replace {placeholders} in template; leave unknown ones as literal text."""
 
     def replace(match):
         key = match.group(1)
-        return str(kwargs.get(key, "{" + key + "}"))
+        if key in kwargs:
+            val = kwargs[key]
+            return str(val) if val is not None else ""
+        return "{" + key + "}"
 
-    return re.sub(r"\{([a-zA-Z0-9_]+)\}", replace, template)
+    res = re.sub(r"\{([a-zA-Z0-9_]+)\}", replace, template)
+    res = re.sub(r"\s*\(\s*\)", "", res)
+    res = re.sub(r"  +", " ", res)
+    return res.strip()
 
 
 def localize(dt, event):
@@ -510,15 +639,21 @@ def _get_template(event, key, context="announcement"):
 def _get_platform_template(event, key, platform, context="announcement"):
     """Return a platform-specific template, cascading through:
     1. Organizer-saved per-platform custom override
-    2. Baked-in platform-specific default
-    3. Existing generic default template
+    2. Organizer-saved generic custom template
+    3. Baked-in platform-specific default
+    4. Baked-in generic default template
     """
-    # 1. Check for organizer-saved platform-specific override
-    custom = event.settings.get(f"socialmedia_{platform}_{key}_template")
-    if custom:
-        return custom
+    # 1. Organizer-saved per-platform custom override
+    custom_plat = event.settings.get(f"socialmedia_{platform}_{key}_template")
+    if custom_plat:
+        return custom_plat
 
-    # 2. Baked-in platform-specific default
+    # 2. Organizer-saved generic custom template
+    custom_gen = event.settings.get(f"socialmedia_{key}_template")
+    if custom_gen:
+        return custom_gen
+
+    # 3. Baked-in platform-specific default
     plat_tpls = PLATFORM_DEFAULT_TEMPLATES.get(platform, {})
     plat_tpl = plat_tpls.get(key, {})
     if isinstance(plat_tpl, dict):
@@ -526,7 +661,7 @@ def _get_platform_template(event, key, platform, context="announcement"):
         if result:
             return result
 
-    # 3. Fall back to generic default
+    # 4. Fall back to generic default
     return _get_template(event, key, context)
 
 
@@ -775,7 +910,9 @@ def build_posts(event, request=None):
             if SubmissionStates:
                 filters["state"] = SubmissionStates.CONFIRMED
             confirmed_subs = list(
-                submissions_mgr.filter(**filters).prefetch_related("speakers")
+                submissions_mgr.filter(**filters).prefetch_related(
+                    "speakers", "speakers__profiles", "speakers__profiles__social_links"
+                )
             )
 
             schedule = getattr(event, "current_schedule", None)
@@ -841,19 +978,29 @@ def build_posts(event, request=None):
                                 enabled_platforms if use_platforms else [None]
                             )
                             for platform in platform_iter:
+                                spk_social_info, spk_social_links = (
+                                    _extract_speaker_social_info(
+                                        speaker, event=event, target_platform=platform
+                                    )
+                                )
                                 if platform:
                                     text_formatted = _get_platform_template(
                                         event, "speaker", platform, template_ctx
                                     )
                                 else:
                                     text_formatted = text
+
+                                format_kwargs = {
+                                    "event_name": str(event.name),
+                                    "speaker_name": speaker.get_display_name(),
+                                    "speaker_link": spk_url,
+                                    "talk_title": sub.title,
+                                    "hashtags": hashtags,
+                                }
+                                format_kwargs.update(spk_social_info)
+
                                 text_formatted = safe_format(
-                                    text_formatted,
-                                    event_name=str(event.name),
-                                    speaker_name=speaker.get_display_name(),
-                                    speaker_link=spk_url,
-                                    talk_title=sub.title,
-                                    hashtags=hashtags,
+                                    text_formatted, **format_kwargs
                                 )
                                 post_id = (
                                     f"{base_id}_{platform}" if platform else base_id
@@ -881,12 +1028,31 @@ def build_posts(event, request=None):
                                         "is_schedule_associated": True,
                                         "offset_days": spk_off,
                                         "template_context": template_ctx,
+                                        "speaker_social_links": spk_social_links,
+                                        "speaker_social_handle": spk_social_info.get(
+                                            "speaker_social_handle", ""
+                                        ),
+                                        "speaker_social_url": spk_social_info.get(
+                                            "speaker_social_link", ""
+                                        ),
                                     }
                                 )
 
                 # Session post
                 if session_enabled and talk_start:
-                    names = ", ".join(s.get_display_name() for s in sub.speakers.all())
+                    sub_speakers = list(sub.speakers.all())
+                    names = ", ".join(s.get_display_name() for s in sub_speakers)
+
+                    sess_social_links = []
+                    sess_handles = []
+                    for spk in sub_speakers:
+                        s_info, s_links = _extract_speaker_social_info(spk, event=event)
+                        if s_info.get("speaker_social_handle"):
+                            sess_handles.append(s_info["speaker_social_handle"])
+                        sess_social_links.extend(s_links)
+
+                    speaker_handles_str = ", ".join(sess_handles)
+
                     room = talk.room.name if (talk and talk.room) else "TBA"
                     if sub.code:
                         talk_url = event_absolute_url(
@@ -915,19 +1081,25 @@ def build_posts(event, request=None):
                                 )
                             else:
                                 text_formatted = text
-                            text_formatted = safe_format(
-                                text_formatted,
-                                event_name=str(event.name),
-                                talk_title=sub.title,
-                                talk_room=room,
-                                talk_start_time=(
+
+                            format_kwargs = {
+                                "event_name": str(event.name),
+                                "talk_title": sub.title,
+                                "talk_room": room,
+                                "talk_start_time": (
                                     localize(talk_start, event).strftime("%H:%M")
                                     if talk_start
                                     else "TBA"
                                 ),
-                                speaker_names=names,
-                                talk_link=talk_url,
-                                hashtags=hashtags,
+                                "speaker_names": names,
+                                "speaker_social_handles": speaker_handles_str,
+                                "speaker_handles": speaker_handles_str,
+                                "talk_link": talk_url,
+                                "hashtags": hashtags,
+                            }
+
+                            text_formatted = safe_format(
+                                text_formatted, **format_kwargs
                             )
                             post_id = f"{base_id}_{platform}" if platform else base_id
                             posts.append(
@@ -950,6 +1122,8 @@ def build_posts(event, request=None):
                                     "is_schedule_associated": True,
                                     "offset_days": sess_off,
                                     "template_context": template_ctx,
+                                    "speaker_social_links": sess_social_links,
+                                    "speaker_social_handles": speaker_handles_str,
                                 }
                             )
 

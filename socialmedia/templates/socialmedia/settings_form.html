@@ -166,6 +166,9 @@
             <span class="tokens-label">{% trans "Insert Placeholders:" %}</span>
             <span class="token-chip" data-target="id_socialmedia_speaker_template">{event_name}</span>
             <span class="token-chip" data-target="id_socialmedia_speaker_template">{speaker_name}</span>
+            <span class="token-chip" data-target="id_socialmedia_speaker_template">{speaker_social_handle}</span>
+            <span class="token-chip" data-target="id_socialmedia_speaker_template">{speaker_twitter}</span>
+            <span class="token-chip" data-target="id_socialmedia_speaker_template">{speaker_linkedin}</span>
             <span class="token-chip" data-target="id_socialmedia_speaker_template">{speaker_link}</span>
             <span class="token-chip" data-target="id_socialmedia_speaker_template">{talk_title}</span>
             <span class="token-chip" data-target="id_socialmedia_speaker_template">{hashtags}</span>
@@ -306,7 +309,11 @@
     </div>
   </form>
 
-</div><!-- /sm-page -->
+<script id="socialmedia-config" type="application/json">
+{
+  "csrfToken": "{{ csrf_token }}"
+}
+</script>
 <link rel="stylesheet" type="text/css" href="{% static 'socialmedia/css/settings.css' %}">
 <script src="{% static 'socialmedia/js/settings.js' %}"></script>
 {% endblock %}
