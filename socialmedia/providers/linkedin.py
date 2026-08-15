@@ -281,7 +281,11 @@ class LinkedInProvider(BaseSocialProvider):
                     try:
                         asset_urn = self._upload_media(item, author_urn)
                         asset_urns.append(asset_urn)
+                    except PublishingError:
+                        # Re-raise credential/scope errors — organizer needs to fix these.
+                        raise
                     except Exception:
+                        # Transient failure (network, etc.): fall back to URL in post text.
                         if item.startswith(("http://", "https://")):
                             fallback_urls.append(item)
 

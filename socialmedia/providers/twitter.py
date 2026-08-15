@@ -108,9 +108,23 @@ class TwitterProvider(BaseSocialProvider):
         return content, mime_type or "image/jpeg", os.path.basename(real_candidate)
 
     def _upload_media(self, media_item: str) -> str:
-        """Upload image file or URL to Twitter Media Upload API (v1.1)."""
+        """Upload image file or URL to Twitter Media Upload API (v1.1).
+
+        .. note::
+            Twitter's v1.1 Media Upload endpoint requires OAuth1 user-context
+            authentication. Bearer tokens are rejected with HTTP 403. All four
+            OAuth1 credentials (API Key, API Secret, Access Token, Access Token
+            Secret) must be configured for media uploads to work.
+        """
         auth = self._get_auth()
-        headers = self._get_headers()
+        if not auth:
+            raise PublishingError(
+                "Twitter media upload requires OAuth1 credentials (API Key, API Secret, "
+                "Access Token, Access Token Secret). The v1.1 media upload endpoint does "
+                "not accept Bearer tokens. Please configure all four OAuth1 credentials."
+            )
+        # Strip Authorization header for v1.1 upload endpoint — only OAuth1 sig is accepted.
+        upload_headers = {}
 
         try:
             if media_item.startswith(("http://", "https://")):
@@ -139,7 +153,7 @@ class TwitterProvider(BaseSocialProvider):
                         self.MEDIA_UPLOAD_URL,
                         files=files,
                         auth=auth,
-                        headers=headers,
+                        headers=upload_headers,
                         timeout=30,
                     )
             else:
@@ -156,7 +170,7 @@ class TwitterProvider(BaseSocialProvider):
                         self.MEDIA_UPLOAD_URL,
                         files=files,
                         auth=auth,
-                        headers=headers,
+                        headers=upload_headers,
                         timeout=30,
                     )
 
@@ -205,7 +219,11 @@ class TwitterProvider(BaseSocialProvider):
                     try:
                         media_id = self._upload_media(item)
                         media_ids.append(media_id)
+                    except PublishingError:
+                        # Re-raise credential/config errors — these need the organizer's attention.
+                        raise
                     except Exception:
+                        # Transient failure (network, etc.): fall back to URL in tweet text.
                         if item.startswith(("http://", "https://")):
                             fallback_urls.append(item)
 
