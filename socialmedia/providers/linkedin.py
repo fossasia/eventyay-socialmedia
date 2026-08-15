@@ -5,7 +5,7 @@ from typing import Any
 
 import requests
 
-from .base import BaseSocialProvider, PublishingError, _safe_fetch_url
+from .base import BaseSocialProvider, PublishingError, _safe_fetch_url, _try_local_media_fallback
 
 logger = logging.getLogger(__name__)
 
@@ -230,14 +230,19 @@ class LinkedInProvider(BaseSocialProvider):
 
             if media_item.startswith(("http://", "https://")):
                 # SSRF guard: blocks private/link-local IPs and caps response size.
+                # Falls back to reading from MEDIA_ROOT if the URL points to our
+                # own server (e.g. localhost in dev, or SITE_URL on the same host).
                 try:
                     img_res = _safe_fetch_url(media_item, timeout=20)
+                    content = img_res.content
+                    content_type = img_res.headers.get("Content-Type", "image/jpeg")
                 except ValueError as exc:
-                    raise PublishingError(
-                        f"Refused to fetch media URL: {exc}"
-                    ) from exc
-                content = img_res.content
-                content_type = img_res.headers.get("Content-Type", "image/jpeg")
+                    local = _try_local_media_fallback(media_item)
+                    if local is None:
+                        raise PublishingError(
+                            f"Refused to fetch media URL: {exc}"
+                        ) from exc
+                    content, content_type = local
             else:
                 # Path traversal guard: confined to MEDIA_ROOT.
                 content, content_type = self._safe_open_local(media_item)
