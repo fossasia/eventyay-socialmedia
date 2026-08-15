@@ -6,7 +6,7 @@ from typing import Any
 import requests
 from requests_oauthlib import OAuth1
 
-from .base import BaseSocialProvider, PublishingError
+from .base import BaseSocialProvider, PublishingError, _safe_fetch_url
 
 
 class TwitterProvider(BaseSocialProvider):
@@ -68,6 +68,45 @@ class TwitterProvider(BaseSocialProvider):
         except requests.RequestException as e:
             raise PublishingError(f"Could not connect to Twitter API: {e}") from e
 
+    @staticmethod
+    def _safe_open_local(media_item: str) -> tuple[bytes, str, str]:
+        """Open a local media path safely, confined to MEDIA_ROOT.
+
+        Returns:
+            (content bytes, mime_type string, filename string)
+
+        Raises:
+            PublishingError: If the path escapes MEDIA_ROOT or the file does not exist.
+        """
+        from django.conf import settings
+
+        media_root = getattr(settings, "MEDIA_ROOT", None)
+        if not media_root:
+            raise PublishingError(
+                "MEDIA_ROOT is not configured; cannot open local media files."
+            )
+
+        rel_path = media_item.lstrip("/")
+        if rel_path.startswith("media/"):
+            rel_path = rel_path[6:]
+        candidate = os.path.join(media_root, rel_path)
+
+        # Resolve symlinks / ".." traversal
+        real_candidate = os.path.realpath(candidate)
+        real_root = os.path.realpath(media_root)
+
+        if not real_candidate.startswith(real_root + os.sep) and real_candidate != real_root:
+            raise PublishingError(
+                f"Access denied: {media_item!r} resolves outside MEDIA_ROOT."
+            )
+        if not os.path.isfile(real_candidate):
+            raise PublishingError(f"Media file not found: {real_candidate!r}")
+
+        mime_type, _ = mimetypes.guess_type(real_candidate)
+        with open(real_candidate, "rb") as f:
+            content = f.read()
+        return content, mime_type or "image/jpeg", os.path.basename(real_candidate)
+
     def _upload_media(self, media_item: str) -> str:
         """Upload image file or URL to Twitter Media Upload API (v1.1)."""
         auth = self._get_auth()
@@ -75,8 +114,13 @@ class TwitterProvider(BaseSocialProvider):
 
         try:
             if media_item.startswith(("http://", "https://")):
-                res = requests.get(media_item, timeout=20)
-                res.raise_for_status()
+                # SSRF guard: blocks private/link-local IPs and caps response size.
+                try:
+                    res = _safe_fetch_url(media_item, timeout=20)
+                except ValueError as exc:
+                    raise PublishingError(
+                        f"Refused to fetch media URL: {exc}"
+                    ) from exc
                 content = res.content
                 content_type = res.headers.get("Content-Type", "")
 
@@ -99,30 +143,15 @@ class TwitterProvider(BaseSocialProvider):
                         timeout=30,
                     )
             else:
-                file_path = media_item
-                if not os.path.exists(file_path):
-                    try:
-                        from django.conf import settings
-
-                        if hasattr(settings, "MEDIA_ROOT") and settings.MEDIA_ROOT:
-                            rel_path = media_item.lstrip("/")
-                            if rel_path.startswith("media/"):
-                                rel_path = rel_path[6:]
-                            possible_path = os.path.join(settings.MEDIA_ROOT, rel_path)
-                            if os.path.exists(possible_path):
-                                file_path = possible_path
-                    except Exception:
-                        pass
-
-                with open(file_path, "rb") as f:
-                    mime_type, _ = mimetypes.guess_type(file_path)
-                    files = {
-                        "media": (
-                            os.path.basename(file_path),
-                            f,
-                            mime_type or "image/jpeg",
-                        )
-                    }
+                # Path traversal guard: confined to MEDIA_ROOT.
+                content, mime_type, filename = self._safe_open_local(media_item)
+                with tempfile.NamedTemporaryFile(
+                    suffix=os.path.splitext(filename)[1], delete=True
+                ) as tmp:
+                    tmp.write(content)
+                    tmp.flush()
+                    tmp.seek(0)
+                    files = {"media": (filename, tmp, mime_type)}
                     resp = requests.post(
                         self.MEDIA_UPLOAD_URL,
                         files=files,
@@ -214,7 +243,13 @@ class TwitterProvider(BaseSocialProvider):
             raise PublishingError(f"Error publishing tweet to Twitter: {e}") from e
 
     def send_test_message(self) -> dict[str, Any]:
-        """Send a test tweet to verify connection and credentials."""
+        """Send a test tweet to verify connection and credentials.
+
+        .. warning::
+            This publishes a **real, public tweet** on Twitter/X. Only call this
+            when the organizer explicitly requests a test and understands that
+            the tweet will be publicly visible.
+        """
         result = self.publish_post("Test message from Eventyay Social Media plugin.")
         tweet_id = result.get("post_id")
         return {

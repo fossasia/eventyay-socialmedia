@@ -448,7 +448,7 @@ _add_platform_clean_methods()
 class TelegramAccountForm(forms.ModelForm):
     bot_token = forms.CharField(
         label=_("Bot API Token"),
-        widget=forms.PasswordInput(render_value=True),
+        widget=forms.PasswordInput(render_value=False),
         help_text=_("The API token for your Telegram Bot (e.g. from @BotFather)"),
         required=True,
     )
@@ -512,7 +512,7 @@ class MastodonAccountForm(forms.ModelForm):
     )
     access_token = forms.CharField(
         label=_("Access Token"),
-        widget=forms.PasswordInput(render_value=True),
+        widget=forms.PasswordInput(render_value=False),
         required=True,
     )
 
@@ -563,7 +563,7 @@ class PostizAccountForm(forms.ModelForm):
     )
     api_key = forms.CharField(
         label=_("API Key"),
-        widget=forms.PasswordInput(render_value=True),
+        widget=forms.PasswordInput(render_value=False),
         required=True,
     )
 
@@ -609,7 +609,7 @@ class PostizAccountForm(forms.ModelForm):
 class BufferAccountForm(forms.ModelForm):
     access_token = forms.CharField(
         label=_("Access Token"),
-        widget=forms.PasswordInput(render_value=True),
+        widget=forms.PasswordInput(render_value=False),
         required=True,
     )
 
@@ -654,22 +654,22 @@ class BufferAccountForm(forms.ModelForm):
 class TwitterAccountForm(forms.ModelForm):
     api_key = forms.CharField(
         label=_("API Key (Consumer Key)"),
-        widget=forms.PasswordInput(render_value=True),
+        widget=forms.PasswordInput(render_value=False),
         required=True,
     )
     api_secret = forms.CharField(
         label=_("API Secret (Consumer Secret)"),
-        widget=forms.PasswordInput(render_value=True),
+        widget=forms.PasswordInput(render_value=False),
         required=True,
     )
     access_token = forms.CharField(
         label=_("Access Token"),
-        widget=forms.PasswordInput(render_value=True),
+        widget=forms.PasswordInput(render_value=False),
         required=True,
     )
     access_token_secret = forms.CharField(
         label=_("Access Token Secret"),
-        widget=forms.PasswordInput(render_value=True),
+        widget=forms.PasswordInput(render_value=False),
         required=True,
     )
 
@@ -733,7 +733,7 @@ class TwitterAccountForm(forms.ModelForm):
 class LinkedInAccountForm(forms.ModelForm):
     access_token = forms.CharField(
         label=_("Access Token"),
-        widget=forms.PasswordInput(render_value=True),
+        widget=forms.PasswordInput(render_value=False),
         required=False,
         help_text=_(
             "Paste your LinkedIn access token here, OR fill in Client ID, "
@@ -749,7 +749,7 @@ class LinkedInAccountForm(forms.ModelForm):
     )
     client_secret = forms.CharField(
         label=_("Client Secret"),
-        widget=forms.PasswordInput(render_value=True),
+        widget=forms.PasswordInput(render_value=False),
         required=False,
         help_text=_(
             "From LinkedIn Developer Portal → Auth tab → Application credentials"
@@ -828,13 +828,21 @@ class LinkedInAccountForm(forms.ModelForm):
                     timeout=15,
                 )
                 if resp.status_code == 200:
-                    token_data = resp.json()
+                    try:
+                        token_data = resp.json()
+                    except Exception:
+                        raise forms.ValidationError(
+                            _("LinkedIn token exchange failed: %(error)s"),
+                            params={"error": resp.text[:200]},
+                        )
                     cleaned_data["access_token"] = token_data.get("access_token")
                 else:
-                    error_msg = resp.json().get("error_description", resp.text)
+                    try:
+                        error_msg = resp.json().get("error_description") or resp.text[:200]
+                    except Exception:
+                        error_msg = resp.text[:200]
                     raise forms.ValidationError(
                         _("LinkedIn token exchange failed: %(error)s"),
-                        error="error_msg",
                         params={"error": error_msg},
                     )
             except http_requests.RequestException as e:

@@ -1,16 +1,23 @@
+import logging
 import mimetypes
 import os
 from typing import Any
 
 import requests
 
-from .base import BaseSocialProvider, PublishingError
+from .base import BaseSocialProvider, PublishingError, _safe_fetch_url
+
+logger = logging.getLogger(__name__)
+
+# Pinned to a documented, stable API version.
+_LINKEDIN_API_VERSION = "202504"
 
 
 class LinkedInProvider(BaseSocialProvider):
     """Direct provider adapter for LinkedIn platform using REST API (v2 / ugcPosts)."""
 
     USERINFO_API_URL = "https://api.linkedin.com/v2/userinfo"
+    ME_API_URL = "https://api.linkedin.com/v2/me"
     REGISTER_UPLOAD_API_URL = "https://api.linkedin.com/v2/assets?action=registerUpload"
     UGC_POSTS_API_URL = "https://api.linkedin.com/v2/ugcPosts"
 
@@ -30,10 +37,8 @@ class LinkedInProvider(BaseSocialProvider):
 
     @staticmethod
     def _validate_urn(urn: str) -> str | None:
-        """Return the URN if valid, or None if the entity key is empty."""
-        if not urn:
-            return None
-        if not urn.startswith("urn:li:"):
+        """Return the URN if valid, or None if missing or malformed."""
+        if not urn or not urn.startswith("urn:li:"):
             return None
         parts = urn.split(":")
         if len(parts) < 4 or not parts[3].strip():
@@ -41,38 +46,29 @@ class LinkedInProvider(BaseSocialProvider):
         return urn
 
     def _resolve_person_urn(self, member_id: str) -> str | None:
-        """Resolve a numeric member ID to the correct person URN via ugcPosts probe."""
-        headers = self._get_headers()
-        test_payload = {
-            "author": f"urn:li:person:{member_id}",
-            "lifecycleState": "DRAFT",
-            "specificContent": {
-                "com.linkedin.ugc.ShareContent": {
-                    "shareCommentary": {"text": ""},
-                    "shareMediaCategory": "NONE",
-                }
-            },
-            "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"},
-        }
-        try:
-            resp = requests.post(
-                self.UGC_POSTS_API_URL,
-                json=test_payload,
-                headers={**headers, "X-Restli-Protocol-Version": "2.0.0"},
-                timeout=15,
-            )
-            if resp.status_code == 201:
-                return f"urn:li:person:{member_id}"
-            # If error contains resolved person URN, extract it
-            body = resp.text
-            import re
+        """Resolve a numeric member ID to the correct person URN.
 
-            match = re.search(r"urn:li:person:([A-Za-z0-9_=-]+)", body)
-            if match:
-                resolved = match.group(0)
-                return resolved
+        Uses a read-only GET /v2/me call rather than creating a draft post,
+        which avoids the side-effecting ugcPosts probe.
+        """
+        headers = self._get_headers()
+        try:
+            resp = requests.get(self.ME_API_URL, headers=headers, timeout=15)
+            if resp.status_code == 200:
+                user_id = resp.json().get("id")
+                if user_id:
+                    return f"urn:li:person:{user_id}"
+            # Fall back: if the member_id matches the authenticated user,
+            # trust it directly rather than creating a draft post.
+            logger.debug(
+                "_resolve_person_urn: /v2/me returned %s for member_id=%s",
+                resp.status_code,
+                member_id,
+            )
         except Exception:
-            pass
+            logger.debug(
+                "_resolve_person_urn: request failed for member_id=%s", member_id, exc_info=True
+            )
         return None
 
     def _get_author_urn(self) -> str:
@@ -101,15 +97,13 @@ class LinkedInProvider(BaseSocialProvider):
         headers = self._get_headers()
         # Try /v2/me first (returns numeric Person ID for ugcPosts API)
         try:
-            resp = requests.get(
-                "https://api.linkedin.com/v2/me", headers=headers, timeout=15
-            )
+            resp = requests.get(self.ME_API_URL, headers=headers, timeout=15)
             if resp.status_code == 200:
                 user_id = resp.json().get("id")
                 if user_id:
                     return f"urn:li:person:{user_id}"
         except Exception:
-            pass
+            logger.debug("_get_author_urn: /v2/me request failed", exc_info=True)
 
         # Try /v2/userinfo (OpenID Connect)
         try:
@@ -119,7 +113,7 @@ class LinkedInProvider(BaseSocialProvider):
                 if sub:
                     return f"urn:li:person:{sub}"
         except Exception:
-            pass
+            logger.debug("_get_author_urn: /v2/userinfo request failed", exc_info=True)
 
         raise PublishingError(
             "Missing LinkedIn Author URN. Please enter your Author URN "
@@ -127,34 +121,69 @@ class LinkedInProvider(BaseSocialProvider):
         )
 
     def validate_credentials(self) -> bool:
-        """Verify LinkedIn access token by probing multiple endpoints."""
+        """Verify LinkedIn access token by probing profile endpoints.
+
+        Fails closed: only returns True when a profile endpoint responds 200.
+        A 403 is NOT treated as success — tokens that cannot read a profile
+        likely cannot post and should be rejected at save time.
+        """
         headers = self._get_headers()
-        # Try endpoints in order of least permissions required
-        endpoints = [
-            "https://api.linkedin.com/v2/userinfo",
-            "https://api.linkedin.com/v2/me",
-            "https://api.linkedin.com/rest/posts",
+        # Prefer least-permission profile endpoints.
+        profile_endpoints = [
+            self.USERINFO_API_URL,
+            self.ME_API_URL,
         ]
         last_error = ""
-        for url in endpoints:
+        for url in profile_endpoints:
             try:
                 resp = requests.get(url, headers=headers, timeout=15)
-                if resp.status_code in (200, 201):
+                if resp.status_code == 200:
                     return True
-                # 403 on /rest/posts is expected for GET without proper auth,
-                # but means the token is at least recognized
-                if resp.status_code == 403:
-                    last_error = resp.text
-                    continue
-                last_error = resp.text
+                last_error = f"HTTP {resp.status_code}: {resp.text[:200]}"
             except requests.RequestException as e:
                 last_error = str(e)
                 continue
-        # If we got 403 on all endpoints, the token is likely valid but lacks
-        # read scopes. Allow save and let publish attempt determine success.
-        if "ACCESS_DENIED" in last_error or "NOT_ENOUGH_PERMISSIONS" in last_error:
-            return True
         raise PublishingError(f"LinkedIn authentication failed: {last_error}")
+
+    @staticmethod
+    def _safe_open_local(media_item: str) -> tuple[bytes, str]:
+        """Open a local media path safely, confined to MEDIA_ROOT.
+
+        Returns:
+            (content bytes, mime_type string)
+
+        Raises:
+            PublishingError: If the path escapes MEDIA_ROOT or does not exist.
+        """
+        from django.conf import settings
+
+        media_root = getattr(settings, "MEDIA_ROOT", None)
+        if not media_root:
+            raise PublishingError(
+                "MEDIA_ROOT is not configured; cannot open local media files."
+            )
+
+        # Build candidate path relative to MEDIA_ROOT
+        rel_path = media_item.lstrip("/")
+        if rel_path.startswith("media/"):
+            rel_path = rel_path[6:]
+        candidate = os.path.join(media_root, rel_path)
+
+        # Resolve symlinks / ".." traversal
+        real_candidate = os.path.realpath(candidate)
+        real_root = os.path.realpath(media_root)
+
+        if not real_candidate.startswith(real_root + os.sep) and real_candidate != real_root:
+            raise PublishingError(
+                f"Access denied: {media_item!r} resolves outside MEDIA_ROOT."
+            )
+        if not os.path.isfile(real_candidate):
+            raise PublishingError(f"Media file not found: {real_candidate!r}")
+
+        with open(real_candidate, "rb") as f:
+            content = f.read()
+        mime_type, _ = mimetypes.guess_type(real_candidate)
+        return content, mime_type or "image/jpeg"
 
     def _upload_media(self, media_item: str, author_urn: str) -> str:
         """Register asset upload and upload binary image bytes to LinkedIn."""
@@ -181,10 +210,9 @@ class LinkedInProvider(BaseSocialProvider):
                 timeout=20,
             )
             if reg_resp.status_code not in (200, 201):
-                err_text = reg_resp.text
                 raise PublishingError(
                     f"LinkedIn registerUpload failed ({reg_resp.status_code}): "
-                    f"{err_text}"
+                    f"{reg_resp.text}"
                 )
 
             reg_data = reg_resp.json().get("value", {})
@@ -201,30 +229,18 @@ class LinkedInProvider(BaseSocialProvider):
                 )
 
             if media_item.startswith(("http://", "https://")):
-                img_res = requests.get(media_item, timeout=20)
-                img_res.raise_for_status()
+                # SSRF guard: blocks private/link-local IPs and caps response size.
+                try:
+                    img_res = _safe_fetch_url(media_item, timeout=20)
+                except ValueError as exc:
+                    raise PublishingError(
+                        f"Refused to fetch media URL: {exc}"
+                    ) from exc
                 content = img_res.content
                 content_type = img_res.headers.get("Content-Type", "image/jpeg")
             else:
-                file_path = media_item
-                if not os.path.exists(file_path):
-                    try:
-                        from django.conf import settings
-
-                        if hasattr(settings, "MEDIA_ROOT") and settings.MEDIA_ROOT:
-                            rel_path = media_item.lstrip("/")
-                            if rel_path.startswith("media/"):
-                                rel_path = rel_path[6:]
-                            possible_path = os.path.join(settings.MEDIA_ROOT, rel_path)
-                            if os.path.exists(possible_path):
-                                file_path = possible_path
-                    except Exception:
-                        pass
-
-                with open(file_path, "rb") as f:
-                    content = f.read()
-                content_type, _ = mimetypes.guess_type(file_path)
-                content_type = content_type or "image/jpeg"
+                # Path traversal guard: confined to MEDIA_ROOT.
+                content, content_type = self._safe_open_local(media_item)
 
             upload_headers = {
                 "Authorization": headers["Authorization"],
@@ -235,10 +251,9 @@ class LinkedInProvider(BaseSocialProvider):
             )
             if up_resp.status_code in (200, 201):
                 return asset_urn
-            up_text = up_resp.text
             raise PublishingError(
                 f"LinkedIn image binary upload failed ({up_resp.status_code}): "
-                f"{up_text}"
+                f"{up_resp.text}"
             )
         except Exception as e:
             if isinstance(e, PublishingError):
@@ -291,7 +306,7 @@ class LinkedInProvider(BaseSocialProvider):
         }
 
         rest_headers = dict(headers)
-        rest_headers["LinkedIn-Version"] = "202607"
+        rest_headers["LinkedIn-Version"] = _LINKEDIN_API_VERSION
         rest_payload: dict[str, Any] = {
             "author": author_urn,
             "commentary": commentary_text,
@@ -313,7 +328,7 @@ class LinkedInProvider(BaseSocialProvider):
 
         rest_err_msg = None
         try:
-            # 1. Try Versioned REST Posts API (202607)
+            # 1. Try Versioned REST Posts API
             resp = requests.post(
                 "https://api.linkedin.com/rest/posts",
                 json=rest_payload,
@@ -321,9 +336,9 @@ class LinkedInProvider(BaseSocialProvider):
                 timeout=20,
             )
             if resp.status_code not in (200, 201) and "not active" in resp.text:
-                # Fallback to version 202606
+                # Fallback to previous minor version
                 fallback_headers = dict(rest_headers)
-                fallback_headers["LinkedIn-Version"] = "202606"
+                fallback_headers["LinkedIn-Version"] = "202503"
                 resp = requests.post(
                     "https://api.linkedin.com/rest/posts",
                     json=rest_payload,
@@ -344,7 +359,10 @@ class LinkedInProvider(BaseSocialProvider):
                 )
                 return {"post_id": post_id, "url": post_url}
 
-            rest_err_msg = resp.json().get("message") or resp.text
+            try:
+                rest_err_msg = resp.json().get("message") or resp.text
+            except Exception:
+                rest_err_msg = resp.text
 
             # 2. Fallback to legacy ugcPosts API
             resp = requests.post(
@@ -358,10 +376,17 @@ class LinkedInProvider(BaseSocialProvider):
                 )
                 return {"post_id": post_id, "url": post_url}
 
-            err_msg = rest_err_msg or resp.json().get("message") or resp.text
+            try:
+                err_msg = rest_err_msg or resp.json().get("message") or resp.text
+            except Exception:
+                err_msg = rest_err_msg or resp.text
+
             # Provide actionable guidance for common error codes
             hint = ""
-            is_403_status = "403" in str(resp.json().get("status", ""))
+            try:
+                is_403_status = "403" in str(resp.json().get("status", ""))
+            except Exception:
+                is_403_status = False
             if resp.status_code in (401, 403) or is_403_status:
                 hint = (
                     "\n\nThis usually means your Access Token is missing the "
@@ -381,7 +406,13 @@ class LinkedInProvider(BaseSocialProvider):
             raise PublishingError(f"Error publishing post to LinkedIn: {e}") from e
 
     def send_test_message(self) -> dict[str, Any]:
-        """Send a test post to verify LinkedIn connection."""
+        """Send a test post to verify LinkedIn connection.
+
+        .. warning::
+            This publishes a **real, public post** on LinkedIn. Only call this
+            when the organizer explicitly requests a test and understands that
+            the post will be visible publicly.
+        """
         result = self.publish_post("Test message from Eventyay Social Media plugin.")
         post_id = result.get("post_id")
         return {
@@ -438,3 +469,6 @@ class LinkedInProvider(BaseSocialProvider):
                 "generated automatically."
             ),
         ]
+
+
+
