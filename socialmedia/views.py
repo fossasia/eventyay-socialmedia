@@ -331,7 +331,7 @@ def preview_posts(request, organizer, event):
             posts.append(p)
     except Exception as exc:  # pragma: no cover
         logger.exception("Error generating preview posts: %s", exc)
-        return JsonResponse({"error": str(exc)}, status=500)
+        return JsonResponse({"error": "Internal server error"}, status=500)
     return JsonResponse({"posts": posts})
 
 

@@ -44,10 +44,25 @@ def test_extract_speaker_social_info_with_links():
     info, links = _extract_speaker_social_info(speaker, target_platform="twitter")
     assert info["speaker_social_handle"] == "@alice_smith"
     assert info["speaker_twitter"] == "@alice_smith"
-    assert info["speaker_linkedin"] == "https://linkedin.com/in/alice-smith"
+    assert info["speaker_linkedin"] == "@alice-smith"
+    assert info["speaker_linkedin_url"] == "https://linkedin.com/in/alice-smith"
     assert len(links) == 2
     assert links[0]["network"] == "twitter"
     assert links[0]["handle"] == "@alice_smith"
+
+
+def test_extract_speaker_social_info_target_platform_mismatch():
+    speaker = DummySpeaker(
+        "Bob Jones",
+        links=[
+            DummyLink("linkedin", "https://linkedin.com/in/bob-jones", "bob-jones"),
+        ],
+    )
+    # Target platform is twitter, but speaker only has linkedin
+    info, links = _extract_speaker_social_info(speaker, target_platform="twitter")
+    assert info["speaker_social_handle"] == ""
+    assert info["speaker_linkedin"] == "@bob-jones"
+    assert info["speaker_linkedin_url"] == "https://linkedin.com/in/bob-jones"
 
 
 def test_safe_format_with_handles():
@@ -57,8 +72,8 @@ def test_safe_format_with_handles():
 
 
 def test_safe_format_empty_handle_cleanup():
-    tmpl = "Meet {speaker_name} ({speaker_social_handle}) at {event_name}!"
-    out = safe_format(tmpl, speaker_name="Alice", speaker_social_handle="", event_name="PyCon")
+    tmpl = "Meet {speaker_name} ({speaker_social_handle}) [{speaker_twitter}] at {event_name}!"
+    out = safe_format(tmpl, speaker_name="Alice", speaker_social_handle="", speaker_twitter="", event_name="PyCon")
     assert out == "Meet Alice at PyCon!"
 
 

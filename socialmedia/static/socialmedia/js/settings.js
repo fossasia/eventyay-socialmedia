@@ -6,7 +6,9 @@
     if (configEl && configEl.textContent) {
       try {
         config = JSON.parse(configEl.textContent);
-      } catch (e) {}
+      } catch (e) {
+        console.warn("Failed to parse socialmedia-config JSON:", e);
+      }
     }
 
     return {
@@ -1603,7 +1605,11 @@
     try {
       input.selectionStart = startPos + token.length;
       input.selectionEnd = startPos + token.length;
-    } catch (err) {}
+    } catch (err) {
+      if (!(err instanceof DOMException)) {
+        console.warn("Failed to set input selection position:", err);
+      }
+    }
 
     const evtInput = document.createEvent("HTMLEvents");
     evtInput.initEvent("input", true, true);
