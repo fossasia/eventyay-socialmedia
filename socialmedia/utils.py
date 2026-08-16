@@ -1,10 +1,75 @@
 import ipaddress
+import logging
+import mimetypes
+import os
 import socket
 from urllib.parse import urlparse
 
 import requests
 
 from .providers.base import PublishingError
+
+logger = logging.getLogger(__name__)
+
+
+def _is_debug() -> bool:
+    """Return True if Django DEBUG mode is active."""
+    try:
+        from django.conf import settings
+        return bool(getattr(settings, "DEBUG", False))
+    except Exception:
+        return False
+
+
+def _try_local_media_fallback(url: str) -> tuple[bytes, str] | None:
+    """Read a media URL from MEDIA_ROOT when it points to our own server.
+
+    Used when the URL maps to a local Django-served file
+    (e.g. ``http://localhost:8000/media/avatars/foo.jpg``).
+    Applies a realpath + MEDIA_ROOT prefix guard to prevent path traversal.
+
+    Returns:
+        ``(content_bytes, mime_type)`` on success, or ``None`` if unmappable.
+    """
+    try:
+        from django.conf import settings
+    except Exception:
+        return None
+
+    media_root = getattr(settings, "MEDIA_ROOT", None)
+    media_url = getattr(settings, "MEDIA_URL", "/media/")
+    if not media_root:
+        return None
+
+    path = urlparse(url).path  # e.g. /media/avatars/foo.jpg
+    if not path.startswith(media_url):
+        return None
+
+    rel = path[len(media_url):]  # e.g. avatars/foo.jpg
+    candidate = os.path.join(media_root, rel)
+    real_candidate = os.path.realpath(candidate)
+    real_root = os.path.realpath(media_root)
+
+    if not real_candidate.startswith(real_root + os.sep) and real_candidate != real_root:
+        logger.warning("_try_local_media_fallback: %r escapes MEDIA_ROOT, skipping.", url)
+        return None
+
+    if not os.path.isfile(real_candidate):
+        logger.debug("_try_local_media_fallback: file not found at %r", real_candidate)
+        return None
+
+    mime_type, _ = mimetypes.guess_type(real_candidate)
+    try:
+        with open(real_candidate, "rb") as f:
+            content = f.read()
+    except OSError as exc:
+        logger.debug("_try_local_media_fallback: cannot read %r: %s", real_candidate, exc)
+        return None
+
+    logger.debug(
+        "_try_local_media_fallback: served %r from disk (%d bytes)", url, len(content)
+    )
+    return content, mime_type or "image/jpeg"
 
 
 class DNSResolverContext:
@@ -32,9 +97,10 @@ class DNSResolverContext:
 
 
 def validate_safe_url(url: str) -> tuple[str, str]:
-    """Validates that a URL uses http/https scheme and does not target
-    private, loopback, or cloud metadata IP addresses (SSRF prevention).
-    Returns (url, first_valid_ip).
+    """Validate that a URL uses http/https and does not target private/loopback IPs.
+
+    In DEBUG mode, localhost is allowed — developers test against local servers.
+    Returns (url, first_valid_ip_or_hostname).
     """
     if not url or not isinstance(url, str):
         raise PublishingError("Invalid media URL provided.")
@@ -50,13 +116,17 @@ def validate_safe_url(url: str) -> tuple[str, str]:
     if not hostname:
         raise PublishingError("Invalid media URL: missing hostname.")
 
-    # Block common local hostnames
+    # In DEBUG mode skip IP blocking — local dev servers resolve to loopback.
+    if _is_debug():
+        logger.debug("validate_safe_url: DEBUG mode, skipping IP block for %r", url)
+        return url, hostname
+
+    # Block common local hostnames in production.
     if hostname.lower() in ("localhost", "localhost.localdomain", "127.0.0.1", "::1"):
         raise PublishingError("Media URL points to a forbidden local address.")
 
     first_ip = None
     try:
-        # Resolve hostname to IP addresses
         resolved_ips = socket.getaddrinfo(hostname, None)
         for res in resolved_ips:
             ip_str = res[4][0]
@@ -82,11 +152,24 @@ def validate_safe_url(url: str) -> tuple[str, str]:
 
 
 def safe_fetch_url(url: str, timeout: int = 20) -> requests.Response:
-    """Safely fetches a remote URL with SSRF validation and DNS pinning
-    to prevent DNS Rebinding (TOCTOU) attacks.
+    """Safely fetch a remote URL with SSRF validation and DNS pinning.
+
+    In DEBUG mode, own-server URLs (under MEDIA_URL) are served directly
+    from MEDIA_ROOT instead of making an HTTP request back to localhost.
     """
+    if _is_debug():
+        local = _try_local_media_fallback(url)
+        if local is not None:
+            content, mime_type = local
+            resp = requests.Response()
+            resp.status_code = 200
+            resp._content = content
+            resp.headers["Content-Type"] = mime_type
+            return resp
+
     url, safe_ip = validate_safe_url(url)
     hostname = urlparse(url).hostname
 
     with DNSResolverContext(hostname, safe_ip):
         return requests.get(url, timeout=timeout)
+

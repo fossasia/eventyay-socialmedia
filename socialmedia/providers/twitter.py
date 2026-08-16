@@ -1,6 +1,6 @@
 import mimetypes
 import os
-import tempfile
+
 from typing import Any
 
 import requests
@@ -134,7 +134,7 @@ class TwitterProvider(BaseSocialProvider):
                 try:
                     res = _safe_fetch_url(media_item, timeout=20)
                     content = res.content
-                    content_type = res.headers.get("Content-Type", "")
+                    content_type = res.headers.get("Content-Type", "") or "image/jpeg"
                 except ValueError as exc:
                     local = _try_local_media_fallback(media_item)
                     if local is None:
@@ -148,36 +148,19 @@ class TwitterProvider(BaseSocialProvider):
                     or ".jpg"
                 )
                 filename = f"twitter_upload{ext}"
-
-                with tempfile.NamedTemporaryFile(suffix=ext, delete=True) as tmp:
-                    tmp.write(content)
-                    tmp.flush()
-                    tmp.seek(0)
-                    files = {"media": (filename, tmp, content_type or "image/jpeg")}
-                    resp = requests.post(
-                        self.MEDIA_UPLOAD_URL,
-                        files=files,
-                        auth=auth,
-                        headers=upload_headers,
-                        timeout=30,
-                    )
             else:
                 # Path traversal guard: confined to MEDIA_ROOT.
-                content, mime_type, filename = self._safe_open_local(media_item)
-                with tempfile.NamedTemporaryFile(
-                    suffix=os.path.splitext(filename)[1], delete=True
-                ) as tmp:
-                    tmp.write(content)
-                    tmp.flush()
-                    tmp.seek(0)
-                    files = {"media": (filename, tmp, mime_type)}
-                    resp = requests.post(
-                        self.MEDIA_UPLOAD_URL,
-                        files=files,
-                        auth=auth,
-                        headers=upload_headers,
-                        timeout=30,
-                    )
+                content, content_type, filename = self._safe_open_local(media_item)
+
+            # Pass bytes directly — requests accepts (filename, bytes, mime_type) tuples.
+            files = {"media": (filename, content, content_type)}
+            resp = requests.post(
+                self.MEDIA_UPLOAD_URL,
+                files=files,
+                auth=auth,
+                headers=upload_headers,
+                timeout=30,
+            )
 
             if resp.status_code in (200, 201):
                 data = resp.json()

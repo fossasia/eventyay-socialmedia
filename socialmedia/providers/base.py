@@ -30,10 +30,35 @@ _BLOCKED_NETWORKS = [
 def _safe_fetch_url(url: str, timeout: int = 20) -> requests.Response:
     """Fetch *url* after verifying it does not point to a private/internal host.
 
+    In DEBUG mode the IP block is skipped and own-server URLs (under MEDIA_URL)
+    are served directly from MEDIA_ROOT to support local development.
+
     Raises:
         ValueError: If the resolved IP is in a blocked range or response too large.
         requests.RequestException: On network errors.
     """
+    # DEBUG shortcut: serve own-server media from disk, skip network entirely.
+    try:
+        from django.conf import settings as _settings
+        _debug = bool(getattr(_settings, "DEBUG", False))
+    except Exception:
+        _debug = False
+
+    if _debug:
+        local = _try_local_media_fallback(url)
+        if local is not None:
+            content, mime_type = local
+            resp = requests.Response()
+            resp.status_code = 200
+            resp._content = content
+            resp.headers["Content-Type"] = mime_type
+            return resp
+        # In DEBUG mode, still allow the request to proceed (no IP block).
+        resp = requests.get(url, timeout=timeout, stream=True)
+        resp.raise_for_status()
+        resp._content = resp.content
+        return resp
+
     parsed = requests.utils.urlparse(url)
     hostname = parsed.hostname
     if not hostname:
@@ -76,6 +101,7 @@ def _safe_fetch_url(url: str, timeout: int = 20) -> requests.Response:
     resp._content = b"".join(chunks)
     resp.encoding = resp.apparent_encoding
     return resp
+
 
 
 def _try_local_media_fallback(url: str) -> tuple[bytes, str] | None:
