@@ -5,8 +5,11 @@
 
 {% block title %}{% trans "Social Media — Posts" %} :: {{ event.name }}{% endblock %}
 
-{% block content %}
+{% block custom_header %}
 <link rel="stylesheet" type="text/css" href="{% static 'socialmedia/css/settings.css' %}">
+{% endblock %}
+
+{% block content %}
 
 <div class="sm-page">
 
@@ -67,9 +70,9 @@
         <option value="-30">{% trans "1 month before (30 days)" %}</option>
         <option value="custom">{% trans "Custom..." %}</option>
       </select>
-      <div id="bulk-schedule-custom-inputs" class="bulk-schedule-custom-inputs" style="display: none; align-items: center; gap: 4px;">
-        <input type="date" id="bulk-schedule-custom-date" class="form-control input-sm" style="width: 130px; display: inline-block;">
-        <input type="time" id="bulk-schedule-custom-time" class="form-control input-sm" style="width: 100px; display: inline-block;" value="09:00">
+      <div id="bulk-schedule-custom-inputs" class="bulk-schedule-custom-inputs">
+        <input type="date" id="bulk-schedule-custom-date" class="form-control input-sm">
+        <input type="time" id="bulk-schedule-custom-time" class="form-control input-sm" value="09:00">
       </div>
       <button id="btn-apply-schedule" class="btn btn-default btn-sm" type="button">
         {% trans "Apply" %}

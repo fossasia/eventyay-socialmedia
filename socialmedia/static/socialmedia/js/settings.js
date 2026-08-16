@@ -1342,7 +1342,7 @@
       const customInputs = document.getElementById("bulk-schedule-custom-inputs");
       if (presetSel && customInputs) {
         presetSel.addEventListener("change", function () {
-          customInputs.classList.toggle("hidden", this.value !== "custom");
+          customInputs.style.display = this.value === "custom" ? "inline-flex" : "none";
         });
       }
 

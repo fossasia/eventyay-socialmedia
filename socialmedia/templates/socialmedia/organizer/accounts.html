@@ -5,8 +5,11 @@
 
 {% block title %}{% trans "Social Media Accounts" %} :: {{ organizer.name }}{% endblock %}
 
-{% block inner %}
+{% block custom_header %}
     <link rel="stylesheet" type="text/css" href="{% static 'socialmedia/css/organizer.css' %}">
+{% endblock %}
+
+{% block inner %}
 
     <div class="pull-right flip sm-organizer-header-actions">
         {% if back_to_event_url %}

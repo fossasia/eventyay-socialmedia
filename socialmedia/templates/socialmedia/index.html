@@ -3,8 +3,11 @@
 {% load static %}
 {% block title %}{% trans "Social Media Dashboard" %} :: {{ event.name }}{% endblock %}
 
-{% block content %}
+{% block custom_header %}
     <link rel="stylesheet" type="text/css" href="{% static 'socialmedia/css/dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
 
     <div class="sm-dashboard-header">
         <h1 class="sm-dashboard-title">

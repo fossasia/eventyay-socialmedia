@@ -12,8 +12,11 @@
     :: {{ organizer.name }}
 {% endblock %}
 
-{% block inner %}
+{% block custom_header %}
     <link rel="stylesheet" type="text/css" href="{% static 'socialmedia/css/organizer.css' %}">
+{% endblock %}
+
+{% block inner %}
 
     <h1>
         {% if object %}

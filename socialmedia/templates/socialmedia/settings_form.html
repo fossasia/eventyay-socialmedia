@@ -5,8 +5,11 @@
 
 {% block title %}{% trans "Social Media — Settings" %} :: {{ event.name }}{% endblock %}
 
-{% block content %}
+{% block custom_header %}
 <link rel="stylesheet" type="text/css" href="{% static 'socialmedia/css/settings.css' %}">
+{% endblock %}
+
+{% block content %}
 
 <div class="sm-page">
   <div class="sm-toolbar">
@@ -305,8 +308,6 @@
       </button>
     </div>
   </form>
-
 </div><!-- /sm-page -->
-<link rel="stylesheet" type="text/css" href="{% static 'socialmedia/css/settings.css' %}">
 <script src="{% static 'socialmedia/js/settings.js' %}"></script>
 {% endblock %}
