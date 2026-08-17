@@ -72,7 +72,8 @@ class TelegramProvider(BaseSocialProvider):
             try:
                 err_data = response.json()
                 desc = err_data.get("description", response.text)
-            except Exception:
+            except Exception as exc:
+                logger.debug("Failed to parse Telegram error response body: %s", exc)
                 desc = response.text
 
             return {
@@ -110,8 +111,8 @@ class TelegramProvider(BaseSocialProvider):
                     username = result.get("username") or "unknown"
                     first_name = result.get("first_name") or "Telegram bot"
                     return f"@{username} ({first_name})"
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to fetch Telegram bot info: %s", exc)
         return "Unknown Bot"
 
     def _error_hint(self, description: str) -> str:

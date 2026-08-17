@@ -17,7 +17,7 @@
       UPDATE_URL: config.updateUrl || "",
       SYNC_URL: config.syncUrl || "",
       PUBLISH_NOW_URL: config.publishNowUrl || (config.updateUrl ? config.updateUrl.replace(/\/update\/?$/, "/publish-now/") : null),
-      CSRF_TOKEN: config.csrfToken || "",
+      CSRF_TOKEN: config.csrfToken || (document.querySelector("input[name=csrfmiddlewaretoken]") ? document.querySelector("input[name=csrfmiddlewaretoken]").value : ""),
       TRANS_CLICK_TO_EDIT: config.transClickToEdit || "Click to edit · Ctrl+Enter to save",
       TRANS_SELECT_AT_LEAST_ONE: config.transSelectAtLeastOne || "Please select at least one post to export.",
     };

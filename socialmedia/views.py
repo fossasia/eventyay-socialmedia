@@ -422,7 +422,8 @@ def update_post(request, organizer, event):
         )
     except (json.JSONDecodeError, ValueError) as exc:
         return JsonResponse({"error": str(exc)}, status=400)
-    except Exception:
+    except Exception as exc:
+        logger.exception("Error updating post: %s", exc)
         return JsonResponse({"error": "Internal server error"}, status=500)
 
 

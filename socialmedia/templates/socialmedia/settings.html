@@ -67,9 +67,9 @@
         <option value="-30">{% trans "1 month before (30 days)" %}</option>
         <option value="custom">{% trans "Custom..." %}</option>
       </select>
-      <div id="bulk-schedule-custom-inputs" class="bulk-schedule-custom-inputs" style="display: none; align-items: center; gap: 4px;">
-        <input type="date" id="bulk-schedule-custom-date" class="form-control input-sm" style="width: 130px; display: inline-block;">
-        <input type="time" id="bulk-schedule-custom-time" class="form-control input-sm" style="width: 100px; display: inline-block;" value="09:00">
+      <div id="bulk-schedule-custom-inputs" class="bulk-schedule-custom-inputs">
+        <input type="date" id="bulk-schedule-custom-date" class="form-control input-sm">
+        <input type="time" id="bulk-schedule-custom-time" class="form-control input-sm" value="09:00">
       </div>
       <button id="btn-apply-schedule" class="btn btn-default btn-sm" type="button">
         {% trans "Apply" %}
@@ -78,7 +78,7 @@
     <span class="sm-count" id="selected-count">–</span>
   </div>
 
-  <div id="validation-alert-container" style="display: none; margin-bottom: 12px;"></div>
+  <div id="validation-alert-container"></div>
 
   <!-- Post table -->
   <div class="sm-table-wrap">
@@ -117,8 +117,8 @@
   <!-- Export bar (below table, right-aligned) -->
   <div class="export-bar">
     <span class="selected-count" id="export-count">0 {% trans "posts selected" %}</span>
-    <div style="display: inline-flex; align-items: center; gap: 8px;">
-      <select id="export-preset-select" class="form-control input-sm" style="width: 150px; display: inline-block;">
+    <div class="sm-export-preset-wrapper">
+      <select id="export-preset-select" class="form-control input-sm">
         <option value="generic">{% trans "Generic CSV" %}</option>
         <option value="postiz">{% trans "Postiz CSV" %}</option>
         <option value="buffer">{% trans "Buffer CSV" %}</option>
@@ -141,7 +141,7 @@
     <button class="adv-header" type="button" id="adv-toggle">
       <i class="fa fa-cog"></i>
       {% trans "Advanced Settings" %}
-      <span style="font-size:12px;font-weight:400;color:#aaa;">
+      <span class="sm-preset-hint">
         — {% trans "customize templates, offsets, hashtags" %}
       </span>
       <i class="fa fa-chevron-down adv-chevron"></i>
@@ -305,7 +305,7 @@
                 <span class="token-chip" data-target="id_socialmedia_speaker_template">{talk_title}</span>
                 <span class="token-chip" data-target="id_socialmedia_speaker_template">{hashtags}</span>
               </div>
-              <p class="help-block text-muted" style="font-size: 11px; margin-top: 5px;">
+              <p class="help-block text-muted sm-placeholder-help">
                 {% trans "Note: Handle placeholders output as @username across supported networks. Wrap optional placeholders in parentheses () or brackets [] to automatically omit them when empty." %}
               </p>
             </div>
@@ -434,7 +434,7 @@
           </div>
         </div>
 
-        <div style="padding-top: 10px; border-top: 1px solid #eee; display:flex; gap:10px;">
+        <div class="sm-preview-actions">
           <button type="submit" class="btn btn-primary">
             <i class="fa fa-save"></i> {% trans "Save Settings" %}
           </button>

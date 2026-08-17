@@ -174,7 +174,7 @@
             <span class="token-chip" data-target="id_socialmedia_speaker_template">{talk_title}</span>
             <span class="token-chip" data-target="id_socialmedia_speaker_template">{hashtags}</span>
           </div>
-          <p class="help-block text-muted" style="font-size: 11px; margin-top: 5px;">
+          <p class="help-block text-muted sm-placeholder-help">
             {% trans "Note: Handle placeholders output as @username across supported networks. Wrap optional placeholders in parentheses () or brackets [] to automatically omit them when empty." %}
           </p>
         </div>
@@ -303,7 +303,7 @@
       </div>
     </div>
 
-    <div style="padding-top: 10px; border-top: 1px solid #eee; display:flex; gap:10px;">
+    <div class="sm-preview-actions">
       <button type="submit" name="action" value="save" class="btn btn-primary">
         <i class="fa fa-save"></i> {% trans "Save Settings" %}
       </button>
@@ -312,12 +312,7 @@
       </button>
     </div>
   </form>
+</div><!-- /sm-page -->
 
-<script id="socialmedia-config" type="application/json">
-{
-  "csrfToken": "{{ csrf_token }}"
-}
-</script>
-<link rel="stylesheet" type="text/css" href="{% static 'socialmedia/css/settings.css' %}">
 <script src="{% static 'socialmedia/js/settings.js' %}"></script>
 {% endblock %}

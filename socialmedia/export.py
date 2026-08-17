@@ -1,10 +1,13 @@
 import csv
 import io
+import logging
 import re
 from datetime import timedelta
 
 import pytz
 from django.utils.timezone import is_naive, make_aware
+
+logger = logging.getLogger(__name__)
 
 try:
     from eventyay.base.models.submission import SubmissionStates
@@ -491,7 +494,8 @@ def _extract_speaker_social_info(speaker, event=None, target_platform=None):
     if event and hasattr(speaker, "event_profile") and callable(getattr(speaker, "event_profile")):
         try:
             profile = speaker.event_profile(event)
-        except Exception:
+        except Exception as exc:
+            logger.warning("Error fetching event profile for speaker: %s", exc)
             profile = None
 
     if not profile and hasattr(speaker, "social_links"):
@@ -506,14 +510,16 @@ def _extract_speaker_social_info(speaker, event=None, target_platform=None):
                 ]
             if profiles:
                 profile = profiles[0]
-        except Exception:
+        except Exception as exc:
+            logger.warning("Error querying speaker profiles: %s", exc)
             profile = None
 
     raw_links = []
     if profile and hasattr(profile, "social_links"):
         try:
             raw_links = list(profile.social_links.all())
-        except Exception:
+        except Exception as exc:
+            logger.warning("Error fetching speaker social links: %s", exc)
             raw_links = []
 
     by_network = {}
@@ -855,7 +861,8 @@ def build_posts(event, request=None):
             active_tickets = list(
                 event.products.filter(active=True, category__is_addon=False)[:5]
             )
-        except Exception:
+        except Exception as exc:
+            logger.warning("Error querying active tickets: %s", exc)
             active_tickets = []
         for ticket in active_tickets:
             price_str = (
@@ -1163,7 +1170,8 @@ def sync_posts_to_db(event, request=None):
         try:
             naive_dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
             scheduled_at = tz.localize(naive_dt)
-        except Exception:
+        except Exception as exc:
+            logger.warning("Error parsing datetime string '%s': %s", dt_str, exc)
             continue
 
         offset_val = p.get("offset_days", 0)
