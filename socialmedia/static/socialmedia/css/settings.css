@@ -1166,7 +1166,7 @@ body .sm-toast i {
 
 /* Bulk schedule & export helpers */
 #bulk-schedule-custom-inputs {
-  display: none;
+  display: inline-flex;
   align-items: center;
   gap: 4px;
 }
