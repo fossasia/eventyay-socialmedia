@@ -644,7 +644,6 @@
       if (p.speaker_social_links && p.speaker_social_links.length > 0) {
         const linksDiv = document.createElement("div");
         linksDiv.className = "speaker-social-links-row";
-        linksDiv.style.cssText = "margin-top: 4px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center;";
 
         p.speaker_social_links.forEach((link) => {
           if (!link.url) return;
@@ -653,7 +652,6 @@
           a.target = "_blank";
           a.rel = "noopener noreferrer";
           a.className = "speaker-social-pill";
-          a.style.cssText = "display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: #337ab7; text-decoration: none;";
 
           const icon = document.createElement("i");
           const net = (link.network || "globe").toLowerCase();
@@ -829,11 +827,9 @@
       if (post.speaker_social_links && post.speaker_social_links.length > 0) {
         const socialBox = document.createElement("div");
         socialBox.className = "sm-preview-speaker-socials";
-        socialBox.style.cssText = "margin-top: 10px; padding: 8px 12px; border-top: 1px solid #eee; background: #f9f9f9; border-radius: 4px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;";
 
         const label = document.createElement("span");
         label.className = "sm-speaker-social-label";
-        label.style.cssText = "font-size: 11px; color: #666; font-weight: 600;";
         label.textContent = "Speaker Profiles:";
         socialBox.appendChild(label);
 
@@ -844,7 +840,6 @@
           a.target = "_blank";
           a.rel = "noopener noreferrer";
           a.className = "sm-speaker-social-link btn btn-xs btn-default";
-          a.style.cssText = "display: inline-flex; align-items: center; gap: 4px; border-radius: 12px; font-size: 11px;";
 
           const icon = document.createElement("i");
           const net = (link.network || "globe").toLowerCase();
