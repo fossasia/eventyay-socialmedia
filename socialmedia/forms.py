@@ -448,7 +448,7 @@ _add_platform_clean_methods()
 class TelegramAccountForm(forms.ModelForm):
     bot_token = forms.CharField(
         label=_("Bot API Token"),
-        widget=forms.PasswordInput(render_value=False),
+        widget=forms.PasswordInput(render_value=True),
         help_text=_("The API token for your Telegram Bot (e.g. from @BotFather)"),
         required=True,
     )
@@ -512,7 +512,7 @@ class MastodonAccountForm(forms.ModelForm):
     )
     access_token = forms.CharField(
         label=_("Access Token"),
-        widget=forms.PasswordInput(render_value=False),
+        widget=forms.PasswordInput(render_value=True),
         required=True,
     )
 
@@ -563,7 +563,7 @@ class PostizAccountForm(forms.ModelForm):
     )
     api_key = forms.CharField(
         label=_("API Key"),
-        widget=forms.PasswordInput(render_value=False),
+        widget=forms.PasswordInput(render_value=True),
         required=True,
     )
 
@@ -609,7 +609,7 @@ class PostizAccountForm(forms.ModelForm):
 class BufferAccountForm(forms.ModelForm):
     access_token = forms.CharField(
         label=_("Access Token"),
-        widget=forms.PasswordInput(render_value=False),
+        widget=forms.PasswordInput(render_value=True),
         required=True,
     )
 
@@ -654,22 +654,22 @@ class BufferAccountForm(forms.ModelForm):
 class TwitterAccountForm(forms.ModelForm):
     api_key = forms.CharField(
         label=_("API Key (Consumer Key)"),
-        widget=forms.PasswordInput(render_value=False),
+        widget=forms.PasswordInput(render_value=True),
         required=True,
     )
     api_secret = forms.CharField(
         label=_("API Secret (Consumer Secret)"),
-        widget=forms.PasswordInput(render_value=False),
+        widget=forms.PasswordInput(render_value=True),
         required=True,
     )
     access_token = forms.CharField(
         label=_("Access Token"),
-        widget=forms.PasswordInput(render_value=False),
+        widget=forms.PasswordInput(render_value=True),
         required=True,
     )
     access_token_secret = forms.CharField(
         label=_("Access Token Secret"),
-        widget=forms.PasswordInput(render_value=False),
+        widget=forms.PasswordInput(render_value=True),
         required=True,
     )
 
@@ -733,7 +733,7 @@ class TwitterAccountForm(forms.ModelForm):
 class LinkedInAccountForm(forms.ModelForm):
     access_token = forms.CharField(
         label=_("Access Token"),
-        widget=forms.PasswordInput(render_value=False),
+        widget=forms.PasswordInput(render_value=True),
         required=False,
         help_text=_(
             "Paste your LinkedIn access token here, OR fill in Client ID, "
@@ -749,7 +749,7 @@ class LinkedInAccountForm(forms.ModelForm):
     )
     client_secret = forms.CharField(
         label=_("Client Secret"),
-        widget=forms.PasswordInput(render_value=False),
+        widget=forms.PasswordInput(render_value=True),
         required=False,
         help_text=_(
             "From LinkedIn Developer Portal → Auth tab → Application credentials"
