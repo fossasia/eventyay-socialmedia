@@ -766,9 +766,8 @@ class LinkedInAccountForm(forms.ModelForm):
     author_urn = forms.CharField(
         label=_("Author URN"),
         help_text=_(
-            "e.g. urn:li:person:XXXX for posting to your profile, or "
-            "urn:li:organization:XXXX for posting to a company page. "
-            "See setup instructions for how to find this."
+            "Optional for personal profiles (leave blank to auto-detect). "
+            "For company pages, enter urn:li:organization:YOUR_PAGE_ID."
         ),
         required=False,
     )

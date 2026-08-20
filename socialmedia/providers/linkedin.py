@@ -438,13 +438,16 @@ class LinkedInProvider(BaseSocialProvider):
                 "your LinkedIn account."
             ),
             (
-                "2. Click 'Create app' and fill in the app name (e.g. Eventyay), "
-                "description, and upload a logo. Click 'Create app'."
+                "2. Click 'Create app', fill in the app name, description, and "
+                "upload a logo. Note: LinkedIn requires you to link the app to a "
+                "Company Page. If you don't have one, click 'Create a new LinkedIn "
+                "Page' to make a quick page first."
             ),
             (
-                "3. On the 'Products' tab, find 'Share on LinkedIn' and click "
-                "'Add product'. This grants w_member_social (post as yourself) "
-                "and w_organization_social (post to pages) permissions."
+                "3. On the 'Products' tab, add these products to get the right permissions:\n"
+                "   • 'Share on LinkedIn' (grants w_member_social)\n"
+                "   • 'Sign In with LinkedIn using OpenID Connect' (grants openid and profile so Eventyay can auto-fetch your ID)\n"
+                "   • 'Advertising API' or 'Community Management API' (grants w_organization_social for posting to company pages)."
             ),
             (
                 "4. On the 'Auth' tab, under 'Authorized redirect URLs', add: "
@@ -456,26 +459,22 @@ class LinkedInProvider(BaseSocialProvider):
                 "your Client ID from step 5):\n"
                 "https://www.linkedin.com/oauth/v2/authorization?response_type=code"
                 "&client_id=YOUR_CLIENT_ID&redirect_uri=https://localhost"
-                "&scope=w_member_social%20w_organization_social"
+                "&scope=w_member_social%20w_organization_social%20openid%20profile"
             ),
             (
                 "7. Click 'Authorize app'. You will be redirected to "
-                "https://localhost?code=XXXXX (the page may show an error — "
+                "https://localhost?code=XXXXX (the page may show a connection error — "
                 "that's normal). Copy the 'code' value from the URL bar."
             ),
             (
                 "8. Your Author URN depends on what you want to post to:\n"
-                "   • Personal profile: urn:li:person:YOUR_PERSON_ID\n"
-                "   • Company page: urn:li:organization:YOUR_PAGE_ID\n"
-                "   To find your person ID: go to your LinkedIn profile, right-click "
-                "→ View Page Source, search for 'memberId'.\n"
-                "   To find your page ID: go to your Company Page URL, the number "
-                "in the URL is your page ID."
+                "   • Personal profile: LEAVE BLANK! (Eventyay will automatically detect your ID).\n"
+                "   • Company page: urn:li:organization:YOUR_PAGE_ID (To find your page ID, go to your Company Page URL on LinkedIn; the number in the URL is your page ID)."
             ),
             (
                 "9. Enter the authorization code (from step 7), Client ID, Client "
-                "Secret, and Author URN into this form. The access token will be "
-                "generated automatically."
+                "Secret, and Author URN (if posting to a company page) into this form. "
+                "The access token will be generated automatically."
             ),
         ]
 
