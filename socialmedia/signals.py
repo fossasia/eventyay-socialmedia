@@ -182,13 +182,23 @@ def publish_scheduled_posts(sender, **kwargs):
     """
     from .tasks import publish_single_post
 
-    due_posts = SocialMediaPost.objects.filter(
-        status=SocialMediaPostStatus.SCHEDULED,
-        is_pinned=True,
-        scheduled_at__lte=now(),
-    ).order_by("scheduled_at", "pk")
+    due_posts = (
+        SocialMediaPost.objects.select_related("event")
+        .filter(
+            status=SocialMediaPostStatus.SCHEDULED,
+            scheduled_at__lte=now(),
+        )
+        .order_by("scheduled_at", "pk")
+    )
 
     for post in due_posts:
+        # Check event setting: auto-publish enabled or explicit pin required
+        auto_publish = post.event.settings.get(
+            "socialmedia_auto_publish", as_type=bool, default=True
+        )
+        if not auto_publish and not post.is_pinned:
+            continue
+
         entity_id = post.entity_id or ""
         provider_names = []
         if any(entity_id.endswith(f"_{prov}") for prov in SCHEDULER_PROVIDERS):

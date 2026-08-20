@@ -1,7 +1,9 @@
 import json
+from datetime import timedelta
 
 import pytest
 from django.urls import reverse
+from django.utils.timezone import now
 from django_scopes import scope
 
 
@@ -72,6 +74,7 @@ def test_socialmedia_settings_view_post(
             "socialmedia_schedule_enabled": "on",
             "socialmedia_schedule_offset": "1",
             "socialmedia_schedule_template": "Schedule: {schedule_link}",
+            "socialmedia_auto_publish": "on",
         },
     )
 
@@ -90,6 +93,7 @@ def test_socialmedia_settings_view_post(
             event.settings.get("socialmedia_cfp_template")
             == "CFP Deadline: {cfp_deadline}"
         )
+        assert event.settings.get("socialmedia_auto_publish", as_type=bool) is True
 
 
 @pytest.mark.django_db
@@ -180,6 +184,51 @@ def test_update_post_reschedule_future_requeues_for_publishing(
         assert post.status == SocialMediaPostStatus.SCHEDULED
         assert post.is_pinned is True
         assert post.error_message == ""
+
+
+@pytest.mark.django_db
+def test_update_post_reschedule_draft_to_future_becomes_scheduled(
+    logged_in_organizer_client, organizer, event, settings
+):
+    settings.SITE_URL = "https://testserver"
+    import pytz
+    from django.utils import timezone
+    from socialmedia.models import SocialMediaPost, SocialMediaPostStatus
+
+    event_tz = pytz.timezone(getattr(event, "timezone", None) or "UTC")
+    future_dt = timezone.now().astimezone(event_tz) + timedelta(days=2)
+
+    with scope(organizer=organizer, event=event):
+        post = SocialMediaPost.objects.create(
+            event=event,
+            post_type="custom",
+            entity_id="custom_draft_1",
+            scheduled_at=timezone.now() - timedelta(days=1),
+            post_text="Draft post",
+            status=SocialMediaPostStatus.DRAFT,
+            is_pinned=False,
+        )
+
+    url = reverse(
+        "plugins:socialmedia:update",
+        kwargs={"organizer": organizer.slug, "event": event.slug},
+    )
+    payload = {
+        "db_id": post.pk,
+        "post_date": future_dt.strftime("%Y-%m-%d"),
+        "post_time": future_dt.strftime("%H:%M"),
+    }
+    response = logged_in_organizer_client.post(
+        url, data=json.dumps(payload), content_type="application/json"
+    )
+
+    assert response.status_code == 200
+    assert response.json()["post_status"] == SocialMediaPostStatus.SCHEDULED
+
+    with scope(organizer=organizer, event=event):
+        post.refresh_from_db()
+        assert post.status == SocialMediaPostStatus.SCHEDULED
+        assert post.is_pinned is True
 
 
 @pytest.mark.django_db
@@ -300,6 +349,8 @@ def test_multi_offset_generation_and_db_sync(organizer, event):
 
     with scope(organizer=organizer, event=event):
         event = event.__class__.objects.get(pk=event.pk)
+        event.date_from = now() + timedelta(days=60)
+        event.save()
         sub_type = event.submission_types.first() or SubmissionType.objects.create(
             event=event, name="Talk"
         )
@@ -324,6 +375,31 @@ def test_multi_offset_generation_and_db_sync(organizer, event):
         db_posts = SocialMediaPost.objects.filter(event=event, post_type="speaker")
         assert db_posts.count() == 3
         assert all(p.status == SocialMediaPostStatus.SCHEDULED for p in db_posts)
+
+
+@pytest.mark.django_db
+def test_sync_posts_to_db_past_draft_future_scheduled(organizer, event):
+    from socialmedia.export import build_posts, sync_posts_to_db
+    from socialmedia.models import SocialMediaPost, SocialMediaPostStatus
+
+    with scope(organizer=organizer, event=event):
+        # Event in the past
+        event = event.__class__.objects.get(pk=event.pk)
+        event.date_from = now() - timedelta(days=60)
+        event.save()
+
+        posts = build_posts(event)
+        if posts:
+            sync_posts_to_db(event)
+            past_posts = SocialMediaPost.objects.filter(event=event)
+            assert all(p.status == SocialMediaPostStatus.DRAFT for p in past_posts)
+
+        # Event in the future
+        event.date_from = now() + timedelta(days=60)
+        event.save()
+        sync_posts_to_db(event)
+        future_posts = SocialMediaPost.objects.filter(event=event)
+        assert any(p.status == SocialMediaPostStatus.SCHEDULED for p in future_posts)
 
 
 @pytest.mark.django_db
