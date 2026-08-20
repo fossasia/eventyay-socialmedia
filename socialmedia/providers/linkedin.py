@@ -459,7 +459,8 @@ class LinkedInProvider(BaseSocialProvider):
                 "your Client ID from step 5):\n"
                 "https://www.linkedin.com/oauth/v2/authorization?response_type=code"
                 "&client_id=YOUR_CLIENT_ID&redirect_uri=https://localhost"
-                "&scope=w_member_social%20w_organization_social%20openid%20profile"
+                "&scope=w_member_social%20openid%20profile\n"
+                "(Note: If posting to a Company Page, append %20w_organization_social to the scope)."
             ),
             (
                 "7. Click 'Authorize app'. You will be redirected to "

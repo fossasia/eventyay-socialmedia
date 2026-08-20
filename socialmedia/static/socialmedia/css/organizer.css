@@ -11,7 +11,8 @@
 }
 
 .sm-setup-instructions-list {
-  padding-left: 20px;
+  list-style: none;
+  padding-left: 0;
   margin-bottom: 0;
 }
 
@@ -23,3 +24,28 @@
   display: none;
   margin-top: 15px;
 }
+
+.sm-oauth-url-box {
+  margin-top: 8px;
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  background-color: #fff;
+  border: 1px solid #d2d6de;
+  border-radius: 4px;
+}
+
+.sm-oauth-url-text {
+  word-break: break-all;
+  font-size: 12px;
+  display: block;
+  margin-bottom: 8px;
+  color: #337ab7;
+}
+
+.sm-oauth-url-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
