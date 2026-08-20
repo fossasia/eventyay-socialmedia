@@ -1,0 +1,25 @@
+/* Styles for Organizer Social Media settings pages */
+
+.sm-organizer-header-actions {
+  margin-top: 10px;
+}
+
+.sm-setup-instructions {
+  margin-top: 20px;
+  background-color: #f7f9fa;
+  border-left: 4px solid #337ab7;
+}
+
+.sm-setup-instructions-list {
+  padding-left: 20px;
+  margin-bottom: 0;
+}
+
+.sm-setup-instructions-item {
+  margin-bottom: 5px;
+}
+
+.sm-test-connection-result {
+  display: none;
+  margin-top: 15px;
+}

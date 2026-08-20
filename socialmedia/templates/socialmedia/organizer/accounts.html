@@ -1,11 +1,17 @@
 {% extends "eventyay_common/organizers/base.html" %}
 {% load i18n %}
 {% load bootstrap3 %}
+{% load static %}
 
 {% block title %}{% trans "Social Media Accounts" %} :: {{ organizer.name }}{% endblock %}
 
+{% block custom_header %}
+    <link rel="stylesheet" type="text/css" href="{% static 'socialmedia/css/organizer.css' %}">
+{% endblock %}
+
 {% block inner %}
-    <div class="pull-right flip">
+
+    <div class="pull-right flip sm-organizer-header-actions">
         {% if back_to_event_url %}
             <a href="{{ back_to_event_url }}" class="btn btn-default">
                 <i class="fa fa-arrow-left"></i> {% trans "Back to Event Social Media" %}

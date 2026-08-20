@@ -1,0 +1,45 @@
+/* Styles for Social Media Dashboard landing page */
+
+.sm-dashboard-header {
+  margin-bottom: 25px;
+}
+
+.sm-dashboard-title {
+  font-size: 28px;
+  margin-top: 10px;
+  margin-bottom: 5px;
+  font-weight: 700;
+  color: #333;
+}
+
+.sm-dashboard-subtitle {
+  font-size: 16px;
+  color: #777;
+  font-weight: normal;
+  margin-left: 5px;
+}
+
+.sm-dashboard-description {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 0;
+}
+
+.sm-dashboard-card {
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.sm-dashboard-card-body {
+  padding: 30px;
+  text-align: center;
+}
+
+.sm-dashboard-icon {
+  margin-bottom: 15px;
+}
+
+.sm-dashboard-text {
+  max-width: 500px;
+  margin: 0 auto 20px;
+}

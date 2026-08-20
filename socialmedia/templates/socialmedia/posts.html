@@ -5,8 +5,11 @@
 
 {% block title %}{% trans "Social Media — Posts" %} :: {{ event.name }}{% endblock %}
 
-{% block content %}
+{% block custom_header %}
 <link rel="stylesheet" type="text/css" href="{% static 'socialmedia/css/settings.css' %}">
+{% endblock %}
+
+{% block content %}
 
 <div class="sm-page">
 

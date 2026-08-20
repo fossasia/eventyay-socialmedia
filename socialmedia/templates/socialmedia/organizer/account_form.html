@@ -1,6 +1,7 @@
 {% extends "eventyay_common/organizers/base.html" %}
 {% load i18n %}
 {% load bootstrap3 %}
+{% load static %}
 
 {% block title %}
     {% if object %}
@@ -11,7 +12,12 @@
     :: {{ organizer.name }}
 {% endblock %}
 
+{% block custom_header %}
+    <link rel="stylesheet" type="text/css" href="{% static 'socialmedia/css/organizer.css' %}">
+{% endblock %}
+
 {% block inner %}
+
     <h1>
         {% if object %}
             {% blocktranslate trimmed with provider=object.get_provider_display %}Edit {{ provider }} Account{% endblocktranslate %}
@@ -45,18 +51,18 @@
             </form>
 
             {% if setup_instructions %}
-            <div class="well" style="margin-top: 20px; background-color: #f7f9fa; border-left: 4px solid #337ab7;">
+            <div class="well sm-setup-instructions">
                 <h4><i class="fa fa-info-circle"></i> {% trans "How to connect:" %}</h4>
-                <ol style="padding-left: 20px; margin-bottom: 0;">
+                <ol class="sm-setup-instructions-list">
                     {% for step in setup_instructions %}
-                        <li style="margin-bottom: 5px;">{{ step }}</li>
+                        <li class="sm-setup-instructions-item">{{ step }}</li>
                     {% endfor %}
                 </ol>
             </div>
             {% endif %}
 
             {% if object %}
-            <div id="test-connection-result" style="display:none; margin-top:15px;"></div>
+            <div id="test-connection-result" class="sm-test-connection-result"></div>
             {% endif %}
         </div>
     </div>
