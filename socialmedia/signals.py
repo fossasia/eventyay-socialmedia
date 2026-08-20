@@ -164,12 +164,12 @@ def claim_post_for_publishing(post_pk, provider_name):
             locked_post.error_message = (
                 f"No active {provider_name} account found for organizer."
             )
-            locked_post.save(update_fields=["status", "error_message"])
+            locked_post.save(update_fields=["status", "error_message", "updated_at"])
             return None, None
 
         locked_post.status = SocialMediaPostStatus.EXPORTED
         locked_post.error_message = ""
-        locked_post.save(update_fields=["status", "error_message"])
+        locked_post.save(update_fields=["status", "error_message", "updated_at"])
         return locked_post, account
 
 

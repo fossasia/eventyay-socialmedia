@@ -30,10 +30,10 @@ def publish_single_post(post_pk: int, provider_name: str):
         provider.publish_post(text=claimed_post.post_text, media=media)
         claimed_post.status = SocialMediaPostStatus.PUBLISHED
         claimed_post.error_message = ""
-        claimed_post.save(update_fields=["status", "error_message"])
+        claimed_post.save(update_fields=["status", "error_message", "updated_at"])
         logger.info(f"Successfully published post {post_pk} to {provider_name}.")
     except Exception as e:
         logger.error(f"Failed to publish post {post_pk} to {provider_name}: {e}")
         claimed_post.status = SocialMediaPostStatus.FAILED
         claimed_post.error_message = str(e)
-        claimed_post.save(update_fields=["status", "error_message"])
+        claimed_post.save(update_fields=["status", "error_message", "updated_at"])

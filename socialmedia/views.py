@@ -871,7 +871,7 @@ def publish_post_now(request, organizer, event):
             db_post = locked_post
             db_post.status = SocialMediaPostStatus.EXPORTED
             db_post.error_message = ""
-            db_post.save(update_fields=["status", "error_message"])
+            db_post.save(update_fields=["status", "error_message", "updated_at"])
 
         entity_id = db_post.entity_id or ""
         provider_name = None
