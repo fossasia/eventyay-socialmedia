@@ -5,8 +5,11 @@
 
 {% block title %}{% trans "Social Media — Settings" %} :: {{ event.name }}{% endblock %}
 
-{% block content %}
+{% block custom_header %}
 <link rel="stylesheet" type="text/css" href="{% static 'socialmedia/css/settings.css' %}">
+{% endblock %}
+
+{% block content %}
 
 <div class="sm-page">
   <div class="sm-toolbar">
@@ -166,10 +169,17 @@
             <span class="tokens-label">{% trans "Insert Placeholders:" %}</span>
             <span class="token-chip" data-target="id_socialmedia_speaker_template">{event_name}</span>
             <span class="token-chip" data-target="id_socialmedia_speaker_template">{speaker_name}</span>
+            <span class="token-chip" data-target="id_socialmedia_speaker_template">{speaker_social_handle}</span>
+            <span class="token-chip" data-target="id_socialmedia_speaker_template">{speaker_twitter}</span>
+            <span class="token-chip" data-target="id_socialmedia_speaker_template">{speaker_linkedin}</span>
+            <span class="token-chip" data-target="id_socialmedia_speaker_template">{speaker_github}</span>
             <span class="token-chip" data-target="id_socialmedia_speaker_template">{speaker_link}</span>
             <span class="token-chip" data-target="id_socialmedia_speaker_template">{talk_title}</span>
             <span class="token-chip" data-target="id_socialmedia_speaker_template">{hashtags}</span>
           </div>
+          <p class="help-block text-muted sm-placeholder-help">
+            {% trans "Note: Handle placeholders output as @username across supported networks. Wrap optional placeholders in parentheses () or brackets [] to automatically omit them when empty." %}
+          </p>
         </div>
       </div>
     </div>
@@ -296,7 +306,7 @@
       </div>
     </div>
 
-    <div style="padding-top: 10px; border-top: 1px solid #eee; display:flex; gap:10px;">
+    <div class="sm-preview-actions">
       <button type="submit" name="action" value="save" class="btn btn-primary">
         <i class="fa fa-save"></i> {% trans "Save Settings" %}
       </button>
@@ -305,8 +315,6 @@
       </button>
     </div>
   </form>
-
 </div><!-- /sm-page -->
-<link rel="stylesheet" type="text/css" href="{% static 'socialmedia/css/settings.css' %}">
 <script src="{% static 'socialmedia/js/settings.js' %}"></script>
 {% endblock %}

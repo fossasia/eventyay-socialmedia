@@ -2,22 +2,26 @@
   // ---- Config module ----
   const Config = (function () {
     const configEl = document.getElementById("socialmedia-config");
-    if (!configEl) return null;
-    const config = JSON.parse(configEl.textContent);
+    let config = {};
+    if (configEl && configEl.textContent) {
+      try {
+        config = JSON.parse(configEl.textContent);
+      } catch (e) {
+        console.warn("Failed to parse socialmedia-config JSON:", e);
+      }
+    }
 
     return {
-      PREVIEW_URL: config.previewUrl,
-      EXPORT_URL: config.exportUrl,
-      UPDATE_URL: config.updateUrl,
-      SYNC_URL: config.syncUrl,
+      PREVIEW_URL: config.previewUrl || "",
+      EXPORT_URL: config.exportUrl || "",
+      UPDATE_URL: config.updateUrl || "",
+      SYNC_URL: config.syncUrl || "",
       PUBLISH_NOW_URL: config.publishNowUrl || (config.updateUrl ? config.updateUrl.replace(/\/update\/?$/, "/publish-now/") : null),
-      CSRF_TOKEN: config.csrfToken,
+      CSRF_TOKEN: config.csrfToken || (document.querySelector("input[name=csrfmiddlewaretoken]") ? document.querySelector("input[name=csrfmiddlewaretoken]").value : ""),
       TRANS_CLICK_TO_EDIT: config.transClickToEdit || "Click to edit · Ctrl+Enter to save",
       TRANS_SELECT_AT_LEAST_ONE: config.transSelectAtLeastOne || "Please select at least one post to export.",
     };
   })();
-
-  if (!Config) return;
 
   // ---- Platform metadata ----
   const PLATFORM_META = {
@@ -637,6 +641,34 @@
         tdContent.appendChild(warn);
       }
 
+      if (p.speaker_social_links && p.speaker_social_links.length > 0) {
+        const linksDiv = document.createElement("div");
+        linksDiv.className = "speaker-social-links-row";
+
+        p.speaker_social_links.forEach((link) => {
+          if (!link.url) return;
+          const a = document.createElement("a");
+          a.href = link.url;
+          a.target = "_blank";
+          a.rel = "noopener noreferrer";
+          a.className = "speaker-social-pill";
+
+          const icon = document.createElement("i");
+          const net = (link.network || "globe").toLowerCase();
+          if (net === "twitter" || net === "x") icon.className = "fa fa-twitter";
+          else if (net === "linkedin") icon.className = "fa fa-linkedin";
+          else if (net === "github") icon.className = "fa fa-github";
+          else if (net === "telegram") icon.className = "fa fa-telegram";
+          else if (net === "instagram") icon.className = "fa fa-instagram";
+          else icon.className = "fa fa-globe";
+
+          a.appendChild(icon);
+          a.appendChild(document.createTextNode(link.handle || link.network));
+          linksDiv.appendChild(a);
+        });
+        tdContent.appendChild(linksDiv);
+      }
+
       tdContent.appendChild(editArea);
       tr.appendChild(tdContent);
 
@@ -789,6 +821,41 @@
         mediaImg.alt = "Post Media Attachment";
         mediaBox.appendChild(mediaImg);
         previewBox.appendChild(mediaBox);
+      }
+
+      // Speaker Social Links Section (if present)
+      if (post.speaker_social_links && post.speaker_social_links.length > 0) {
+        const socialBox = document.createElement("div");
+        socialBox.className = "sm-preview-speaker-socials";
+
+        const label = document.createElement("span");
+        label.className = "sm-speaker-social-label";
+        label.textContent = "Speaker Profiles:";
+        socialBox.appendChild(label);
+
+        post.speaker_social_links.forEach((link) => {
+          if (!link.url) return;
+          const a = document.createElement("a");
+          a.href = link.url;
+          a.target = "_blank";
+          a.rel = "noopener noreferrer";
+          a.className = "sm-speaker-social-link btn btn-xs btn-default";
+
+          const icon = document.createElement("i");
+          const net = (link.network || "globe").toLowerCase();
+          if (net === "twitter" || net === "x") icon.className = "fa fa-twitter";
+          else if (net === "linkedin") icon.className = "fa fa-linkedin";
+          else if (net === "github") icon.className = "fa fa-github";
+          else if (net === "telegram") icon.className = "fa fa-telegram";
+          else if (net === "instagram") icon.className = "fa fa-instagram";
+          else icon.className = "fa fa-globe";
+
+          a.appendChild(icon);
+          a.appendChild(document.createTextNode(link.handle || link.network));
+          socialBox.appendChild(a);
+        });
+
+        previewBox.appendChild(socialBox);
       }
 
       // Footer / Char Counter
@@ -1342,7 +1409,7 @@
       const customInputs = document.getElementById("bulk-schedule-custom-inputs");
       if (presetSel && customInputs) {
         presetSel.addEventListener("change", function () {
-          customInputs.classList.toggle("hidden", this.value !== "custom");
+          customInputs.style.display = this.value === "custom" ? "inline-flex" : "none";
         });
       }
 
@@ -1500,27 +1567,52 @@
     }
   };
 
+  // Track last focused input for token chip insertion
+  let lastFocusedInput = null;
+  document.addEventListener("focusin", (e) => {
+    if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) {
+      lastFocusedInput = e.target;
+    }
+  });
+
   // ---- Token & Preset UI Helpers ----
   function insertToken(chip) {
     const targetId = chip.dataset.target;
     const token = chip.textContent;
-    const input = document.getElementById(targetId);
+    let input = lastFocusedInput;
+    if (!input || !document.body.contains(input)) {
+      input = targetId ? document.getElementById(targetId) : null;
+    }
+    if (!input && targetId) {
+      input = document.getElementById(targetId);
+    }
     if (!input) return;
 
-    const startPos = input.selectionStart;
-    const endPos = input.selectionEnd;
-    const value = input.value;
+    const value = input.value || "";
+    let startPos = typeof input.selectionStart === "number" ? input.selectionStart : value.length;
+    let endPos = typeof input.selectionEnd === "number" ? input.selectionEnd : value.length;
+    if (startPos < 0) startPos = value.length;
+    if (endPos < 0) endPos = value.length;
 
     input.value = value.substring(0, startPos) + token + value.substring(endPos);
 
     input.focus();
-    input.selectionStart = startPos + token.length;
-    input.selectionEnd = startPos + token.length;
+    try {
+      input.selectionStart = startPos + token.length;
+      input.selectionEnd = startPos + token.length;
+    } catch (err) {
+      if (!(err instanceof DOMException)) {
+        console.warn("Failed to set input selection position:", err);
+      }
+    }
 
-    // Trigger input/change event
-    const evt = document.createEvent("HTMLEvents");
-    evt.initEvent("input", true, true);
-    input.dispatchEvent(evt);
+    const evtInput = document.createEvent("HTMLEvents");
+    evtInput.initEvent("input", true, true);
+    input.dispatchEvent(evtInput);
+
+    const evtChange = document.createEvent("HTMLEvents");
+    evtChange.initEvent("change", true, true);
+    input.dispatchEvent(evtChange);
   }
 
   function handlePresetClick(btn) {
@@ -1547,10 +1639,30 @@
     offsets.sort((a, b) => b - a);
     input.value = offsets.join(", ");
 
-    const evt = document.createEvent("HTMLEvents");
-    evt.initEvent("change", true, true);
-    input.dispatchEvent(evt);
+    const evtInput = document.createEvent("HTMLEvents");
+    evtInput.initEvent("input", true, true);
+    input.dispatchEvent(evtInput);
+
+    const evtChange = document.createEvent("HTMLEvents");
+    evtChange.initEvent("change", true, true);
+    input.dispatchEvent(evtChange);
   }
+
+  // Document-level event delegation for token chips & preset buttons
+  document.addEventListener("click", (e) => {
+    const chip = e.target.closest(".token-chip");
+    if (chip) {
+      e.preventDefault();
+      insertToken(chip);
+      return;
+    }
+    const presetBtn = e.target.closest(".presets-container .preset-btn");
+    if (presetBtn) {
+      e.preventDefault();
+      handlePresetClick(presetBtn);
+      return;
+    }
+  });
 
   function updatePresetsUI(container, currentOffsets) {
     container.querySelectorAll(".preset-btn").forEach(btn => {
