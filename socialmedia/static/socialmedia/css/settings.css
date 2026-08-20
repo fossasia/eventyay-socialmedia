@@ -1163,3 +1163,102 @@ body .sm-toast i {
   font-size: 12px;
   color: #6c757d;
 }
+
+/* Bulk schedule & export helpers */
+#bulk-schedule-custom-inputs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+#bulk-schedule-custom-date {
+  width: 130px;
+  display: inline-block;
+}
+
+#bulk-schedule-custom-time {
+  width: 100px;
+  display: inline-block;
+}
+
+#validation-alert-container {
+  display: none;
+  margin-bottom: 12px;
+}
+
+.sm-export-preset-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#export-preset-select {
+  width: 150px;
+  display: inline-block;
+}
+
+.sm-preset-hint {
+  font-size: 12px;
+  font-weight: 400;
+  color: #aaa;
+}
+
+.sm-preview-actions {
+  padding-top: 10px;
+  border-top: 1px solid #eee;
+  display: flex;
+  gap: 10px;
+}
+
+.sm-placeholder-help {
+  font-size: 11px;
+  margin-top: 5px;
+}
+
+/* Speaker social links in table and preview modal */
+.speaker-social-links-row {
+  margin-top: 4px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.speaker-social-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: #337ab7;
+  text-decoration: none;
+}
+
+.speaker-social-pill:hover {
+  text-decoration: underline;
+}
+
+.sm-preview-speaker-socials {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-top: 1px solid #eee;
+  background: #f9f9f9;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sm-speaker-social-label {
+  font-size: 11px;
+  color: #666;
+  font-weight: 600;
+}
+
+.sm-speaker-social-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 12px;
+  font-size: 11px;
+}
