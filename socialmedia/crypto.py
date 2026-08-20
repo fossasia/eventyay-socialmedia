@@ -1,9 +1,12 @@
 import base64
 import hashlib
 import json
+import logging
 
 from cryptography.fernet import Fernet
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
 
 
 def _get_fernet() -> Fernet:
@@ -31,6 +34,6 @@ def decrypt_credentials(encrypted_text: str) -> dict:
         fernet = _get_fernet()
         decrypted_bytes = fernet.decrypt(encrypted_text.encode("utf-8"))
         return json.loads(decrypted_bytes.decode("utf-8"))
-    except Exception:
-        # Return empty dictionary in case of tampering or key mismatch
+    except Exception as exc:
+        logger.warning("Failed to decrypt credentials: %s", exc)
         return {}
