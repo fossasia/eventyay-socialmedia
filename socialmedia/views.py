@@ -931,6 +931,12 @@ def publish_post_now(request, organizer, event):
             else:
                 db_post.error_message = err_details
             db_post.save()
+            logger.error(
+                "Manual publishing failed for post %s (event '%s'): %s",
+                db_post.pk,
+                request.event.slug,
+                db_post.error_message,
+            )
             return JsonResponse(
                 {
                     "success": False,
@@ -948,6 +954,13 @@ def publish_post_now(request, organizer, event):
         )
         db_post.error_message = ""
         db_post.save()
+        logger.info(
+            "Manual publishing succeeded for post %s (event '%s', providers: %s, status -> %s).",
+            db_post.pk,
+            request.event.slug,
+            published_providers,
+            db_post.status,
+        )
 
         return JsonResponse(
             {
