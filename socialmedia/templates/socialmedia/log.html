@@ -60,20 +60,16 @@
             </span>
           </td>
           <td>
-            {% if post.entity_id %}
-              {% for platform in platforms %}
-                {% if platform in post.entity_id %}
-                  <span class="sm-platform-badge sm-platform-{{ platform }}">
-                    {% if platform == "telegram" %}<i class="fa fa-paper-plane"></i>{% endif %}
-                    {% if platform == "mastodon" %}<i class="fa fa-bullhorn"></i>{% endif %}
-                    {% if platform == "twitter" %}<i class="fa fa-twitter"></i>{% endif %}
-                    {% if platform == "linkedin" %}<i class="fa fa-linkedin"></i>{% endif %}
-                    {{ platform|capfirst }}
-                  </span>
-                {% endif %}
-              {% endfor %}
+            {% if "telegram" in post.entity_id %}
+              <span class="sm-platform-badge sm-platform-telegram"><i class="fa fa-paper-plane"></i> Telegram</span>
+            {% elif "mastodon" in post.entity_id %}
+              <span class="sm-platform-badge sm-platform-mastodon"><i class="fa fa-bullhorn"></i> Mastodon</span>
+            {% elif "twitter" in post.entity_id %}
+              <span class="sm-platform-badge sm-platform-twitter"><i class="fa fa-twitter"></i> Twitter</span>
+            {% elif "linkedin" in post.entity_id %}
+              <span class="sm-platform-badge sm-platform-linkedin"><i class="fa fa-linkedin"></i> LinkedIn</span>
             {% else %}
-              <span class="sm-platform-badge">{% trans "Generic" %}</span>
+              <span class="sm-platform-badge sm-platform-generic">{% trans "Generic" %}</span>
             {% endif %}
           </td>
           <td class="sm-log-content">

@@ -186,7 +186,7 @@ def test_publish_scheduled_posts_future_or_other_status(organizer, event, settin
 
 
 @pytest.mark.django_db
-def test_publish_scheduled_posts_ignores_unpinned_stale_generated_posts(
+def test_publish_scheduled_posts_auto_publishes_unpinned_posts_when_enabled(
     organizer, event, settings
 ):
     settings.CELERY_TASK_ALWAYS_EAGER = True
@@ -200,12 +200,52 @@ def test_publish_scheduled_posts_ignores_unpinned_stale_generated_posts(
     account.save()
 
     with scope(organizer=organizer, event=event):
+        event.settings.set("socialmedia_auto_publish", True)
         post = SocialMediaPost.objects.create(
             event=event,
             post_type="cfp",
             entity_id="cfp_1_telegram",
-            scheduled_at=now() - timedelta(days=30),
-            post_text="Old generated post",
+            scheduled_at=now() - timedelta(minutes=5),
+            post_text="Unpinned auto published post",
+            status=SocialMediaPostStatus.SCHEDULED,
+            is_pinned=False,
+        )
+
+    with patch.object(
+        TelegramProvider,
+        "publish_post",
+        return_value={"post_id": "123", "url": "https://t.me/123"},
+    ) as mock_publish:
+        publish_scheduled_posts(sender=None)
+        mock_publish.assert_called_once_with(text="Unpinned auto published post", media=None)
+
+    with scope(organizer=organizer, event=event):
+        post.refresh_from_db()
+        assert post.status == SocialMediaPostStatus.PUBLISHED
+
+
+@pytest.mark.django_db
+def test_publish_scheduled_posts_skips_unpinned_when_auto_publish_disabled(
+    organizer, event, settings
+):
+    settings.CELERY_TASK_ALWAYS_EAGER = True
+    account = SocialMediaAccount.objects.create(
+        organizer=organizer,
+        provider="telegram",
+        platform_username="test_channel",
+        is_active=True,
+    )
+    account.credentials = {"bot_token": "fake_token"}
+    account.save()
+
+    with scope(organizer=organizer, event=event):
+        event.settings.set("socialmedia_auto_publish", False)
+        post = SocialMediaPost.objects.create(
+            event=event,
+            post_type="cfp",
+            entity_id="cfp_1_telegram",
+            scheduled_at=now() - timedelta(minutes=5),
+            post_text="Unpinned post should be skipped",
             status=SocialMediaPostStatus.SCHEDULED,
             is_pinned=False,
         )

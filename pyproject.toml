@@ -15,6 +15,7 @@ maintainers = [
 dependencies = [
     "Mastodon.py",
     "requests-oauthlib",
+    "cryptography",
 ]
 
 [project.entry-points."pretix.plugin"]

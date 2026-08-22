@@ -380,9 +380,10 @@ def update_post(request, organizer, event):
             new_scheduled_at = tz.localize(naive_dt)
             db_post.scheduled_at = new_scheduled_at
 
-            # When the organizer moves a post to a future time, reset any terminal
-            # or done status back to SCHEDULED so Celery Beat picks it up again.
-            _terminal_statuses = (
+            # When the organizer moves a post to a future time, reset any terminal,
+            # draft, or failed status back to SCHEDULED so Celery Beat picks it up.
+            _reschedulable_statuses = (
+                SocialMediaPostStatus.DRAFT,
                 SocialMediaPostStatus.PUBLISHED,
                 SocialMediaPostStatus.EXPORTED,
                 SocialMediaPostStatus.FAILED,
@@ -390,7 +391,8 @@ def update_post(request, organizer, event):
             )
             if (
                 new_scheduled_at > timezone.now()
-                and db_post.status in _terminal_statuses
+                and db_post.status in _reschedulable_statuses
+                and (status is None or status == SocialMediaPostStatus.SCHEDULED)
             ):
                 db_post.status = SocialMediaPostStatus.SCHEDULED
                 db_post.error_message = ""
@@ -399,6 +401,12 @@ def update_post(request, organizer, event):
                     db_post.pk,
                     new_scheduled_at,
                 )
+            elif (
+                new_scheduled_at <= timezone.now()
+                and db_post.status == SocialMediaPostStatus.SCHEDULED
+                and status is None
+            ):
+                db_post.status = SocialMediaPostStatus.DRAFT
 
         if is_pinned is not None:
             db_post.is_pinned = is_pinned
@@ -863,7 +871,7 @@ def publish_post_now(request, organizer, event):
             db_post = locked_post
             db_post.status = SocialMediaPostStatus.EXPORTED
             db_post.error_message = ""
-            db_post.save(update_fields=["status", "error_message"])
+            db_post.save(update_fields=["status", "error_message", "updated_at"])
 
         entity_id = db_post.entity_id or ""
         provider_name = None
@@ -930,6 +938,12 @@ def publish_post_now(request, organizer, event):
             else:
                 db_post.error_message = err_details
             db_post.save()
+            logger.error(
+                "Manual publishing failed for post %s (event '%s'): %s",
+                db_post.pk,
+                request.event.slug,
+                db_post.error_message,
+            )
             return JsonResponse(
                 {
                     "success": False,
@@ -947,6 +961,13 @@ def publish_post_now(request, organizer, event):
         )
         db_post.error_message = ""
         db_post.save()
+        logger.info(
+            "Manual publishing succeeded for post %s (event '%s', providers: %s, status -> %s).",
+            db_post.pk,
+            request.event.slug,
+            published_providers,
+            db_post.status,
+        )
 
         return JsonResponse(
             {

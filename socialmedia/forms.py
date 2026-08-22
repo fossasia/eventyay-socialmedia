@@ -136,6 +136,16 @@ class SocialMediaSettingsForm(SettingsForm):
         required=False,
         max_length=200,
     )
+    socialmedia_auto_publish = forms.BooleanField(
+        label=_("Automatically Publish Scheduled Posts"),
+        help_text=_(
+            "When enabled, scheduled posts for direct integrations (e.g. Telegram, Mastodon) "
+            "are published automatically at their scheduled time by the background worker. "
+            "When disabled, posts remain as drafts until manually approved or pinned."
+        ),
+        required=False,
+        initial=True,
+    )
 
     # ------------------------------------------------------------------
     # Platform toggles  (order: Twitter, LinkedIn, Telegram, Mastodon)

@@ -1,3 +1,5 @@
+import logging
+
 from django.conf import settings
 from django.db import transaction
 from django.dispatch import receiver
@@ -131,13 +133,17 @@ def control_dashboard_socialmedia(sender, request=None, **kwargs):
     )
 
 
-def claim_post_for_publishing(post_pk, provider_name):
+logger = logging.getLogger(__name__)
+
+
+def claim_post_for_publishing(post_pk: int, provider_name: str):
     """Atomically claim a scheduled or failed post for publishing.
 
     Transitions status to EXPORTED while holding select_for_update row lock,
     releasing the lock immediately upon commit before HTTP network calls.
     Returns (claimed_post, account) or (None, None) if unavailable.
     """
+    logger.debug("Attempting to claim post %s for provider %s.", post_pk, provider_name)
     with transaction.atomic():
         locked_post = (
             SocialMediaPost.objects.filter(
@@ -151,6 +157,10 @@ def claim_post_for_publishing(post_pk, provider_name):
             .first()
         )
         if not locked_post:
+            logger.info(
+                "Post %s could not be locked for publishing (already claimed, running, or not in SCHEDULED/FAILED state).",
+                post_pk,
+            )
             return None, None
 
         account = SocialMediaAccount.objects.filter(
@@ -164,12 +174,23 @@ def claim_post_for_publishing(post_pk, provider_name):
             locked_post.error_message = (
                 f"No active {provider_name} account found for organizer."
             )
-            locked_post.save(update_fields=["status", "error_message"])
+            locked_post.save(update_fields=["status", "error_message", "updated_at"])
+            logger.warning(
+                "Post %s marked as FAILED: No active %s account found for organizer '%s'.",
+                post_pk,
+                provider_name,
+                locked_post.event.organizer.slug,
+            )
             return None, None
 
         locked_post.status = SocialMediaPostStatus.EXPORTED
         locked_post.error_message = ""
-        locked_post.save(update_fields=["status", "error_message"])
+        locked_post.save(update_fields=["status", "error_message", "updated_at"])
+        logger.info(
+            "Post %s successfully claimed for %s (status transitioned to EXPORTED).",
+            post_pk,
+            provider_name,
+        )
         return locked_post, account
 
 
@@ -182,16 +203,40 @@ def publish_scheduled_posts(sender, **kwargs):
     """
     from .tasks import publish_single_post
 
-    due_posts = SocialMediaPost.objects.filter(
-        status=SocialMediaPostStatus.SCHEDULED,
-        is_pinned=True,
-        scheduled_at__lte=now(),
-    ).order_by("scheduled_at", "pk")
+    due_posts = (
+        SocialMediaPost.objects.select_related("event", "event__organizer")
+        .filter(
+            status=SocialMediaPostStatus.SCHEDULED,
+            scheduled_at__lte=now(),
+        )
+        .order_by("scheduled_at", "pk")
+    )
+
+    count = due_posts.count()
+    if count > 0:
+        logger.info("Social media periodic runner found %d due post(s) to process.", count)
 
     for post in due_posts:
+        # Check event setting: auto-publish enabled or explicit pin required
+        auto_publish = post.event.settings.get(
+            "socialmedia_auto_publish", as_type=bool, default=True
+        )
+        if not auto_publish and not post.is_pinned:
+            logger.info(
+                "Skipping post %s (event '%s'): socialmedia_auto_publish is False and post is unpinned.",
+                post.pk,
+                post.event.slug,
+            )
+            continue
+
         entity_id = post.entity_id or ""
         provider_names = []
         if any(entity_id.endswith(f"_{prov}") for prov in SCHEDULER_PROVIDERS):
+            logger.debug(
+                "Skipping post %s (entity '%s'): belongs to external scheduler provider.",
+                post.pk,
+                entity_id,
+            )
             continue
 
         for prov in DIRECT_PUBLISH_PROVIDERS:
@@ -212,10 +257,26 @@ def publish_scheduled_posts(sender, **kwargs):
             )
             provider_names = active_provs
 
+        if not provider_names:
+            logger.warning(
+                "Post %s (event '%s', scheduled for %s) has no active direct providers (Telegram/Mastodon) configured.",
+                post.pk,
+                post.event.slug,
+                post.scheduled_at,
+            )
+            continue
+
         for provider_name in provider_names:
-            if getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False) or getattr(
+            is_eager = getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False) or getattr(
                 settings, "CELERY_ALWAYS_EAGER", False
-            ):
+            )
+            logger.info(
+                "Dispatching publish_single_post for post %s to provider %s (eager=%s).",
+                post.pk,
+                provider_name,
+                is_eager,
+            )
+            if is_eager:
                 publish_single_post(post.pk, provider_name)
             else:
                 publish_single_post.apply_async(args=[post.pk, provider_name])

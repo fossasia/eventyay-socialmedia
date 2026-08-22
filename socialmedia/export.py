@@ -5,6 +5,7 @@ import re
 from datetime import timedelta
 
 import pytz
+from django.utils import timezone
 from django.utils.timezone import is_naive, make_aware
 
 logger = logging.getLogger(__name__)
@@ -1174,6 +1175,12 @@ def sync_posts_to_db(event, request=None):
             logger.warning("Error parsing datetime string '%s': %s", dt_str, exc)
             continue
 
+        now_dt = timezone.now()
+        initial_status = (
+            SocialMediaPostStatus.DRAFT
+            if scheduled_at < now_dt
+            else SocialMediaPostStatus.SCHEDULED
+        )
         offset_val = p.get("offset_days", 0)
         db_post, created = SocialMediaPost.objects.get_or_create(
             event=event,
@@ -1185,7 +1192,7 @@ def sync_posts_to_db(event, request=None):
                 "post_text": p["post_text"],
                 "media_url": p.get("media_url"),
                 "template_context": p.get("template_context", "announcement"),
-                "status": SocialMediaPostStatus.SCHEDULED,
+                "status": initial_status,
             },
         )
         if not created and not db_post.is_pinned:
@@ -1194,6 +1201,10 @@ def sync_posts_to_db(event, request=None):
             if "media_url" in p and p["media_url"] is not None:
                 db_post.media_url = p["media_url"]
             db_post.template_context = p.get("template_context", "announcement")
+            if db_post.status == SocialMediaPostStatus.SCHEDULED and scheduled_at < now_dt:
+                db_post.status = SocialMediaPostStatus.DRAFT
+            elif db_post.status == SocialMediaPostStatus.DRAFT and scheduled_at >= now_dt:
+                db_post.status = SocialMediaPostStatus.SCHEDULED
             db_post.save()
 
     # Clean up obsolete non-pinned, non-custom posts that are no longer generated.
