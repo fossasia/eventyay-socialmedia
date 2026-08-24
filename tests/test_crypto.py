@@ -40,23 +40,26 @@ def test_encryption_empty_or_none():
 
 @pytest.mark.django_db
 def test_social_media_account_credentials_property(organizer):
-    account = SocialMediaAccount.objects.create(
-        organizer=organizer,
-        provider="mastodon",
-        platform_username="test_user",
-    )
+    from django_scopes import scope
 
-    credentials_payload = {
-        "access_token": "token-xyz",
-        "instance_url": "https://mastodon.social",
-    }
+    with scope(organizer=organizer):
+        account = SocialMediaAccount.objects.create(
+            organizer=organizer,
+            provider="mastodon",
+            platform_username="test_user",
+        )
 
-    # Set credentials via property
-    account.credentials = credentials_payload
-    account.save()
+        credentials_payload = {
+            "access_token": "token-xyz",
+            "instance_url": "https://mastodon.social",
+        }
 
-    # Re-fetch from DB
-    db_account = SocialMediaAccount.objects.get(pk=account.pk)
-    assert db_account.encrypted_credentials != ""
-    assert "token-xyz" not in db_account.encrypted_credentials
-    assert db_account.credentials == credentials_payload
+        # Set credentials via property
+        account.credentials = credentials_payload
+        account.save()
+
+        # Re-fetch from DB
+        db_account = SocialMediaAccount.objects.get(pk=account.pk)
+        assert db_account.encrypted_credentials != ""
+        assert "token-xyz" not in db_account.encrypted_credentials
+        assert db_account.credentials == credentials_payload

@@ -661,9 +661,238 @@ class BufferAccountForm(forms.ModelForm):
         return instance
 
 
+class TwitterAccountForm(forms.ModelForm):
+    api_key = forms.CharField(
+        label=_("API Key (Consumer Key)"),
+        widget=forms.PasswordInput(render_value=True),
+        required=True,
+    )
+    api_secret = forms.CharField(
+        label=_("API Secret (Consumer Secret)"),
+        widget=forms.PasswordInput(render_value=True),
+        required=True,
+    )
+    access_token = forms.CharField(
+        label=_("Access Token"),
+        widget=forms.PasswordInput(render_value=True),
+        required=True,
+    )
+    access_token_secret = forms.CharField(
+        label=_("Access Token Secret"),
+        widget=forms.PasswordInput(render_value=True),
+        required=True,
+    )
+
+    class Meta:
+        model = SocialMediaAccount
+        fields = ["platform_username", "is_active"]
+        labels = {
+            "platform_username": _("Twitter/X Handle"),
+        }
+        help_texts = {
+            "platform_username": _("e.g. @eventyay"),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            creds = self.instance.credentials
+            fields = [
+                "api_key",
+                "api_secret",
+                "access_token",
+                "access_token_secret",
+            ]
+            for field_name in fields:
+                if creds.get(field_name):
+                    self.fields[field_name].initial = "••••••••"
+                    self.fields[field_name].required = False
+
+    def _clean_credential(self, field_name):
+        val = self.cleaned_data.get(field_name)
+        if (not val or val == "••••••••") and self.instance and self.instance.pk:
+            return self.instance.credentials.get(field_name)
+        return val.strip() if val else val
+
+    def clean_api_key(self):
+        return self._clean_credential("api_key")
+
+    def clean_api_secret(self):
+        return self._clean_credential("api_secret")
+
+    def clean_access_token(self):
+        return self._clean_credential("access_token")
+
+    def clean_access_token_secret(self):
+        return self._clean_credential("access_token_secret")
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.provider = "twitter"
+        instance.credentials = {
+            "api_key": self.cleaned_data.get("api_key"),
+            "api_secret": self.cleaned_data.get("api_secret"),
+            "access_token": self.cleaned_data.get("access_token"),
+            "access_token_secret": self.cleaned_data.get("access_token_secret"),
+        }
+        if commit:
+            instance.save()
+        return instance
+
+
+class LinkedInAccountForm(forms.ModelForm):
+    access_token = forms.CharField(
+        label=_("Access Token"),
+        widget=forms.PasswordInput(render_value=True),
+        required=False,
+        help_text=_(
+            "Paste your LinkedIn access token here, OR fill in Client ID, "
+            "Client Secret, and Authorization Code below to generate one."
+        ),
+    )
+    client_id = forms.CharField(
+        label=_("Client ID"),
+        required=False,
+        help_text=_(
+            "From LinkedIn Developer Portal → Auth tab → Application credentials"
+        ),
+    )
+    client_secret = forms.CharField(
+        label=_("Client Secret"),
+        widget=forms.PasswordInput(render_value=True),
+        required=False,
+        help_text=_(
+            "From LinkedIn Developer Portal → Auth tab → Application credentials"
+        ),
+    )
+    authorization_code = forms.CharField(
+        label=_("Authorization Code"),
+        required=False,
+        help_text=_(
+            "The code from the OAuth redirect URL after authorizing your app. "
+            "See setup instructions for details."
+        ),
+    )
+    author_urn = forms.CharField(
+        label=_("Author URN"),
+        help_text=_(
+            "Optional for personal profiles (leave blank to auto-detect). "
+            "For company pages, enter urn:li:organization:YOUR_PAGE_ID."
+        ),
+        required=False,
+    )
+
+    class Meta:
+        model = SocialMediaAccount
+        fields = ["platform_username", "is_active"]
+        labels = {
+            "platform_username": _("LinkedIn Profile/Page Name"),
+        }
+        help_texts = {
+            "platform_username": _("e.g. Eventyay Organization Page"),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            creds = self.instance.credentials
+            if creds.get("author_urn"):
+                self.fields["author_urn"].initial = creds.get("author_urn")
+            if creds.get("access_token"):
+                self.fields["access_token"].initial = "••••••••"
+                self.fields["client_id"].initial = creds.get("client_id", "")
+                # Don't show client_secret
+
+    def clean(self):
+        cleaned_data = super().clean()
+        access_token = cleaned_data.get("access_token")
+        client_id = cleaned_data.get("client_id")
+        client_secret = cleaned_data.get("client_secret")
+        auth_code = cleaned_data.get("authorization_code")
+
+        # If token is masked and no OAuth credentials provided, keep existing
+        if (
+            (not access_token or access_token == "••••••••")
+            and self.instance
+            and self.instance.pk
+        ):
+            existing_token = self.instance.credentials.get("access_token")
+            if existing_token:
+                cleaned_data["access_token"] = existing_token
+
+        # Exchange authorization code for access token
+        if auth_code and client_id and client_secret:
+            import requests as http_requests
+
+            try:
+                resp = http_requests.post(
+                    "https://www.linkedin.com/oauth/v2/accessToken",
+                    data={
+                        "grant_type": "authorization_code",
+                        "code": auth_code,
+                        "redirect_uri": "https://localhost",
+                        "client_id": client_id,
+                        "client_secret": client_secret,
+                    },
+                    timeout=15,
+                )
+                if resp.status_code == 200:
+                    try:
+                        token_data = resp.json()
+                    except Exception:
+                        raise forms.ValidationError(
+                            _("LinkedIn token exchange failed: %(error)s"),
+                            params={"error": resp.text[:200]},
+                        )
+                    cleaned_data["access_token"] = token_data.get("access_token")
+                else:
+                    try:
+                        error_msg = resp.json().get("error_description") or resp.text[:200]
+                    except Exception:
+                        error_msg = resp.text[:200]
+                    raise forms.ValidationError(
+                        _("LinkedIn token exchange failed: %(error)s"),
+                        params={"error": error_msg},
+                    )
+            except http_requests.RequestException as e:
+                raise forms.ValidationError(
+                    _("Could not connect to LinkedIn: %(error)s"),
+                    params={"error": str(e)},
+                ) from e
+        elif auth_code and (not client_id or not client_secret):
+            raise forms.ValidationError(
+                _(
+                    "Client ID and Client Secret are required when using "
+                    "Authorization Code."
+                )
+            )
+
+        return cleaned_data
+
+    def clean_access_token(self):
+        token = self.cleaned_data.get("access_token")
+        if (not token or token == "••••••••") and self.instance and self.instance.pk:
+            return self.instance.credentials.get("access_token")
+        return token.strip() if token else token
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.provider = "linkedin"
+        instance.credentials = {
+            "access_token": self.cleaned_data.get("access_token"),
+            "author_urn": (self.cleaned_data.get("author_urn") or "").strip(),
+            "client_id": (self.cleaned_data.get("client_id") or "").strip(),
+        }
+        if commit:
+            instance.save()
+        return instance
+
+
 PROVIDER_FORMS = {
     "telegram": TelegramAccountForm,
     "mastodon": MastodonAccountForm,
+    "twitter": TwitterAccountForm,
+    "linkedin": LinkedInAccountForm,
     "postiz": PostizAccountForm,
     "buffer": BufferAccountForm,
 }

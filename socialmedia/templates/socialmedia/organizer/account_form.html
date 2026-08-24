@@ -53,11 +53,11 @@
             {% if setup_instructions %}
             <div class="well sm-setup-instructions">
                 <h4><i class="fa fa-info-circle"></i> {% trans "How to connect:" %}</h4>
-                <ol class="sm-setup-instructions-list">
+                <ul class="sm-setup-instructions-list list-unstyled">
                     {% for step in setup_instructions %}
                         <li class="sm-setup-instructions-item">{{ step }}</li>
                     {% endfor %}
-                </ol>
+                </ul>
             </div>
             {% endif %}
 
@@ -67,48 +67,28 @@
         </div>
     </div>
 
-    {% if object %}
-    <script>
-    (function() {
-        var btn = document.getElementById('test-connection-btn');
-        if (!btn) return;
-        btn.addEventListener('click', function() {
-            var pk = btn.getAttribute('data-account-pk');
-            var resultDiv = document.getElementById('test-connection-result');
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> {% trans "Testing..." %}';
-            resultDiv.style.display = 'none';
-
-            var xhr = new XMLHttpRequest();
-            xhr.open('POST', '{% url "plugins:socialmedia:organizer_account_test" organizer=organizer.slug pk=object.pk %}');
-            xhr.setRequestHeader('X-CSRFToken', '{{ csrf_token }}');
-            xhr.onload = function() {
-                var data;
-                try {
-                    data = JSON.parse(xhr.responseText);
-                } catch(e) {
-                    data = { success: false, message: "{% trans 'An unexpected server error occurred.' %}" };
-                }
-                resultDiv.style.display = 'block';
-                if (xhr.status === 200 && data.success) {
-                    resultDiv.innerHTML = '<div class="alert alert-success"><i class="fa fa-check-circle"></i> ' + data.message + '</div>';
-                } else {
-                    resultDiv.innerHTML = '<div class="alert alert-danger"><i class="fa fa-times-circle"></i> ' + data.message + '</div>';
-                }
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fa fa-plug"></i> {% trans "Test Connection" %}';
-            };
-            xhr.onerror = function() {
-                resultDiv.style.display = 'block';
-                resultDiv.innerHTML = '<div class="alert alert-danger"><i class="fa fa-times-circle"></i> {% trans "Network error. Please try again." %}</div>';
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fa fa-plug"></i> {% trans "Test Connection" %}';
-            };
-
-
-            xhr.send(JSON.stringify({}));
-        });
-    })();
+    <script id="socialmedia-organizer-config" type="application/json">
+    {
+        {% if object %}
+        "testUrl": "{% url 'plugins:socialmedia:organizer_account_test' organizer=organizer.slug pk=object.pk %}",
+        {% else %}
+        "testUrl": null,
+        {% endif %}
+        "csrfToken": "{{ csrf_token }}",
+        "transTesting": "{% trans 'Testing...' %}",
+        "transTestConnection": "{% trans 'Test Connection' %}",
+        "transServerError": "{% trans 'An unexpected server error occurred.' %}",
+        "transNetworkError": "{% trans 'Network error. Please try again.' %}",
+        "transCopyUrl": "{% trans 'Copy URL' %}",
+        "transCopied": "{% trans 'Copied!' %}",
+        "transOpenAuth": "{% trans 'Open Authorization Page' %}",
+        "transAuthReady": "{% trans 'Your custom authorization link is ready:' %}",
+        "transAuthPasteHint": "{% trans 'Paste your Client ID in the form above to generate your custom link:' %}",
+        "transAuthStepTitle": "{% trans 'Authorize your LinkedIn account using this link:' %}",
+        "transCompanyScopeOption": "{% trans 'Include Company Page scope (w_organization_social) - only if approved on your app' %}"
+    }
     </script>
-    {% endif %}
+    <script src="{% static 'socialmedia/js/organizer.js' %}"></script>
 {% endblock %}
+
+

@@ -237,12 +237,36 @@ class TelegramProvider(BaseSocialProvider):
     @classmethod
     def get_setup_instructions(cls) -> list[str]:
         return [
-            "Message @BotFather on Telegram and send /newbot to create your bot.",
-            "Copy the Bot API Token provided by BotFather.",
-            "Add the bot as an administrator (or member) to your target group/channel.",
             (
-                "Obtain the numeric Channel/Chat ID (prefixed with -100 for "
-                "supergroups, e.g. -1004301847700) or public @username, then "
-                "input it above."
+                "1. Open Telegram and search for @BotFather. Send /newbot to "
+                "create a new bot."
+            ),
+            (
+                "2. Choose a name for your bot (e.g. 'Eventyay Social Bot') and "
+                "a username (must end in 'bot', e.g. 'eventyay_social_bot')."
+            ),
+            (
+                "3. BotFather will give you a Bot API Token (e.g. "
+                "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11). Copy this token."
+            ),
+            (
+                "4. Add the bot to your target group or channel:\n"
+                "   • For groups: go to group settings → Administrators → Add "
+                "administrator → search for your bot username.\n"
+                "   For channels: go to channel settings → Administrators → "
+                "Add administrator → search for your bot username.\n"
+                "   The bot needs 'Post Messages' permission at minimum."
+            ),
+            (
+                "5. Get your Chat ID:\n"
+                "   • Public channel: use the @username (e.g. @mychannel)\n"
+                "   • Private group/channel: send a message in the group, then "
+                "open https://api.telegram.org/botYOUR_TOKEN/getUpdates in a "
+                "browser. Look for 'chat' → 'id' in the response. Private "
+                "groups have IDs starting with -100 (e.g. -1001234567890)."
+            ),
+            (
+                "6. Enter the Bot API Token and Chat ID (or @username) in the "
+                "fields below."
             ),
         ]

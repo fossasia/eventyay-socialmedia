@@ -13,6 +13,14 @@
 
 <div class="sm-page">
 
+  {# Form errors shown at the top so they're always visible — not buried inside the accordion #}
+  {% if form.errors %}
+  <div id="sm-form-errors" class="alert alert-danger" style="margin-bottom:16px;">
+    <strong><i class="fa fa-exclamation-triangle"></i> {% trans "Please fix the errors below before saving." %}</strong>
+    {% bootstrap_form_errors form %}
+  </div>
+  {% endif %}
+
   <!-- Toolbar -->
   <div class="sm-toolbar">
     <h1>
@@ -152,7 +160,6 @@
     <div class="adv-body" id="adv-body">
       <form action="" method="post" class="form-horizontal">
         {% csrf_token %}
-        {% bootstrap_form_errors form %}
 
         <!-- Platforms -->
         <div class="adv-group">
@@ -464,4 +471,21 @@
   }
 </script>
 <script src="{% static 'socialmedia/js/settings.js' %}"></script>
+{% if form.errors %}
+<script>
+  // Auto-expand the Advanced Settings accordion and scroll to the error banner.
+  document.addEventListener("DOMContentLoaded", function () {
+    var advBody = document.getElementById("adv-body");
+    var advToggle = document.getElementById("adv-toggle");
+    var errBanner = document.getElementById("sm-form-errors");
+    if (advBody) {
+      advBody.style.display = "block";
+      if (advToggle) advToggle.classList.add("open");
+    }
+    if (errBanner) {
+      errBanner.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  });
+</script>
+{% endif %}
 {% endblock %}

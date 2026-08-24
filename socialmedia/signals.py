@@ -20,7 +20,7 @@ from eventyay.control.signals import (
 from .models import SocialMediaAccount, SocialMediaPost, SocialMediaPostStatus
 
 HAS_SOCIAL_MEDIA_PERM = hasattr(Team, "can_manage_social_media")
-DIRECT_PUBLISH_PROVIDERS = ["telegram", "mastodon"]
+DIRECT_PUBLISH_PROVIDERS = ["telegram", "mastodon", "twitter", "linkedin"]
 SCHEDULER_PROVIDERS = ["postiz", "buffer"]
 
 ORGANIZER_PERMISSION = (

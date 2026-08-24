@@ -137,8 +137,25 @@ class PostizProvider(BaseSocialProvider):
     @classmethod
     def get_setup_instructions(cls) -> list[str]:
         return [
-            "Log in to your Postiz dashboard instance.",
-            "Navigate to Settings -> API Keys (or Developer Settings).",
-            "Generate a new API Key and copy the value.",
-            "Enter your Postiz API instance URL and key to establish connection.",
+            (
+                "1. Log in to your Postiz dashboard (e.g. https://app.postiz.com "
+                "or your self-hosted instance)."
+            ),
+            (
+                "2. Connect your social media channels in Postiz first "
+                "(Settings → Channels). Postiz acts as a bridge to multiple "
+                "platforms."
+            ),
+            (
+                "3. Go to Settings → API Keys (or Developer Settings). "
+                "Generate a new API key."
+            ),
+            (
+                "4. Enter below:\n"
+                "   • API Instance URL: your Postiz API URL "
+                "(e.g. https://api.postiz.com)\n"
+                "   • API Key: the key from step 3\n"
+                "   • Configuration Name: a label for this connection "
+                "(e.g. 'My Postiz Account')"
+            ),
         ]
