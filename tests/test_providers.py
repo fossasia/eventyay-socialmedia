@@ -9,10 +9,8 @@ from socialmedia.providers import (
     get_provider,
     get_provider_class,
 )
-from socialmedia.providers.buffer import BufferProvider
 from socialmedia.providers.linkedin import LinkedInProvider
 from socialmedia.providers.mastodon import MastodonProvider
-from socialmedia.providers.postiz import PostizProvider
 from socialmedia.providers.telegram import TelegramProvider
 from socialmedia.providers.twitter import TwitterProvider
 
@@ -32,14 +30,17 @@ def test_base_provider_raises_not_implemented(mock_account):
         provider.validate_credentials()
     with pytest.raises(NotImplementedError):
         provider.publish_post("text")
-    assert provider.sync_campaign([]) == []
 
 
 def test_registry_get_provider_class():
     assert get_provider_class("telegram") == TelegramProvider
     assert get_provider_class("mastodon") == MastodonProvider
-    assert get_provider_class("postiz") == PostizProvider
-    assert get_provider_class("buffer") == BufferProvider
+    assert get_provider_class("twitter") == TwitterProvider
+    assert get_provider_class("linkedin") == LinkedInProvider
+    with pytest.raises(ValueError):
+        get_provider_class("postiz")
+    with pytest.raises(ValueError):
+        get_provider_class("buffer")
     with pytest.raises(ValueError):
         get_provider_class("unknown")
 
@@ -215,206 +216,6 @@ def test_mastodon_publish_post(mock_mastodon_cls, mock_account):
     res = provider.publish_post("Mastodon post")
     assert res["post_id"] == "12345"
     assert res["url"] == "https://mastodon.social/@testuser/12345"
-
-
-@patch("requests.get")
-def test_postiz_validate_credentials(mock_get, mock_account):
-    mock_account.provider = "postiz"
-    mock_account.credentials = {
-        "api_url": "https://api.postiz.com",
-        "api_key": "fake_key",
-    }
-    provider = PostizProvider(mock_account)
-
-    # Valid
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_get.return_value = mock_response
-    assert provider.validate_credentials() is True
-
-    # Invalid
-    mock_response.status_code = 401
-    assert provider.validate_credentials() is False
-
-
-@patch("requests.post")
-def test_postiz_publish_post(mock_post, mock_account):
-    mock_account.provider = "postiz"
-    mock_account.credentials = {
-        "api_url": "https://api.postiz.com",
-        "api_key": "fake_key",
-    }
-    provider = PostizProvider(mock_account)
-    mock_response = MagicMock()
-    mock_response.status_code = 201
-    mock_response.json.return_value = {
-        "id": "postiz_123",
-        "url": "https://postiz.com/posts/postiz_123",
-    }
-    mock_post.return_value = mock_response
-
-    res = provider.publish_post("Postiz status")
-    assert res["post_id"] == "postiz_123"
-    assert res["url"] == "https://postiz.com/posts/postiz_123"
-
-
-@patch("requests.post")
-def test_postiz_publish_post_accepts_empty_success_response(mock_post, mock_account):
-    mock_account.provider = "postiz"
-    mock_account.credentials = {
-        "api_url": "https://api.postiz.com",
-        "api_key": "fake_key",
-    }
-    provider = PostizProvider(mock_account)
-    mock_response = MagicMock()
-    mock_response.status_code = 204
-    mock_response.text = ""
-    mock_post.return_value = mock_response
-
-    res = provider.publish_post("Postiz status")
-
-    assert res == {"post_id": "", "url": ""}
-
-
-@patch("requests.post")
-@patch("requests.get")
-def test_postiz_send_test_message_creates_visible_post(
-    mock_get, mock_post, mock_account
-):
-    mock_account.provider = "postiz"
-    mock_account.credentials = {
-        "api_url": "https://api.postiz.com",
-        "api_key": "fake_key",
-    }
-    provider = PostizProvider(mock_account)
-
-    mock_get_response = MagicMock()
-    mock_get_response.status_code = 200
-    mock_get.return_value = mock_get_response
-
-    mock_post_response = MagicMock()
-    mock_post_response.status_code = 201
-    mock_post_response.json.return_value = {
-        "id": "postiz_test_123",
-        "url": "https://postiz.com/posts/postiz_test_123",
-    }
-    mock_post.return_value = mock_post_response
-
-    result = provider.send_test_message()
-
-    assert result["success"] is True
-    assert "Test post created in Postiz" in result["message"]
-    assert "postiz_test_123" in result["message"]
-    assert mock_post.call_args.kwargs["json"] == {
-        "content": "✅ Connection successful from Eventyay!"
-    }
-
-
-@patch("requests.post")
-@patch("requests.get")
-def test_postiz_send_test_message_handles_empty_success_response(
-    mock_get, mock_post, mock_account
-):
-    mock_account.provider = "postiz"
-    mock_account.credentials = {
-        "api_url": "https://api.postiz.com",
-        "api_key": "fake_key",
-    }
-    provider = PostizProvider(mock_account)
-
-    mock_get_response = MagicMock()
-    mock_get_response.status_code = 200
-    mock_get.return_value = mock_get_response
-
-    mock_post_response = MagicMock()
-    mock_post_response.status_code = 204
-    mock_post_response.text = ""
-    mock_post.return_value = mock_post_response
-
-    result = provider.send_test_message()
-
-    assert result["success"] is True
-    assert "Postiz accepted the request" in result["message"]
-
-
-@patch("requests.post")
-def test_buffer_validate_credentials(mock_post, mock_account):
-    mock_account.provider = "buffer"
-    mock_account.credentials = {
-        "access_token": "fake_token",
-    }
-    provider = BufferProvider(mock_account)
-
-    # Valid
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = {"data": {"account": {"id": "account123"}}}
-    mock_post.return_value = mock_response
-    assert provider.validate_credentials() is True
-
-    # Invalid
-    mock_response.json.return_value = {"data": {"account": None}}
-    assert provider.validate_credentials() is False
-
-
-@patch("requests.post")
-def test_buffer_publish_post(mock_post, mock_account):
-    mock_account.provider = "buffer"
-    mock_account.platform_username = "profile123"
-    mock_account.credentials = {
-        "access_token": "fake_token",
-    }
-    provider = BufferProvider(mock_account)
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = {
-        "data": {
-            "createPost": {
-                "post": {
-                    "id": "buffer_123",
-                    "text": "Buffer update",
-                }
-            }
-        }
-    }
-    mock_post.return_value = mock_response
-
-    res = provider.publish_post("Buffer update")
-    assert res["post_id"] == "buffer_123"
-    assert res["url"] == "https://publish.buffer.com/content/buffer_123"
-    query = mock_post.call_args.kwargs["json"]["query"]
-    assert 'channelId: "profile123"' in query
-    assert "saveToDraft: false" in query
-
-
-@patch("requests.post")
-def test_buffer_send_test_message_creates_draft(mock_post, mock_account):
-    mock_account.provider = "buffer"
-    mock_account.platform_username = "profile123"
-    mock_account.credentials = {
-        "access_token": "fake_token",
-    }
-    provider = BufferProvider(mock_account)
-
-    validate_response = MagicMock()
-    validate_response.status_code = 200
-    validate_response.json.return_value = {"data": {"account": {"id": "account123"}}}
-
-    draft_response = MagicMock()
-    draft_response.status_code = 200
-    draft_response.json.return_value = {
-        "data": {
-            "createPost": {
-                "post": {
-                    "id": "draft_123",
-                    "text": "✅ Connection successful from Eventyay!",
-                }
-            }
-        }
-    }
-    mock_post.side_effect = [validate_response, draft_response]
-
-    provider.send_test_message()
 
 
 @patch("requests.get")

@@ -21,7 +21,6 @@ from .models import SocialMediaAccount, SocialMediaPost, SocialMediaPostStatus
 
 HAS_SOCIAL_MEDIA_PERM = hasattr(Team, "can_manage_social_media")
 DIRECT_PUBLISH_PROVIDERS = ["telegram", "mastodon", "twitter", "linkedin"]
-SCHEDULER_PROVIDERS = ["postiz", "buffer"]
 
 ORGANIZER_PERMISSION = (
     ("can_change_organizer_settings", "can_manage_social_media")
@@ -231,14 +230,6 @@ def publish_scheduled_posts(sender, **kwargs):
 
         entity_id = post.entity_id or ""
         provider_names = []
-        if any(entity_id.endswith(f"_{prov}") for prov in SCHEDULER_PROVIDERS):
-            logger.debug(
-                "Skipping post %s (entity '%s'): belongs to external scheduler provider.",
-                post.pk,
-                entity_id,
-            )
-            continue
-
         for prov in DIRECT_PUBLISH_PROVIDERS:
             if entity_id.endswith(f"_{prov}"):
                 provider_names = [prov]
@@ -259,7 +250,7 @@ def publish_scheduled_posts(sender, **kwargs):
 
         if not provider_names:
             logger.warning(
-                "Post %s (event '%s', scheduled for %s) has no active direct providers (Telegram/Mastodon) configured.",
+                "Post %s (event '%s', scheduled for %s) has no active direct providers configured.",
                 post.pk,
                 post.event.slug,
                 post.scheduled_at,

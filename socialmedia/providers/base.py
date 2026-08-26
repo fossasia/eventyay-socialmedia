@@ -176,7 +176,7 @@ class PublishingError(Exception):
 
 
 class BaseSocialProvider:
-    """Abstract base class representing a social media or scheduling provider
+    """Abstract base class representing a native direct social media provider
     integration.
     """
 
@@ -185,7 +185,7 @@ class BaseSocialProvider:
         self.credentials = account.credentials
 
     def validate_credentials(self) -> bool:
-        """Verify the connection status with the remote platform or aggregator API.
+        """Verify the connection status with the remote platform API.
 
         Returns:
             bool: True if connection is valid, False otherwise.
@@ -217,12 +217,6 @@ class BaseSocialProvider:
         raise NotImplementedError(
             "send_test_message must be implemented by subclasses."
         )
-
-    def sync_campaign(self, posts: list[Any]) -> list[Any]:
-        """(Optional override for schedulers) Batches multiple scheduled posts
-        and sends them to the scheduling queue in a single sync session.
-        """
-        return []
 
     @classmethod
     def get_setup_instructions(cls) -> list[str]:

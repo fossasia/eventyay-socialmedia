@@ -633,25 +633,12 @@ class OrganizerAccountDeleteView(
             scheduled_at__gt=timezone.now(),
         )
 
-        # Note: Since SocialMediaPost rows do not have a foreign key to a
-        # specific SocialMediaAccount, we filter by the provider type suffix
-        # on the entity_id (e.g. "_telegram") or general/aggregator posts.
-        if account.provider in ["postiz", "buffer"]:
-            # Aggregator integrations sync general scheduled posts (not
-            # specific to direct platforms). We exclude posts that are
-            # targeted to direct platforms (telegram, mastodon, etc.).
-            direct_platforms = ["telegram", "mastodon", "twitter", "linkedin"]
-            for p in direct_platforms:
-                active_posts = active_posts.exclude(entity_id__endswith=f"_{p}")
-            has_active = active_posts.exists()
-            count = active_posts.count()
-        else:
-            has_active = active_posts.filter(
-                entity_id__endswith=f"_{account.provider}"
-            ).exists()
-            count = active_posts.filter(
-                entity_id__endswith=f"_{account.provider}"
-            ).count()
+        has_active = active_posts.filter(
+            entity_id__endswith=f"_{account.provider}"
+        ).exists()
+        count = active_posts.filter(
+            entity_id__endswith=f"_{account.provider}"
+        ).count()
 
         ctx["has_active_posts"] = has_active
         ctx["active_posts_count"] = count
@@ -704,114 +691,6 @@ def test_connection(request, organizer, pk):
         provider = get_provider(account)
         result = provider.send_test_message()
         return JsonResponse(result)
-    except Exception as e:
-        return JsonResponse({"success": False, "message": str(e)}, status=500)
-
-
-@require_POST
-def sync_to_schedulers(request, organizer, event):
-    """AJAX POST — trigger synchronization of active scheduled posts
-    to Postiz or Buffer scheduler accounts.
-    """
-    _check_permission(request)
-    _check_plugin_active(request)
-    try:
-        scheduler_accounts = SocialMediaAccount.objects.filter(
-            organizer=request.event.organizer,
-            provider__in=["postiz", "buffer"],
-            is_active=True,
-        )
-        if not scheduler_accounts.exists():
-            return JsonResponse(
-                {
-                    "success": False,
-                    "message": _("No active scheduler accounts connected."),
-                },
-                status=400,
-            )
-
-        posts_to_sync = SocialMediaPost.objects.filter(
-            event=request.event,
-            status=SocialMediaPostStatus.SCHEDULED,
-            scheduled_at__gt=timezone.now(),
-        )
-        direct_platforms = ["telegram", "mastodon", "twitter", "linkedin"]
-        for p in direct_platforms:
-            posts_to_sync = posts_to_sync.exclude(entity_id__endswith=f"_{p}")
-
-        if not posts_to_sync.exists():
-            return JsonResponse(
-                {"success": True, "message": _("No scheduled posts found to sync.")}
-            )
-
-        synced_count = 0
-        errors = []
-        all_synced_post_pks = set()
-
-        all_posts_list = list(posts_to_sync)
-
-        for account in scheduler_accounts:
-            try:
-                other_platforms = [
-                    p
-                    for p in [
-                        "telegram",
-                        "mastodon",
-                        "twitter",
-                        "linkedin",
-                        "postiz",
-                        "buffer",
-                    ]
-                    if p != account.provider
-                ]
-                account_posts = [
-                    post
-                    for post in all_posts_list
-                    if not any(
-                        (post.entity_id or "").endswith(f"_{other_p}")
-                        for other_p in other_platforms
-                    )
-                ]
-
-                if not account_posts:
-                    continue
-
-                provider = get_provider(account)
-                provider.sync_campaign(account_posts)
-                synced_count += 1
-                all_synced_post_pks.update(p.pk for p in account_posts)
-            except Exception as e:
-                errors.append(f"{account.provider}: {str(e)}")
-
-        if all_synced_post_pks:
-            SocialMediaPost.objects.filter(pk__in=all_synced_post_pks).update(
-                status=SocialMediaPostStatus.EXPORTED
-            )
-
-        if errors:
-            succ_msg = (
-                f" ({synced_count}/{len(scheduler_accounts)} succeeded)"
-                if synced_count > 0
-                else ""
-            )
-            err_str = ", ".join(errors)
-            return JsonResponse(
-                {
-                    "success": False,
-                    "message": f"Synchronization partially failed{succ_msg}: {err_str}",
-                },
-                status=500,
-            )
-
-        return JsonResponse(
-            {
-                "success": True,
-                "message": (
-                    f"Successfully synchronized posts to {synced_count} "
-                    "scheduler platform(s)."
-                ),
-            }
-        )
     except Exception as e:
         return JsonResponse({"success": False, "message": str(e)}, status=500)
 
@@ -875,7 +754,7 @@ def publish_post_now(request, organizer, event):
 
         entity_id = db_post.entity_id or ""
         provider_name = None
-        for prov in ["telegram", "mastodon", "twitter", "linkedin", "postiz", "buffer"]:
+        for prov in ["telegram", "mastodon", "twitter", "linkedin"]:
             if entity_id.endswith(f"_{prov}"):
                 provider_name = prov
                 break
@@ -898,8 +777,6 @@ def publish_post_now(request, organizer, event):
                         "mastodon",
                         "twitter",
                         "linkedin",
-                        "postiz",
-                        "buffer",
                     ],
                     is_active=True,
                 )
@@ -953,12 +830,7 @@ def publish_post_now(request, organizer, event):
                 status=500,
             )
 
-        is_scheduler = all(p in ["postiz", "buffer"] for p in published_providers)
-        db_post.status = (
-            SocialMediaPostStatus.EXPORTED
-            if is_scheduler
-            else SocialMediaPostStatus.PUBLISHED
-        )
+        db_post.status = SocialMediaPostStatus.PUBLISHED
         db_post.error_message = ""
         db_post.save()
         logger.info(
@@ -972,7 +844,7 @@ def publish_post_now(request, organizer, event):
         return JsonResponse(
             {
                 "success": True,
-                "message": _("Post successfully published/synced!"),
+                "message": _("Post successfully published!"),
                 "status": db_post.status,
             }
         )

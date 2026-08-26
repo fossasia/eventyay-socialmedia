@@ -160,13 +160,13 @@ def test_publish_scheduled_posts_future_or_other_status(organizer, event, settin
             status=SocialMediaPostStatus.PUBLISHED,
             is_pinned=True,
         )
-        post_generic = SocialMediaPost.objects.create(
+        post_draft = SocialMediaPost.objects.create(
             event=event,
             post_type="cfp",
-            entity_id="cfp_3_postiz",  # postiz (skipped by worker)
+            entity_id="cfp_3_draft",
             scheduled_at=now() - timedelta(minutes=5),
-            post_text="Postiz post!",
-            status=SocialMediaPostStatus.SCHEDULED,
+            post_text="Draft post!",
+            status=SocialMediaPostStatus.DRAFT,
             is_pinned=True,
         )
 
@@ -181,8 +181,8 @@ def test_publish_scheduled_posts_future_or_other_status(organizer, event, settin
         post_published.refresh_from_db()
         assert post_published.status == SocialMediaPostStatus.PUBLISHED
 
-        post_generic.refresh_from_db()
-        assert post_generic.status == SocialMediaPostStatus.SCHEDULED
+        post_draft.refresh_from_db()
+        assert post_draft.status == SocialMediaPostStatus.DRAFT
 
 
 @pytest.mark.django_db

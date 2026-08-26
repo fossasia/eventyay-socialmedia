@@ -565,102 +565,6 @@ class MastodonAccountForm(forms.ModelForm):
         return instance
 
 
-class PostizAccountForm(forms.ModelForm):
-    api_url = forms.URLField(
-        label=_("API Instance URL"),
-        help_text=_("e.g. https://api.postiz.com or self-hosted endpoint"),
-        required=True,
-    )
-    api_key = forms.CharField(
-        label=_("API Key"),
-        widget=forms.PasswordInput(render_value=True),
-        required=True,
-    )
-
-    class Meta:
-        model = SocialMediaAccount
-        fields = ["platform_username", "is_active"]
-        labels = {
-            "platform_username": _("Configuration Name"),
-        }
-        help_texts = {
-            "platform_username": _("e.g. My Organization Postiz Link"),
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if self.instance and self.instance.pk:
-            creds = self.instance.credentials
-            if creds.get("api_url"):
-                self.fields["api_url"].initial = creds.get("api_url")
-            if creds.get("api_key"):
-                self.fields["api_key"].initial = "••••••••"
-                self.fields["api_key"].required = False
-
-    def clean_api_key(self):
-        key = self.cleaned_data.get("api_key")
-        if (not key or key == "••••••••") and self.instance and self.instance.pk:
-            creds = self.instance.credentials
-            return creds.get("api_key")
-        return key.strip() if key else key
-
-    def save(self, commit=True):
-        instance = super().save(commit=False)
-        instance.provider = "postiz"
-        instance.credentials = {
-            "api_url": self.cleaned_data.get("api_url"),
-            "api_key": self.cleaned_data.get("api_key"),
-        }
-        if commit:
-            instance.save()
-        return instance
-
-
-class BufferAccountForm(forms.ModelForm):
-    access_token = forms.CharField(
-        label=_("Access Token"),
-        widget=forms.PasswordInput(render_value=True),
-        required=True,
-    )
-
-    class Meta:
-        model = SocialMediaAccount
-        fields = ["platform_username", "is_active"]
-        labels = {
-            "platform_username": _("Buffer Channel ID"),
-        }
-        help_texts = {
-            "platform_username": _(
-                "The id of the connected Buffer channel/profile you want to post to."
-            ),
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if self.instance and self.instance.pk:
-            creds = self.instance.credentials
-            if creds.get("access_token"):
-                self.fields["access_token"].initial = "••••••••"
-                self.fields["access_token"].required = False
-
-    def clean_access_token(self):
-        token = self.cleaned_data.get("access_token")
-        if (not token or token == "••••••••") and self.instance and self.instance.pk:
-            creds = self.instance.credentials
-            return creds.get("access_token")
-        return token.strip() if token else token
-
-    def save(self, commit=True):
-        instance = super().save(commit=False)
-        instance.provider = "buffer"
-        instance.credentials = {
-            "access_token": self.cleaned_data.get("access_token"),
-        }
-        if commit:
-            instance.save()
-        return instance
-
-
 class TwitterAccountForm(forms.ModelForm):
     api_key = forms.CharField(
         label=_("API Key (Consumer Key)"),
@@ -893,6 +797,4 @@ PROVIDER_FORMS = {
     "mastodon": MastodonAccountForm,
     "twitter": TwitterAccountForm,
     "linkedin": LinkedInAccountForm,
-    "postiz": PostizAccountForm,
-    "buffer": BufferAccountForm,
 }
