@@ -875,7 +875,15 @@ def publish_post_now(request, organizer, event):
 
         entity_id = db_post.entity_id or ""
         provider_name = None
-        for prov in ["telegram", "mastodon", "twitter", "linkedin", "postiz", "buffer"]:
+        for prov in [
+            "telegram",
+            "mastodon",
+            "twitter",
+            "linkedin",
+            "bluesky",
+            "postiz",
+            "buffer",
+        ]:
             if entity_id.endswith(f"_{prov}"):
                 provider_name = prov
                 break
@@ -898,6 +906,7 @@ def publish_post_now(request, organizer, event):
                         "mastodon",
                         "twitter",
                         "linkedin",
+                        "bluesky",
                         "postiz",
                         "buffer",
                     ],

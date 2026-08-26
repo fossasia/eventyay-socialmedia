@@ -127,19 +127,24 @@ Explore sessions and speakers: {schedule_url}
 
 Templates should support placeholders for event, organiser, speaker, session, schedule, ticket, and online event data.
 
-## Planned Postiz integration
+## Direct Platform Publishing & CSV Scheduler Exports
 
-A later milestone can add integration with [Postiz](https://github.com/gitroomhq/postiz-app) or similar social media publishing systems.
+Eventyay Social Media supports native, direct platform publishing as well as external scheduler CSV export presets:
 
-Possible Postiz related features include:
+### 1. Direct Native Publishing
+Organizers can connect their social media accounts at the organizer level and publish directly from Eventyay without third-party aggregator services:
+- **Bluesky**: Direct post publishing using the AT Protocol (`atproto`) with rich text facets and media upload.
+- **Telegram**: Direct bot messaging and channel broadcasts.
+- **Mastodon**: Direct status publishing to any Mastodon/Fediverse instance.
+- **Twitter / X**: Direct tweet publishing via Twitter API v2.
+- **LinkedIn**: Direct post publishing to personal profiles and organization pages.
 
-- Export CSV files in a format that can be imported into Postiz.
-- Create drafts in Postiz through an API when available.
-- Send selected Eventyay content to Postiz for review and scheduling.
-- Map Eventyay events to Postiz workspaces or projects.
-- Keep Eventyay as the source of event data while using Postiz for publishing workflows.
-
-Direct posting should not be the first milestone. The safer first step is export and review, followed by optional API based draft creation.
+### 2. External Scheduler CSV Exports
+Organizers who prefer using external scheduling suites retain 100% interoperability via Eventyay's built-in CSV export generator. Built-in export presets include:
+- **Generic CSV**: Standard multi-field CSV export format.
+- **Postiz CSV**: Pre-formatted CSV matching Postiz bulk import structure.
+- **Buffer CSV**: Pre-formatted CSV matching Buffer bulk composer format.
+- **Hootsuite CSV**: Pre-formatted CSV matching Hootsuite bulk upload structure.
 
 ## AI assisted content generation
 

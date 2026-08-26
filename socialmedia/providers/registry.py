@@ -1,4 +1,5 @@
 from .base import BaseSocialProvider
+from .bluesky import BlueskyProvider
 from .buffer import BufferProvider
 from .linkedin import LinkedInProvider
 from .mastodon import MastodonProvider
@@ -11,6 +12,7 @@ _registry: dict[str, type[BaseSocialProvider]] = {
     "mastodon": MastodonProvider,
     "twitter": TwitterProvider,
     "linkedin": LinkedInProvider,
+    "bluesky": BlueskyProvider,
     "postiz": PostizProvider,
     "buffer": BufferProvider,
 }

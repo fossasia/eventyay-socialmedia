@@ -7,7 +7,7 @@ from django.utils import timezone
 from django_scopes import scope
 from eventyay.base.models import Organizer, Team
 
-from socialmedia.forms import TelegramAccountForm
+from socialmedia.forms import BlueskyAccountForm, TelegramAccountForm
 from socialmedia.models import (
     SocialMediaAccount,
     SocialMediaPost,
@@ -440,3 +440,83 @@ def test_organizer_accounts_view_with_social_media_permission(
     )
     response = client.get(url, HTTP_HOST="testserver")
     assert response.status_code == 200
+
+
+@pytest.mark.django_db
+def test_account_create_bluesky(organizer_admin_client, organizer):
+    url = (
+        reverse(
+            "plugins:socialmedia:organizer_account_add",
+            kwargs={"organizer": organizer.slug},
+        )
+        + "?provider=bluesky"
+    )
+
+    payload = {
+        "handle": "@testuser.bsky.social",
+        "app_password": "my-secret-app-password",
+        "pds_url": "https://bsky.social/",
+        "is_active": "on",
+    }
+    response = organizer_admin_client.post(url, data=payload)
+    assert response.status_code == 302
+
+    with scope(organizer=organizer):
+        account = SocialMediaAccount.objects.get(provider="bluesky")
+        assert account.platform_username == "@testuser.bsky.social"
+        assert account.credentials["handle"] == "testuser.bsky.social"
+        assert account.credentials["app_password"] == "my-secret-app-password"
+        assert account.credentials["pds_url"] == "https://bsky.social"
+        assert account.is_active is True
+
+
+def test_bluesky_account_form_clean():
+    form = BlueskyAccountForm(
+        data={
+            "handle": "@myuser.bsky.social",
+            "app_password": "my-app-password",
+            "pds_url": "https://bsky.social/",
+            "is_active": "on",
+        }
+    )
+    assert form.is_valid()
+    assert form.cleaned_data["handle"] == "myuser.bsky.social"
+    assert form.cleaned_data["pds_url"] == "https://bsky.social"
+
+
+@pytest.mark.django_db
+def test_bluesky_account_update_masked_password(organizer_admin_client, organizer):
+    with scope(organizer=organizer):
+        account = SocialMediaAccount.objects.create(
+            organizer=organizer,
+            provider="bluesky",
+            platform_username="@myuser.bsky.social",
+        )
+        account.credentials = {
+            "handle": "myuser.bsky.social",
+            "app_password": "existing-secret-password",
+            "pds_url": "https://bsky.social",
+        }
+        account.save()
+
+    url = reverse(
+        "plugins:socialmedia:organizer_account_edit",
+        kwargs={"organizer": organizer.slug, "pk": account.pk},
+    )
+    response = organizer_admin_client.get(url)
+    assert response.status_code == 200
+    assert "••••••••" in response.content.decode("utf-8")
+
+    # Update without changing password
+    payload = {
+        "handle": "myuser.bsky.social",
+        "app_password": "••••••••",
+        "pds_url": "https://custom.pds.social",
+        "is_active": "on",
+    }
+    response = organizer_admin_client.post(url, data=payload)
+    assert response.status_code == 302
+
+    account.refresh_from_db()
+    assert account.credentials["app_password"] == "existing-secret-password"
+    assert account.credentials["pds_url"] == "https://custom.pds.social"

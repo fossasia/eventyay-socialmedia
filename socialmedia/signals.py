@@ -20,7 +20,7 @@ from eventyay.control.signals import (
 from .models import SocialMediaAccount, SocialMediaPost, SocialMediaPostStatus
 
 HAS_SOCIAL_MEDIA_PERM = hasattr(Team, "can_manage_social_media")
-DIRECT_PUBLISH_PROVIDERS = ["telegram", "mastodon", "twitter", "linkedin"]
+DIRECT_PUBLISH_PROVIDERS = ["telegram", "mastodon", "twitter", "linkedin", "bluesky"]
 SCHEDULER_PROVIDERS = ["postiz", "buffer"]
 
 ORGANIZER_PERMISSION = (
@@ -214,7 +214,9 @@ def publish_scheduled_posts(sender, **kwargs):
 
     count = due_posts.count()
     if count > 0:
-        logger.info("Social media periodic runner found %d due post(s) to process.", count)
+        logger.info(
+            "Social media periodic runner found %d due post(s) to process.", count
+        )
 
     for post in due_posts:
         # Check event setting: auto-publish enabled or explicit pin required
