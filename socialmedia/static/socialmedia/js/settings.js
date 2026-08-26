@@ -26,6 +26,7 @@
   // ---- Platform metadata ----
   const PLATFORM_META = {
     twitter: { label: "X / Twitter", iconClass: "fa fa-twitter", colorClass: "plat-twitter" },
+    bluesky: { label: "Bluesky", iconClass: "fa fa-cloud", colorClass: "plat-bluesky" },
     mastodon: { label: "Mastodon", iconClass: "fa fa-globe", colorClass: "plat-mastodon" },
     telegram: { label: "Telegram", iconClass: "fa fa-paper-plane", colorClass: "plat-telegram" },
     linkedin: { label: "LinkedIn", iconClass: "fa fa-linkedin", colorClass: "plat-linkedin" },
@@ -33,6 +34,7 @@
 
   const PLATFORM_LIMITS = {
     twitter: 280,
+    bluesky: 300,
     mastodon: 500,
     telegram: 4096,
     linkedin: 3000
@@ -1718,7 +1720,7 @@
     });
 
     // Platform toggle: show/hide per-platform template fields
-    const platformKeys = ["twitter", "mastodon", "telegram", "linkedin"];
+    const platformKeys = ["twitter", "bluesky", "mastodon", "telegram", "linkedin"];
     platformKeys.forEach(platform => {
       const checkbox = document.getElementById(`id_socialmedia_${platform}_enabled`);
       const tplBlock = document.getElementById(`plat-tpls-${platform}`);

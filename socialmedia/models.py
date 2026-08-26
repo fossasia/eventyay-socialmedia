@@ -89,6 +89,7 @@ class SocialMediaAccount(models.Model):
             ("telegram", _("Telegram")),
             ("twitter", _("Twitter / X")),
             ("linkedin", _("LinkedIn")),
+            ("bluesky", _("Bluesky")),
             ("postiz", _("Postiz")),
             ("buffer", _("Buffer")),
         ],

@@ -56,6 +56,8 @@
                                                 <i class="fa fa-twitter"></i> Twitter / X
                                             {% elif account.provider == 'linkedin' %}
                                                 <i class="fa fa-linkedin"></i> LinkedIn
+                                            {% elif account.provider == 'bluesky' %}
+                                                <i class="fa fa-cloud"></i> Bluesky
                                             {% elif account.provider == 'postiz' %}
                                                 <i class="fa fa-clock-o"></i> Postiz
                                             {% elif account.provider == 'buffer' %}
@@ -100,7 +102,7 @@
         </div>
         <div class="panel-body">
             <div class="row">
-                <div class="col-sm-4 text-center">
+                <div class="col-sm-6 col-md-4 text-center">
                     <div class="well">
                         <h4><i class="fa fa-telegram fa-2x text-info"></i></h4>
                         <h5>Telegram</h5>
@@ -110,7 +112,17 @@
                         </a>
                     </div>
                 </div>
-                <div class="col-sm-4 text-center">
+                <div class="col-sm-6 col-md-4 text-center">
+                    <div class="well">
+                        <h4><i class="fa fa-cloud fa-2x text-info"></i></h4>
+                        <h5>Bluesky</h5>
+                        <p class="text-muted"><small>{% trans "Publish posts directly using the AT Protocol." %}</small></p>
+                        <a href="{% url 'plugins:socialmedia:organizer_account_add' organizer=organizer.slug %}?provider=bluesky{% if request.GET.event %}&event={{ request.GET.event }}{% endif %}" class="btn btn-primary btn-sm btn-block">
+                            {% trans "Connect Bluesky" %}
+                        </a>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-md-4 text-center">
                     <div class="well">
                         <h4><i class="fa fa-share-alt-square fa-2x text-primary"></i></h4>
                         <h5>Mastodon</h5>
@@ -120,7 +132,9 @@
                         </a>
                     </div>
                 </div>
-                <div class="col-sm-4 text-center">
+            </div>
+            <div class="row">
+                <div class="col-sm-6 col-md-4 text-center">
                     <div class="well">
                         <h4><i class="fa fa-twitter fa-2x text-info"></i></h4>
                         <h5>Twitter / X</h5>
@@ -130,9 +144,7 @@
                         </a>
                     </div>
                 </div>
-            </div>
-            <div class="row">
-                <div class="col-sm-4 text-center">
+                <div class="col-sm-6 col-md-4 text-center">
                     <div class="well">
                         <h4><i class="fa fa-linkedin fa-2x text-primary"></i></h4>
                         <h5>LinkedIn</h5>

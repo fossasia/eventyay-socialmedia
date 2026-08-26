@@ -183,6 +183,20 @@
               </div>
             </div>
 
+            <!-- Bluesky -->
+            <div class="platform-block" id="platform-block-bluesky">
+              <div class="platform-block-header">
+                {% bootstrap_field form.socialmedia_bluesky_enabled layout="horizontal" %}
+              </div>
+              <div class="platform-block-templates" id="plat-tpls-bluesky">
+                {% bootstrap_field form.socialmedia_bluesky_cfp_template layout="horizontal" %}
+                {% bootstrap_field form.socialmedia_bluesky_speaker_template layout="horizontal" %}
+                {% bootstrap_field form.socialmedia_bluesky_session_template layout="horizontal" %}
+                {% bootstrap_field form.socialmedia_bluesky_ticket_template layout="horizontal" %}
+                {% bootstrap_field form.socialmedia_bluesky_schedule_template layout="horizontal" %}
+              </div>
+            </div>
+
             <!-- LinkedIn -->
             <div class="platform-block" id="platform-block-linkedin">
               <div class="platform-block-header">
