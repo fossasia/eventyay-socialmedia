@@ -24,12 +24,12 @@
     </div>
     <h1>{% trans "Social Media Accounts" %}</h1>
     <p class="text-muted">
-        {% trans "Connect and manage your social media accounts and scheduler integrations (Postiz, Buffer) at the organizer level." %}
+        {% trans "Connect and manage your native social media accounts at the organizer level for direct publishing." %}
     </p>
 
     <div class="panel panel-default">
         <div class="panel-heading">
-            <h3 class="panel-title">{% trans "Connected Accounts & Schedulers" %}</h3>
+            <h3 class="panel-title">{% trans "Connected Accounts" %}</h3>
         </div>
         <div class="panel-body">
             {% if accounts %}
@@ -37,8 +37,8 @@
                     <table class="table table-hover table-vertical-middle">
                         <thead>
                             <tr>
-                                <th>{% trans "Platform/Scheduler" %}</th>
-                                <th>{% trans "Account/Profile/Workspace" %}</th>
+                                <th>{% trans "Platform" %}</th>
+                                <th>{% trans "Account / Channel / Page" %}</th>
                                 <th>{% trans "Status" %}</th>
                                 <th class="text-right">{% trans "Actions" %}</th>
                             </tr>
@@ -56,10 +56,6 @@
                                                 <i class="fa fa-twitter"></i> Twitter / X
                                             {% elif account.provider == 'linkedin' %}
                                                 <i class="fa fa-linkedin"></i> LinkedIn
-                                            {% elif account.provider == 'postiz' %}
-                                                <i class="fa fa-clock-o"></i> Postiz
-                                            {% elif account.provider == 'buffer' %}
-                                                <i class="fa fa-refresh"></i> Buffer
                                             {% else %}
                                                 {{ account.get_provider_display }}
                                             {% endif %}
@@ -96,11 +92,11 @@
 
     <div class="panel panel-default">
         <div class="panel-heading">
-            <h3 class="panel-title">{% trans "Connect New Integration" %}</h3>
+            <h3 class="panel-title">{% trans "Connect New Account" %}</h3>
         </div>
         <div class="panel-body">
             <div class="row">
-                <div class="col-sm-4 text-center">
+                <div class="col-sm-6 col-md-3 text-center">
                     <div class="well">
                         <h4><i class="fa fa-telegram fa-2x text-info"></i></h4>
                         <h5>Telegram</h5>
@@ -110,7 +106,7 @@
                         </a>
                     </div>
                 </div>
-                <div class="col-sm-4 text-center">
+                <div class="col-sm-6 col-md-3 text-center">
                     <div class="well">
                         <h4><i class="fa fa-share-alt-square fa-2x text-primary"></i></h4>
                         <h5>Mastodon</h5>
@@ -120,7 +116,7 @@
                         </a>
                     </div>
                 </div>
-                <div class="col-sm-4 text-center">
+                <div class="col-sm-6 col-md-3 text-center">
                     <div class="well">
                         <h4><i class="fa fa-twitter fa-2x text-info"></i></h4>
                         <h5>Twitter / X</h5>
@@ -130,35 +126,13 @@
                         </a>
                     </div>
                 </div>
-            </div>
-            <div class="row">
-                <div class="col-sm-4 text-center">
+                <div class="col-sm-6 col-md-3 text-center">
                     <div class="well">
                         <h4><i class="fa fa-linkedin fa-2x text-primary"></i></h4>
                         <h5>LinkedIn</h5>
                         <p class="text-muted"><small>{% trans "Publish updates to personal profile or company page." %}</small></p>
                         <a href="{% url 'plugins:socialmedia:organizer_account_add' organizer=organizer.slug %}?provider=linkedin{% if request.GET.event %}&event={{ request.GET.event }}{% endif %}" class="btn btn-primary btn-sm btn-block">
                             {% trans "Connect LinkedIn" %}
-                        </a>
-                    </div>
-                </div>
-                <div class="col-sm-4 text-center">
-                    <div class="well">
-                        <h4><i class="fa fa-clock-o fa-2x text-success"></i></h4>
-                        <h5>Postiz</h5>
-                        <p class="text-muted"><small>{% trans "Sync schedules to your Postiz aggregator dashboard." %}</small></p>
-                        <a href="{% url 'plugins:socialmedia:organizer_account_add' organizer=organizer.slug %}?provider=postiz{% if request.GET.event %}&event={{ request.GET.event }}{% endif %}" class="btn btn-primary btn-sm btn-block">
-                            {% trans "Connect Postiz" %}
-                        </a>
-                    </div>
-                </div>
-                <div class="col-sm-4 text-center">
-                    <div class="well">
-                        <h4><i class="fa fa-refresh fa-2x text-warning"></i></h4>
-                        <h5>Buffer</h5>
-                        <p class="text-muted"><small>{% trans "Queue posts to your connected Buffer queues." %}</small></p>
-                        <a href="{% url 'plugins:socialmedia:organizer_account_add' organizer=organizer.slug %}?provider=buffer{% if request.GET.event %}&event={{ request.GET.event }}{% endif %}" class="btn btn-primary btn-sm btn-block">
-                            {% trans "Connect Buffer" %}
                         </a>
                     </div>
                 </div>

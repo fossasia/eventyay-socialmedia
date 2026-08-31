@@ -15,7 +15,6 @@
       PREVIEW_URL: config.previewUrl || "",
       EXPORT_URL: config.exportUrl || "",
       UPDATE_URL: config.updateUrl || "",
-      SYNC_URL: config.syncUrl || "",
       PUBLISH_NOW_URL: config.publishNowUrl || (config.updateUrl ? config.updateUrl.replace(/\/update\/?$/, "/publish-now/") : null),
       CSRF_TOKEN: config.csrfToken || (document.querySelector("input[name=csrfmiddlewaretoken]") ? document.querySelector("input[name=csrfmiddlewaretoken]").value : ""),
       TRANS_CLICK_TO_EDIT: config.transClickToEdit || "Click to edit · Ctrl+Enter to save",
@@ -272,22 +271,6 @@
           return res;
         })
         .catch(err => console.error("Failed to update post status:", err));
-    },
-
-    syncSchedulers() {
-      if (!Config.SYNC_URL) return Promise.reject(new Error("Sync URL not configured"));
-      return fetch(Config.SYNC_URL, {
-        method: "POST",
-        headers: {
-          "X-CSRFToken": Config.CSRF_TOKEN,
-          "X-Requested-With": "XMLHttpRequest",
-        }
-      }).then(r => {
-        return r.json().then(data => {
-          if (!r.ok) throw new Error(data.message || `HTTP error ${r.status}`);
-          return data;
-        });
-      });
     },
 
     publishPostNow(dbId, postId) {
@@ -1299,29 +1282,6 @@
         .catch(err => UI.showToast(`Export error: ${err.message}`, "warning"));
     },
 
-    syncSchedulers() {
-      const btn = document.getElementById("btn-sync-schedulers");
-      if (btn) {
-        btn.disabled = true;
-        UI.setWithIcon(btn, "Syncing…", "fa fa-refresh fa-spin");
-      }
-
-      APIClient.syncSchedulers()
-        .then(res => {
-          UI.showToast(res.message || "Successfully synchronized scheduler platforms.", "success");
-          this.loadInitialData();
-        })
-        .catch(err => {
-          UI.showToast(`Sync failed: ${err.message}`, "warning");
-        })
-        .finally(() => {
-          if (btn) {
-            btn.disabled = false;
-            UI.setWithIcon(btn, "Sync to Schedulers", "fa fa-refresh");
-          }
-        });
-    },
-
     publishPostNow(postId, dbId, button) {
       if (button) {
         button.disabled = true;
@@ -1398,9 +1358,6 @@
 
       const btnExport = document.getElementById("btn-export");
       if (btnExport) btnExport.addEventListener("click", () => this.exportCSV());
-
-      const btnSync = document.getElementById("btn-sync-schedulers");
-      if (btnSync) btnSync.addEventListener("click", () => this.syncSchedulers());
 
       const advToggle = document.getElementById("adv-toggle");
       if (advToggle) advToggle.addEventListener("click", () => UI.toggleAdv());

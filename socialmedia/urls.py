@@ -46,11 +46,6 @@ urlpatterns = [
         name="update",
     ),
     path(
-        "social/event/<orgslug:organizer>/<slug:event>/sync/",
-        views.sync_to_schedulers,
-        name="sync",
-    ),
-    path(
         "social/event/<orgslug:organizer>/<slug:event>/publish-now/",
         views.publish_post_now,
         name="publish_now",

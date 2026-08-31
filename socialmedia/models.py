@@ -89,13 +89,11 @@ class SocialMediaAccount(models.Model):
             ("telegram", _("Telegram")),
             ("twitter", _("Twitter / X")),
             ("linkedin", _("LinkedIn")),
-            ("postiz", _("Postiz")),
-            ("buffer", _("Buffer")),
         ],
     )
     platform_username = models.CharField(
         max_length=255,
-        help_text=_("e.g. channel ID, username handle, or scheduler workspace name"),
+        help_text=_("e.g. channel ID or username handle"),
     )
     encrypted_credentials = models.TextField(
         blank=True,
