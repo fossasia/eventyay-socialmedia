@@ -753,6 +753,17 @@ def publish_post_now(request, organizer, event):
             db_post.save(update_fields=["status", "error_message", "updated_at"])
 
         entity_id = db_post.entity_id or ""
+        if any(entity_id.endswith(f"_{prov}") for prov in ["postiz", "buffer"]):
+            return JsonResponse(
+                {
+                    "success": False,
+                    "message": _(
+                        "Post belongs to a legacy scheduler integration and cannot be published natively. Please export as CSV."
+                    ),
+                },
+                status=400,
+            )
+
         provider_name = None
         for prov in ["telegram", "mastodon", "twitter", "linkedin"]:
             if entity_id.endswith(f"_{prov}"):

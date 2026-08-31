@@ -21,6 +21,7 @@ from .models import SocialMediaAccount, SocialMediaPost, SocialMediaPostStatus
 
 HAS_SOCIAL_MEDIA_PERM = hasattr(Team, "can_manage_social_media")
 DIRECT_PUBLISH_PROVIDERS = ["telegram", "mastodon", "twitter", "linkedin"]
+LEGACY_SCHEDULER_PROVIDERS = ["postiz", "buffer"]
 
 ORGANIZER_PERMISSION = (
     ("can_change_organizer_settings", "can_manage_social_media")
@@ -197,7 +198,7 @@ def claim_post_for_publishing(post_pk: int, provider_name: str):
 @scopes_disabled()
 def publish_scheduled_posts(sender, **kwargs):
     """Periodic task dispatcher to publish scheduled social media posts
-    for direct integrations (Telegram, Mastodon).
+    for direct native platform integrations (Telegram, Mastodon, Twitter/X, LinkedIn).
     Dispatches execution to dedicated Celery tasks off the main beat worker.
     """
     from .tasks import publish_single_post
@@ -213,7 +214,9 @@ def publish_scheduled_posts(sender, **kwargs):
 
     count = due_posts.count()
     if count > 0:
-        logger.info("Social media periodic runner found %d due post(s) to process.", count)
+        logger.info(
+            "Social media periodic runner found %d due post(s) to process.", count
+        )
 
     for post in due_posts:
         # Check event setting: auto-publish enabled or explicit pin required
@@ -229,6 +232,14 @@ def publish_scheduled_posts(sender, **kwargs):
             continue
 
         entity_id = post.entity_id or ""
+        if any(entity_id.endswith(f"_{prov}") for prov in LEGACY_SCHEDULER_PROVIDERS):
+            logger.debug(
+                "Skipping post %s (entity '%s'): belongs to legacy external scheduler provider.",
+                post.pk,
+                entity_id,
+            )
+            continue
+
         provider_names = []
         for prov in DIRECT_PUBLISH_PROVIDERS:
             if entity_id.endswith(f"_{prov}"):

@@ -309,3 +309,48 @@ def test_safe_fetch_url_ssrf_and_dns_pinning():
         mock_getaddrinfo.return_value = [(2, 1, 6, "", ("192.168.1.1", 0))]
         with pytest.raises(PublishingError, match="resolved to forbidden IP"):
             safe_fetch_url("http://private-domain.local/image.png")
+
+
+@pytest.mark.django_db
+def test_publish_scheduled_posts_skips_legacy_scheduler_providers(
+    organizer, event, settings
+):
+    settings.CELERY_TASK_ALWAYS_EAGER = True
+    account = SocialMediaAccount.objects.create(
+        organizer=organizer,
+        provider="telegram",
+        platform_username="test_channel",
+        is_active=True,
+    )
+    account.credentials = {"bot_token": "fake_token"}
+    account.save()
+
+    with scope(organizer=organizer, event=event):
+        post_postiz = SocialMediaPost.objects.create(
+            event=event,
+            post_type="cfp",
+            entity_id="cfp_1_postiz",
+            scheduled_at=now() - timedelta(minutes=5),
+            post_text="Postiz scheduled post",
+            status=SocialMediaPostStatus.SCHEDULED,
+            is_pinned=True,
+        )
+        post_buffer = SocialMediaPost.objects.create(
+            event=event,
+            post_type="cfp",
+            entity_id="cfp_2_buffer",
+            scheduled_at=now() - timedelta(minutes=5),
+            post_text="Buffer scheduled post",
+            status=SocialMediaPostStatus.SCHEDULED,
+            is_pinned=True,
+        )
+
+    with patch.object(TelegramProvider, "publish_post") as mock_publish:
+        publish_scheduled_posts(sender=None)
+        mock_publish.assert_not_called()
+
+    with scope(organizer=organizer, event=event):
+        post_postiz.refresh_from_db()
+        post_buffer.refresh_from_db()
+        assert post_postiz.status == SocialMediaPostStatus.SCHEDULED
+        assert post_buffer.status == SocialMediaPostStatus.SCHEDULED

@@ -854,3 +854,17 @@ def test_publish_post_now_view(logged_in_organizer_client, organizer, event, set
         post.refresh_from_db()
         assert post.status == SocialMediaPostStatus.FAILED
         assert "Rate limited" in post.error_message
+
+        legacy_post = SocialMediaPost.objects.create(
+            event=event,
+            post_type="cfp",
+            entity_id="cfp_1_postiz",
+            scheduled_at=now(),
+            post_text="Legacy post",
+            status=SocialMediaPostStatus.SCHEDULED,
+        )
+    resp_legacy = logged_in_organizer_client.post(
+        url, data=json.dumps({"db_id": legacy_post.pk}), content_type="application/json"
+    )
+    assert resp_legacy.status_code == 400
+    assert "legacy scheduler integration" in resp_legacy.json()["message"]
