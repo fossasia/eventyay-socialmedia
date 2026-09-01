@@ -84,12 +84,16 @@ def control_nav_event_common_socialmedia(sender, request=None, **kwargs):
     url = resolve(request.path_info)
     in_sm = url.namespace == "plugins:socialmedia"
 
-    posts_url = reverse(
-        "plugins:socialmedia:posts",
-        kwargs={"organizer": sender.organizer.slug, "event": sender.slug},
-    )
     settings_url = reverse(
         "plugins:socialmedia:plugin_settings",
+        kwargs={"organizer": sender.organizer.slug, "event": sender.slug},
+    )
+    templates_url = reverse(
+        "plugins:socialmedia:templates",
+        kwargs={"organizer": sender.organizer.slug, "event": sender.slug},
+    )
+    posts_url = reverse(
+        "plugins:socialmedia:posts",
         kwargs={"organizer": sender.organizer.slug, "event": sender.slug},
     )
     log_url = reverse(
@@ -100,19 +104,24 @@ def control_nav_event_common_socialmedia(sender, request=None, **kwargs):
     return [
         {
             "label": str(_("Social Media")),
-            "url": posts_url,
+            "url": settings_url,
             "icon": "share-alt",
-            "active": in_sm and url.url_name in ("index", "posts"),
+            "active": in_sm,
             "children": [
-                {
-                    "label": _("Posts"),
-                    "url": posts_url,
-                    "active": in_sm and url.url_name in ("index", "posts"),
-                },
                 {
                     "label": _("Settings"),
                     "url": settings_url,
                     "active": in_sm and url.url_name == "plugin_settings",
+                },
+                {
+                    "label": _("Templates"),
+                    "url": templates_url,
+                    "active": in_sm and url.url_name == "templates",
+                },
+                {
+                    "label": _("Posts"),
+                    "url": posts_url,
+                    "active": in_sm and url.url_name in ("index", "posts"),
                 },
                 {
                     "label": _("Publishing Log"),

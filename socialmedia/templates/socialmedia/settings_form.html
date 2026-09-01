@@ -17,6 +17,14 @@
       {% trans "Social Media Settings" %}
       <small>{{ event.name }}</small>
     </h1>
+    <div class="sm-toolbar-actions">
+      <button type="button" class="btn btn-default" data-toggle="modal" data-target="#sm-workflow-guide-modal">
+        <i class="fa fa-question-circle text-primary"></i> {% trans "How It Works" %}
+      </button>
+      <a href="{{ templates_url }}" class="btn btn-default">
+        <i class="fa fa-file-text-o"></i> {% trans "Post Templates" %} <i class="fa fa-arrow-right"></i>
+      </a>
+    </div>
   </div>
 
   <form action="" method="post" class="form-horizontal">
@@ -30,60 +38,48 @@
         {% trans "Enable the platforms you post to. Each enabled platform generates its own draft row in the preview table with a platform-specific default template. Leave all disabled to generate a single generic draft per content item." %}
       </p>
 
-      <div class="platform-toggles">
+      <div class="platform-toggles-grid">
         <!-- Twitter / X -->
-        <div class="platform-block" id="platform-block-twitter">
-          <div class="platform-block-header">
-            {% bootstrap_field form.socialmedia_twitter_enabled layout="horizontal" %}
+        <div class="platform-toggle-card">
+          <div class="platform-toggle-header">
+            <span class="plat-badge plat-twitter"><i class="fa fa-twitter"></i> X / Twitter</span>
+            <span class="plat-cap-hint">{% trans "≤280 chars" %}</span>
           </div>
-          <div class="platform-block-templates" id="plat-tpls-twitter">
-            {% bootstrap_field form.socialmedia_twitter_cfp_template layout="horizontal" %}
-            {% bootstrap_field form.socialmedia_twitter_speaker_template layout="horizontal" %}
-            {% bootstrap_field form.socialmedia_twitter_session_template layout="horizontal" %}
-            {% bootstrap_field form.socialmedia_twitter_ticket_template layout="horizontal" %}
-            {% bootstrap_field form.socialmedia_twitter_schedule_template layout="horizontal" %}
+          <div class="platform-toggle-input">
+            {% bootstrap_field form.socialmedia_twitter_enabled layout="inline" %}
           </div>
         </div>
 
         <!-- LinkedIn -->
-        <div class="platform-block" id="platform-block-linkedin">
-          <div class="platform-block-header">
-            {% bootstrap_field form.socialmedia_linkedin_enabled layout="horizontal" %}
+        <div class="platform-toggle-card">
+          <div class="platform-toggle-header">
+            <span class="plat-badge plat-linkedin"><i class="fa fa-linkedin"></i> LinkedIn</span>
+            <span class="plat-cap-hint">{% trans "≤3000 chars" %}</span>
           </div>
-          <div class="platform-block-templates" id="plat-tpls-linkedin">
-            {% bootstrap_field form.socialmedia_linkedin_cfp_template layout="horizontal" %}
-            {% bootstrap_field form.socialmedia_linkedin_speaker_template layout="horizontal" %}
-            {% bootstrap_field form.socialmedia_linkedin_session_template layout="horizontal" %}
-            {% bootstrap_field form.socialmedia_linkedin_ticket_template layout="horizontal" %}
-            {% bootstrap_field form.socialmedia_linkedin_schedule_template layout="horizontal" %}
+          <div class="platform-toggle-input">
+            {% bootstrap_field form.socialmedia_linkedin_enabled layout="inline" %}
           </div>
         </div>
 
         <!-- Telegram -->
-        <div class="platform-block" id="platform-block-telegram">
-          <div class="platform-block-header">
-            {% bootstrap_field form.socialmedia_telegram_enabled layout="horizontal" %}
+        <div class="platform-toggle-card">
+          <div class="platform-toggle-header">
+            <span class="plat-badge plat-telegram"><i class="fa fa-paper-plane"></i> Telegram</span>
+            <span class="plat-cap-hint">{% trans "Markdown supported" %}</span>
           </div>
-          <div class="platform-block-templates" id="plat-tpls-telegram">
-            {% bootstrap_field form.socialmedia_telegram_cfp_template layout="horizontal" %}
-            {% bootstrap_field form.socialmedia_telegram_speaker_template layout="horizontal" %}
-            {% bootstrap_field form.socialmedia_telegram_session_template layout="horizontal" %}
-            {% bootstrap_field form.socialmedia_telegram_ticket_template layout="horizontal" %}
-            {% bootstrap_field form.socialmedia_telegram_schedule_template layout="horizontal" %}
+          <div class="platform-toggle-input">
+            {% bootstrap_field form.socialmedia_telegram_enabled layout="inline" %}
           </div>
         </div>
 
         <!-- Mastodon -->
-        <div class="platform-block" id="platform-block-mastodon">
-          <div class="platform-block-header">
-            {% bootstrap_field form.socialmedia_mastodon_enabled layout="horizontal" %}
+        <div class="platform-toggle-card">
+          <div class="platform-toggle-header">
+            <span class="plat-badge plat-mastodon"><i class="fa fa-globe"></i> Mastodon</span>
+            <span class="plat-cap-hint">{% trans "≤500 chars" %}</span>
           </div>
-          <div class="platform-block-templates" id="plat-tpls-mastodon">
-            {% bootstrap_field form.socialmedia_mastodon_cfp_template layout="horizontal" %}
-            {% bootstrap_field form.socialmedia_mastodon_speaker_template layout="horizontal" %}
-            {% bootstrap_field form.socialmedia_mastodon_session_template layout="horizontal" %}
-            {% bootstrap_field form.socialmedia_mastodon_ticket_template layout="horizontal" %}
-            {% bootstrap_field form.socialmedia_mastodon_schedule_template layout="horizontal" %}
+          <div class="platform-toggle-input">
+            {% bootstrap_field form.socialmedia_mastodon_enabled layout="inline" %}
           </div>
         </div>
       </div>
@@ -91,231 +87,187 @@
 
     <!-- Global -->
     <div class="adv-group">
-      <div class="adv-group-title"><i class="fa fa-globe"></i> {% trans "Global" %}</div>
+      <div class="adv-group-title"><i class="fa fa-globe"></i> {% trans "Global Configuration" %}</div>
       {% bootstrap_field form.socialmedia_event_link layout="horizontal" %}
       {% bootstrap_field form.socialmedia_default_hashtags layout="horizontal" %}
       {% bootstrap_field form.socialmedia_auto_publish layout="horizontal" %}
     </div>
 
-    <!-- CFP -->
+    <!-- Timing & Schedule Offsets -->
     <div class="adv-group">
-      <div class="adv-group-title"><i class="fa fa-bullhorn"></i> {% trans "CFP" %}</div>
-      {% bootstrap_field form.socialmedia_cfp_enabled layout="horizontal" %}
-      {% bootstrap_field form.socialmedia_cfp_offset layout="horizontal" %}
-      <div class="form-group helper-row">
-        <div class="col-md-9 col-md-offset-3">
-          <div class="presets-container" data-target="id_socialmedia_cfp_offset" data-unit="{% trans 'days' %}">
-            <span class="presets-label">{% trans "Quick Presets:" %}</span>
-            <button type="button" class="btn btn-default btn-xs preset-btn" data-val="30">30d</button>
-            <button type="button" class="btn btn-default btn-xs preset-btn" data-val="14">14d</button>
-            <button type="button" class="btn btn-default btn-xs preset-btn" data-val="7">7d</button>
-            <button type="button" class="btn btn-default btn-xs preset-btn" data-val="3">3d</button>
-            <button type="button" class="btn btn-default btn-xs preset-btn" data-val="1">1d</button>
-            <span class="live-offsets-preview"></span>
+      <div class="adv-group-title"><i class="fa fa-clock-o"></i> {% trans "Schedule Timing & Offsets" %}</div>
+      <p class="adv-group-desc">
+        {% trans "Configure when posts should be scheduled before event milestones. You can enter comma-separated numbers for multiple schedule waves." %}
+      </p>
+
+      <!-- CFP -->
+      <div class="sub-offset-section">
+        <h4><i class="fa fa-bullhorn"></i> {% trans "Call for Proposals (CFP)" %}</h4>
+        {% bootstrap_field form.socialmedia_cfp_enabled layout="horizontal" %}
+        {% bootstrap_field form.socialmedia_cfp_offset layout="horizontal" %}
+        <div class="form-group helper-row">
+          <div class="col-md-9 col-md-offset-3">
+            <div class="presets-container" data-target="id_socialmedia_cfp_offset" data-unit="{% trans 'days' %}">
+              <span class="presets-label">{% trans "Quick Presets:" %}</span>
+              <button type="button" class="btn btn-default btn-xs preset-btn" data-val="30">30d</button>
+              <button type="button" class="btn btn-default btn-xs preset-btn" data-val="14">14d</button>
+              <button type="button" class="btn btn-default btn-xs preset-btn" data-val="7">7d</button>
+              <button type="button" class="btn btn-default btn-xs preset-btn" data-val="3">3d</button>
+              <button type="button" class="btn btn-default btn-xs preset-btn" data-val="1">1d</button>
+              <span class="live-offsets-preview"></span>
+            </div>
           </div>
         </div>
       </div>
-      <div class="default-template-preview">
-        <strong>{% trans "Default templates per wave:" %}</strong>
-        <div class="wave-template-list">
-          <div class="wave-template-item"><span class="wave-label">{% trans "30+ days:" %}</span> {{ form.default_template_preview.cfp.announcement }}</div>
-          <div class="wave-template-item"><span class="wave-label">{% trans "3–29 days:" %}</span> {{ form.default_template_preview.cfp.reminder }}</div>
-          <div class="wave-template-item"><span class="wave-label">{% trans "0–2 days:" %}</span> {{ form.default_template_preview.cfp.final_call }}</div>
+
+      <!-- Speakers -->
+      <div class="sub-offset-section">
+        <h4><i class="fa fa-user"></i> {% trans "Speakers" %}</h4>
+        {% bootstrap_field form.socialmedia_speaker_enabled layout="horizontal" %}
+        {% bootstrap_field form.socialmedia_speaker_offset layout="horizontal" %}
+        <div class="form-group helper-row">
+          <div class="col-md-9 col-md-offset-3">
+            <div class="presets-container" data-target="id_socialmedia_speaker_offset" data-unit="{% trans 'days' %}">
+              <span class="presets-label">{% trans "Quick Presets:" %}</span>
+              <button type="button" class="btn btn-default btn-xs preset-btn" data-val="30">30d</button>
+              <button type="button" class="btn btn-default btn-xs preset-btn" data-val="14">14d</button>
+              <button type="button" class="btn btn-default btn-xs preset-btn" data-val="7">7d</button>
+              <button type="button" class="btn btn-default btn-xs preset-btn" data-val="3">3d</button>
+              <button type="button" class="btn btn-default btn-xs preset-btn" data-val="1">1d</button>
+              <span class="live-offsets-preview"></span>
+            </div>
+          </div>
         </div>
       </div>
-      {% bootstrap_field form.socialmedia_cfp_template layout="horizontal" %}
-      <div class="form-group helper-row">
-        <div class="col-md-9 col-md-offset-3">
-          <div class="tokens-container">
-            <span class="tokens-label">{% trans "Insert Placeholders:" %}</span>
-            <span class="token-chip" data-target="id_socialmedia_cfp_template">{event_name}</span>
-            <span class="token-chip" data-target="id_socialmedia_cfp_template">{cfp_deadline}</span>
-            <span class="token-chip" data-target="id_socialmedia_cfp_template">{cfp_link}</span>
-            <span class="token-chip" data-target="id_socialmedia_cfp_template">{hashtags}</span>
+
+      <!-- Sessions -->
+      <div class="sub-offset-section">
+        <h4><i class="fa fa-calendar"></i> {% trans "Sessions" %}</h4>
+        {% bootstrap_field form.socialmedia_session_enabled layout="horizontal" %}
+        {% bootstrap_field form.socialmedia_session_offset layout="horizontal" %}
+        <div class="form-group helper-row">
+          <div class="col-md-9 col-md-offset-3">
+            <div class="presets-container" data-target="id_socialmedia_session_offset" data-unit="{% trans 'min' %}">
+              <span class="presets-label">{% trans "Quick Presets:" %}</span>
+              <button type="button" class="btn btn-default btn-xs preset-btn" data-val="1440">1440m</button>
+              <button type="button" class="btn btn-default btn-xs preset-btn" data-val="120">120m</button>
+              <button type="button" class="btn btn-default btn-xs preset-btn" data-val="60">60m</button>
+              <button type="button" class="btn btn-default btn-xs preset-btn" data-val="30">30m</button>
+              <button type="button" class="btn btn-default btn-xs preset-btn" data-val="15">15m</button>
+              <span class="live-offsets-preview"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tickets -->
+      <div class="sub-offset-section">
+        <h4><i class="fa fa-ticket"></i> {% trans "Tickets" %}</h4>
+        {% bootstrap_field form.socialmedia_ticket_enabled layout="horizontal" %}
+        {% bootstrap_field form.socialmedia_ticket_offset layout="horizontal" %}
+        <div class="form-group helper-row">
+          <div class="col-md-9 col-md-offset-3">
+            <div class="presets-container" data-target="id_socialmedia_ticket_offset" data-unit="{% trans 'days' %}">
+              <span class="presets-label">{% trans "Quick Presets:" %}</span>
+              <button type="button" class="btn btn-default btn-xs preset-btn" data-val="30">30d</button>
+              <button type="button" class="btn btn-default btn-xs preset-btn" data-val="14">14d</button>
+              <button type="button" class="btn btn-default btn-xs preset-btn" data-val="7">7d</button>
+              <button type="button" class="btn btn-default btn-xs preset-btn" data-val="3">3d</button>
+              <button type="button" class="btn btn-default btn-xs preset-btn" data-val="1">1d</button>
+              <span class="live-offsets-preview"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Schedule -->
+      <div class="sub-offset-section">
+        <h4><i class="fa fa-list-alt"></i> {% trans "Schedule" %}</h4>
+        {% bootstrap_field form.socialmedia_schedule_enabled layout="horizontal" %}
+        {% bootstrap_field form.socialmedia_schedule_offset layout="horizontal" %}
+        <div class="form-group helper-row">
+          <div class="col-md-9 col-md-offset-3">
+            <div class="presets-container" data-target="id_socialmedia_schedule_offset" data-unit="{% trans 'days' %}">
+              <span class="presets-label">{% trans "Quick Presets:" %}</span>
+              <button type="button" class="btn btn-default btn-xs preset-btn" data-val="14">14d</button>
+              <button type="button" class="btn btn-default btn-xs preset-btn" data-val="7">7d</button>
+              <button type="button" class="btn btn-default btn-xs preset-btn" data-val="3">3d</button>
+              <button type="button" class="btn btn-default btn-xs preset-btn" data-val="2">2d</button>
+              <button type="button" class="btn btn-default btn-xs preset-btn" data-val="1">1d</button>
+              <span class="live-offsets-preview"></span>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Speaker -->
-    <div class="adv-group">
-      <div class="adv-group-title"><i class="fa fa-user"></i> {% trans "Speaker" %}</div>
-      {% bootstrap_field form.socialmedia_speaker_enabled layout="horizontal" %}
-      {% bootstrap_field form.socialmedia_speaker_offset layout="horizontal" %}
-      <div class="form-group helper-row">
-        <div class="col-md-9 col-md-offset-3">
-          <div class="presets-container" data-target="id_socialmedia_speaker_offset" data-unit="{% trans 'days' %}">
-            <span class="presets-label">{% trans "Quick Presets:" %}</span>
-            <button type="button" class="btn btn-default btn-xs preset-btn" data-val="30">30d</button>
-            <button type="button" class="btn btn-default btn-xs preset-btn" data-val="14">14d</button>
-            <button type="button" class="btn btn-default btn-xs preset-btn" data-val="7">7d</button>
-            <button type="button" class="btn btn-default btn-xs preset-btn" data-val="3">3d</button>
-            <button type="button" class="btn btn-default btn-xs preset-btn" data-val="1">1d</button>
-            <span class="live-offsets-preview"></span>
-          </div>
-        </div>
-      </div>
-      <div class="default-template-preview">
-        <strong>{% trans "Default templates per wave:" %}</strong>
-        <div class="wave-template-list">
-          <div class="wave-template-item"><span class="wave-label">{% trans "14+ days:" %}</span> {{ form.default_template_preview.speaker.announcement }}</div>
-          <div class="wave-template-item"><span class="wave-label">{% trans "3–13 days:" %}</span> {{ form.default_template_preview.speaker.reminder }}</div>
-          <div class="wave-template-item"><span class="wave-label">{% trans "0–2 days:" %}</span> {{ form.default_template_preview.speaker.final_call }}</div>
-        </div>
-      </div>
-      {% bootstrap_field form.socialmedia_speaker_template layout="horizontal" %}
-      <div class="form-group helper-row">
-        <div class="col-md-9 col-md-offset-3">
-          <div class="tokens-container">
-            <span class="tokens-label">{% trans "Insert Placeholders:" %}</span>
-            <span class="token-chip" data-target="id_socialmedia_speaker_template">{event_name}</span>
-            <span class="token-chip" data-target="id_socialmedia_speaker_template">{speaker_name}</span>
-            <span class="token-chip" data-target="id_socialmedia_speaker_template">{speaker_social_handle}</span>
-            <span class="token-chip" data-target="id_socialmedia_speaker_template">{speaker_twitter}</span>
-            <span class="token-chip" data-target="id_socialmedia_speaker_template">{speaker_linkedin}</span>
-            <span class="token-chip" data-target="id_socialmedia_speaker_template">{speaker_github}</span>
-            <span class="token-chip" data-target="id_socialmedia_speaker_template">{speaker_link}</span>
-            <span class="token-chip" data-target="id_socialmedia_speaker_template">{talk_title}</span>
-            <span class="token-chip" data-target="id_socialmedia_speaker_template">{hashtags}</span>
-          </div>
-          <p class="help-block text-muted sm-placeholder-help">
-            {% trans "Note: Handle placeholders output as @username across supported networks. Wrap optional placeholders in parentheses () or brackets [] to automatically omit them when empty." %}
-          </p>
-        </div>
-      </div>
-    </div>
-
-    <!-- Session -->
-    <div class="adv-group">
-      <div class="adv-group-title"><i class="fa fa-calendar"></i> {% trans "Session" %}</div>
-      {% bootstrap_field form.socialmedia_session_enabled layout="horizontal" %}
-      {% bootstrap_field form.socialmedia_session_offset layout="horizontal" %}
-      <div class="form-group helper-row">
-        <div class="col-md-9 col-md-offset-3">
-          <div class="presets-container" data-target="id_socialmedia_session_offset" data-unit="{% trans 'min' %}">
-            <span class="presets-label">{% trans "Quick Presets:" %}</span>
-            <button type="button" class="btn btn-default btn-xs preset-btn" data-val="1440">1440m</button>
-            <button type="button" class="btn btn-default btn-xs preset-btn" data-val="120">120m</button>
-            <button type="button" class="btn btn-default btn-xs preset-btn" data-val="60">60m</button>
-            <button type="button" class="btn btn-default btn-xs preset-btn" data-val="30">30m</button>
-            <button type="button" class="btn btn-default btn-xs preset-btn" data-val="15">15m</button>
-            <span class="live-offsets-preview"></span>
-          </div>
-        </div>
-      </div>
-      <div class="default-template-preview">
-        <strong>{% trans "Default templates per wave:" %}</strong>
-        <div class="wave-template-list">
-          <div class="wave-template-item"><span class="wave-label">{% trans "1440+ min:" %}</span> {{ form.default_template_preview.session.announcement }}</div>
-          <div class="wave-template-item"><span class="wave-label">{% trans "60–1439 min:" %}</span> {{ form.default_template_preview.session.reminder }}</div>
-          <div class="wave-template-item"><span class="wave-label">{% trans "0–59 min:" %}</span> {{ form.default_template_preview.session.final_call }}</div>
-        </div>
-      </div>
-      {% bootstrap_field form.socialmedia_session_template layout="horizontal" %}
-      <div class="form-group helper-row">
-        <div class="col-md-9 col-md-offset-3">
-          <div class="tokens-container">
-            <span class="tokens-label">{% trans "Insert Placeholders:" %}</span>
-            <span class="token-chip" data-target="id_socialmedia_session_template">{event_name}</span>
-            <span class="token-chip" data-target="id_socialmedia_session_template">{talk_title}</span>
-            <span class="token-chip" data-target="id_socialmedia_session_template">{talk_room}</span>
-            <span class="token-chip" data-target="id_socialmedia_session_template">{talk_start_time}</span>
-            <span class="token-chip" data-target="id_socialmedia_session_template">{speaker_names}</span>
-            <span class="token-chip" data-target="id_socialmedia_session_template">{talk_link}</span>
-            <span class="token-chip" data-target="id_socialmedia_session_template">{hashtags}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Ticket -->
-    <div class="adv-group">
-      <div class="adv-group-title"><i class="fa fa-ticket"></i> {% trans "Ticket" %}</div>
-      {% bootstrap_field form.socialmedia_ticket_enabled layout="horizontal" %}
-      {% bootstrap_field form.socialmedia_ticket_offset layout="horizontal" %}
-      <div class="form-group helper-row">
-        <div class="col-md-9 col-md-offset-3">
-          <div class="presets-container" data-target="id_socialmedia_ticket_offset" data-unit="{% trans 'days' %}">
-            <span class="presets-label">{% trans "Quick Presets:" %}</span>
-            <button type="button" class="btn btn-default btn-xs preset-btn" data-val="30">30d</button>
-            <button type="button" class="btn btn-default btn-xs preset-btn" data-val="14">14d</button>
-            <button type="button" class="btn btn-default btn-xs preset-btn" data-val="7">7d</button>
-            <button type="button" class="btn btn-default btn-xs preset-btn" data-val="5">5d</button>
-            <button type="button" class="btn btn-default btn-xs preset-btn" data-val="1">1d</button>
-            <span class="live-offsets-preview"></span>
-          </div>
-        </div>
-      </div>
-      <div class="default-template-preview">
-        <strong>{% trans "Default templates per wave:" %}</strong>
-        <div class="wave-template-list">
-          <div class="wave-template-item"><span class="wave-label">{% trans "14+ days:" %}</span> {{ form.default_template_preview.ticket.announcement }}</div>
-          <div class="wave-template-item"><span class="wave-label">{% trans "3–13 days:" %}</span> {{ form.default_template_preview.ticket.reminder }}</div>
-          <div class="wave-template-item"><span class="wave-label">{% trans "0–2 days:" %}</span> {{ form.default_template_preview.ticket.final_call }}</div>
-        </div>
-      </div>
-      {% bootstrap_field form.socialmedia_ticket_template layout="horizontal" %}
-      <div class="form-group helper-row">
-        <div class="col-md-9 col-md-offset-3">
-          <div class="tokens-container">
-            <span class="tokens-label">{% trans "Insert Placeholders:" %}</span>
-            <span class="token-chip" data-target="id_socialmedia_ticket_template">{event_name}</span>
-            <span class="token-chip" data-target="id_socialmedia_ticket_template">{ticket_name}</span>
-            <span class="token-chip" data-target="id_socialmedia_ticket_template">{ticket_price}</span>
-            <span class="token-chip" data-target="id_socialmedia_ticket_template">{ticket_link}</span>
-            <span class="token-chip" data-target="id_socialmedia_ticket_template">{hashtags}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Schedule -->
-    <div class="adv-group">
-      <div class="adv-group-title"><i class="fa fa-list-alt"></i> {% trans "Schedule" %}</div>
-      {% bootstrap_field form.socialmedia_schedule_enabled layout="horizontal" %}
-      {% bootstrap_field form.socialmedia_schedule_offset layout="horizontal" %}
-      <div class="form-group helper-row">
-        <div class="col-md-9 col-md-offset-3">
-          <div class="presets-container" data-target="id_socialmedia_schedule_offset" data-unit="{% trans 'days' %}">
-            <span class="presets-label">{% trans "Quick Presets:" %}</span>
-            <button type="button" class="btn btn-default btn-xs preset-btn" data-val="14">14d</button>
-            <button type="button" class="btn btn-default btn-xs preset-btn" data-val="7">7d</button>
-            <button type="button" class="btn btn-default btn-xs preset-btn" data-val="3">3d</button>
-            <button type="button" class="btn btn-default btn-xs preset-btn" data-val="2">2d</button>
-            <button type="button" class="btn btn-default btn-xs preset-btn" data-val="1">1d</button>
-            <span class="live-offsets-preview"></span>
-          </div>
-        </div>
-      </div>
-      <div class="default-template-preview">
-        <strong>{% trans "Default templates per wave:" %}</strong>
-        <div class="wave-template-list">
-          <div class="wave-template-item"><span class="wave-label">{% trans "7+ days:" %}</span> {{ form.default_template_preview.schedule.announcement }}</div>
-          <div class="wave-template-item"><span class="wave-label">{% trans "0–6 days:" %}</span> {{ form.default_template_preview.schedule.reminder }}</div>
-        </div>
-      </div>
-      {% bootstrap_field form.socialmedia_schedule_template layout="horizontal" %}
-      <div class="form-group helper-row">
-        <div class="col-md-9 col-md-offset-3">
-          <div class="tokens-container">
-            <span class="tokens-label">{% trans "Insert Placeholders:" %}</span>
-            <span class="token-chip" data-target="id_socialmedia_schedule_template">{event_name}</span>
-            <span class="token-chip" data-target="id_socialmedia_schedule_template">{schedule_link}</span>
-            <span class="token-chip" data-target="id_socialmedia_schedule_template">{hashtags}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
+    <!-- Actions -->
     <div class="sm-preview-actions">
-      <button type="submit" name="action" value="save" class="btn btn-primary">
+      <button type="submit" class="btn btn-primary">
         <i class="fa fa-save"></i> {% trans "Save Settings" %}
       </button>
-      <button type="submit" name="action" value="save_and_preview" class="btn btn-default" id="btn-save-regenerate">
-        <i class="fa fa-refresh"></i> {% trans "Save & Regenerate Preview" %}
+      <button type="submit" name="action" value="save_and_templates" class="btn btn-default">
+        {% trans "Save & Continue to Templates" %} <i class="fa fa-arrow-right"></i>
       </button>
     </div>
   </form>
 </div><!-- /sm-page -->
+
+<!-- Workflow Guide Modal -->
+<div class="modal fade" id="sm-workflow-guide-modal" tabindex="-1" role="dialog" aria-labelledby="sm-workflow-guide-title">
+  <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-content sm-workflow-modal">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="sm-workflow-guide-title">
+          <i class="fa fa-map-signs text-primary"></i> {% trans "Social Media Workflow Guide" %}
+        </h4>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted" style="margin-bottom: 20px;">
+          {% trans "Welcome to Eventyay Social Media! Follow this simple 4-step journey to automate and schedule posts for your event." %}
+        </p>
+
+        <div class="workflow-steps-container">
+          <div class="workflow-step-card">
+            <div class="step-badge">1</div>
+            <div class="step-content">
+              <h4>{% trans "1. Settings" %}</h4>
+              <p>{% trans "Enable your desired platforms (X/Twitter, LinkedIn, Telegram, Mastodon), set your default hashtags, and configure timing offsets for when posts should trigger before milestones." %}</p>
+            </div>
+          </div>
+
+          <div class="workflow-step-card">
+            <div class="step-badge">2</div>
+            <div class="step-content">
+              <h4>{% trans "2. Templates" %}</h4>
+              <p>{% trans "Posts use smart, milestone-aware system wave defaults out of the box (fits all platform limits). Optionally set a Universal template or write platform-specific copy (with rich Markdown support for Telegram)." %}</p>
+            </div>
+          </div>
+
+          <div class="workflow-step-card">
+            <div class="step-badge">3</div>
+            <div class="step-content">
+              <h4>{% trans "3. Posts Queue" %}</h4>
+              <p>{% trans "Click 'Generate Posts' to build your queue. Filter by Content-Type or Status, edit text inline, view live mockup cards, and select posts for bulk scheduling, bulk discard, or bulk retry." %}</p>
+            </div>
+          </div>
+
+          <div class="workflow-step-card">
+            <div class="step-badge">4</div>
+            <div class="step-content">
+              <h4>{% trans "4. Publishing & Log" %}</h4>
+              <p>{% trans "Automated workers publish scheduled posts at the exact time to your connected accounts. Monitor real-time status and error reports in the Publishing Log." %}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-dismiss="modal">{% trans "Got It" %}</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="{% static 'socialmedia/js/settings.js' %}"></script>
 {% endblock %}

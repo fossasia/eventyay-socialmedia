@@ -56,9 +56,7 @@ class TelegramProvider(BaseSocialProvider):
                 "chat_id": self._resolve_chat_id(),
                 "text": "✅ Connection successful from Eventyay!",
             }
-            response = requests.post(
-                url, data=payload, timeout=DEFAULT_REQUEST_TIMEOUT
-            )
+            response = requests.post(url, data=payload, timeout=DEFAULT_REQUEST_TIMEOUT)
             if response.status_code == 200:
                 result = response.json()
                 if result.get("ok"):
@@ -145,7 +143,9 @@ class TelegramProvider(BaseSocialProvider):
                 payload["caption"] = text
                 payload["parse_mode"] = "Markdown"
 
-                def _do_send_photo(current_payload: dict[str, Any]) -> requests.Response:
+                def _do_send_photo(
+                    current_payload: dict[str, Any],
+                ) -> requests.Response:
                     if is_url:
                         try:
                             r = requests.get(media_item, timeout=MEDIA_UPLOAD_TIMEOUT)
@@ -154,7 +154,10 @@ class TelegramProvider(BaseSocialProvider):
                             ext = "png" if "png" in content_type else "jpg"
                             files = {"photo": (f"photo.{ext}", r.content, content_type)}
                             return requests.post(
-                                url, data=current_payload, files=files, timeout=MEDIA_UPLOAD_TIMEOUT
+                                url,
+                                data=current_payload,
+                                files=files,
+                                timeout=MEDIA_UPLOAD_TIMEOUT,
                             )
                         except Exception as download_err:
                             logger.warning(
@@ -170,7 +173,10 @@ class TelegramProvider(BaseSocialProvider):
                         with open(media_item, "rb") as f:
                             files = {"photo": f}
                             return requests.post(
-                                url, data=current_payload, files=files, timeout=MEDIA_UPLOAD_TIMEOUT
+                                url,
+                                data=current_payload,
+                                files=files,
+                                timeout=MEDIA_UPLOAD_TIMEOUT,
                             )
 
                 response = _do_send_photo(payload)

@@ -492,7 +492,11 @@ def _extract_speaker_social_info(speaker, event=None, target_platform=None):
         return social_info, serialized_links
 
     profile = None
-    if event and hasattr(speaker, "event_profile") and callable(getattr(speaker, "event_profile")):
+    if (
+        event
+        and hasattr(speaker, "event_profile")
+        and callable(speaker.event_profile)
+    ):
         try:
             profile = speaker.event_profile(event)
         except Exception as exc:
@@ -507,7 +511,9 @@ def _extract_speaker_social_info(speaker, event=None, target_platform=None):
             profiles = list(speaker.profiles.all())
             if event:
                 profiles = [
-                    p for p in profiles if getattr(p, "event_id", None) == getattr(event, "pk", None)
+                    p
+                    for p in profiles
+                    if getattr(p, "event_id", None) == getattr(event, "pk", None)
                 ]
             if profiles:
                 profile = profiles[0]
@@ -538,7 +544,19 @@ def _extract_speaker_social_info(speaker, event=None, target_platform=None):
                 path = path[1:]
 
         handle = path
-        if net in ("twitter", "x", "github", "linkedin", "mastodon", "telegram", "instagram") and handle:
+        if (
+            net
+            in (
+                "twitter",
+                "x",
+                "github",
+                "linkedin",
+                "mastodon",
+                "telegram",
+                "instagram",
+            )
+            and handle
+        ):
             if not handle.startswith("@"):
                 handle = f"@{handle}"
 
@@ -1201,9 +1219,14 @@ def sync_posts_to_db(event, request=None):
             if "media_url" in p and p["media_url"] is not None:
                 db_post.media_url = p["media_url"]
             db_post.template_context = p.get("template_context", "announcement")
-            if db_post.status == SocialMediaPostStatus.SCHEDULED and scheduled_at < now_dt:
+            if (
+                db_post.status == SocialMediaPostStatus.SCHEDULED
+                and scheduled_at < now_dt
+            ):
                 db_post.status = SocialMediaPostStatus.DRAFT
-            elif db_post.status == SocialMediaPostStatus.DRAFT and scheduled_at >= now_dt:
+            elif (
+                db_post.status == SocialMediaPostStatus.DRAFT and scheduled_at >= now_dt
+            ):
                 db_post.status = SocialMediaPostStatus.SCHEDULED
             db_post.save()
 

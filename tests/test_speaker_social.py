@@ -1,5 +1,5 @@
 from unittest.mock import MagicMock
-import pytest
+
 from socialmedia.export import _extract_speaker_social_info, safe_format
 
 
@@ -67,18 +67,29 @@ def test_extract_speaker_social_info_target_platform_mismatch():
 
 def test_safe_format_with_handles():
     tmpl = "Meet {speaker_name} ({speaker_social_handle}) at {event_name}!"
-    out = safe_format(tmpl, speaker_name="Alice", speaker_social_handle="@alice", event_name="PyCon")
+    out = safe_format(
+        tmpl, speaker_name="Alice", speaker_social_handle="@alice", event_name="PyCon"
+    )
     assert out == "Meet Alice (@alice) at PyCon!"
 
 
 def test_safe_format_empty_handle_cleanup():
     tmpl = "Meet {speaker_name} ({speaker_social_handle}) [{speaker_twitter}] at {event_name}!"
-    out = safe_format(tmpl, speaker_name="Alice", speaker_social_handle="", speaker_twitter="", event_name="PyCon")
+    out = safe_format(
+        tmpl,
+        speaker_name="Alice",
+        speaker_social_handle="",
+        speaker_twitter="",
+        event_name="PyCon",
+    )
     assert out == "Meet Alice at PyCon!"
 
 
 def test_extract_speaker_social_info_user_instance():
-    profile = DummySpeaker("Alice User", links=[DummyLink("twitter", "https://x.com/alice_user", "alice_user")])
+    profile = DummySpeaker(
+        "Alice User",
+        links=[DummyLink("twitter", "https://x.com/alice_user", "alice_user")],
+    )
     user = MagicMock()
     user.event_profile.return_value = profile
     event = MagicMock()
@@ -91,18 +102,26 @@ def test_extract_speaker_social_info_user_instance():
 def test_custom_template_priority_over_platform_defaults():
     event = MagicMock()
     event.settings.get.side_effect = lambda key, default=None, **kwargs: (
-        "Custom Speaker Template {speaker_name} ({speaker_social_handle})" if key == "socialmedia_speaker_template" else default
+        "Custom Speaker Template {speaker_name} ({speaker_social_handle})"
+        if key == "socialmedia_speaker_template"
+        else default
     )
     from socialmedia.export import _get_platform_template
+
     tpl = _get_platform_template(event, "speaker", "twitter", "announcement")
     assert tpl == "Custom Speaker Template {speaker_name} ({speaker_social_handle})"
 
 
 def test_platform_default_templates_contain_social_handles():
     from socialmedia.export import PLATFORM_DEFAULT_TEMPLATES
+
     for platform in ["twitter", "telegram", "linkedin", "mastodon"]:
         speaker_tpl = PLATFORM_DEFAULT_TEMPLATES[platform]["speaker"]["announcement"]
-        assert "{speaker_social_handle}" in speaker_tpl, f"Missing in {platform} speaker announcement"
+        assert "{speaker_social_handle}" in speaker_tpl, (
+            f"Missing in {platform} speaker announcement"
+        )
 
         session_tpl = PLATFORM_DEFAULT_TEMPLATES[platform]["session"]["announcement"]
-        assert "{speaker_social_handles}" in session_tpl, f"Missing in {platform} session announcement"
+        assert "{speaker_social_handles}" in session_tpl, (
+            f"Missing in {platform} session announcement"
+        )

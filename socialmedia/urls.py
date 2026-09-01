@@ -23,6 +23,12 @@ urlpatterns = [
         views.SocialMediaPostSettingsView.as_view(),
         name="plugin_settings",
     ),
+    # ── Templates form ────────────────────────────────────────────────────────
+    path(
+        "social/event/<orgslug:organizer>/<slug:event>/templates/",
+        views.SocialMediaTemplatesView.as_view(),
+        name="templates",
+    ),
     # ── Publishing log ────────────────────────────────────────────────────────
     path(
         "social/event/<orgslug:organizer>/<slug:event>/log/",
@@ -34,6 +40,16 @@ urlpatterns = [
         "social/event/<orgslug:organizer>/<slug:event>/preview/",
         views.preview_posts,
         name="preview",
+    ),
+    path(
+        "social/event/<orgslug:organizer>/<slug:event>/generate/",
+        views.generate_posts_view,
+        name="generate_posts",
+    ),
+    path(
+        "social/event/<orgslug:organizer>/<slug:event>/bulk-action/",
+        views.bulk_post_action,
+        name="bulk_action",
     ),
     path(
         "social/event/<orgslug:organizer>/<slug:event>/export/",

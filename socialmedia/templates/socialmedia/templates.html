@@ -1,0 +1,656 @@
+{% extends "eventyay_common/event/base.html" %}
+{% load i18n %}
+{% load bootstrap3 %}
+{% load static %}
+
+{% block title %}{% trans "Social Media — Post Templates" %} :: {{ event.name }}{% endblock %}
+
+{% block custom_header %}
+<link rel="stylesheet" type="text/css" href="{% static 'socialmedia/css/settings.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<div class="sm-page">
+  <div class="sm-toolbar">
+    <h1>
+      {% trans "Social Media Post Templates" %}
+      <small>{{ event.name }}</small>
+    </h1>
+    <div class="sm-toolbar-actions">
+      <button type="button" class="btn btn-default" data-toggle="modal" data-target="#sm-workflow-guide-modal">
+        <i class="fa fa-question-circle text-primary"></i> {% trans "How It Works" %}
+      </button>
+      <a href="{{ settings_url }}" class="btn btn-default">
+        <i class="fa fa-cog"></i> {% trans "Settings" %}
+      </a>
+      <a href="{{ posts_url }}" class="btn btn-default">
+        <i class="fa fa-share-alt"></i> {% trans "View Posts" %}
+      </a>
+    </div>
+  </div>
+
+  <div class="alert alert-info sm-templates-intro">
+    <i class="fa fa-info-circle"></i>
+    {% trans "By default, all posts use intelligent milestone wave templates pre-optimized to comply with platform character limits. You can review default wave texts below, write one Universal template for all platforms, or customize specific copy per platform." %}
+  </div>
+
+  <form action="" method="post" class="form-horizontal sm-templates-form">
+    {% csrf_token %}
+    {% bootstrap_form_errors form %}
+
+    <!-- 1. CFP Templates -->
+    <div class="adv-group template-group" data-type="cfp">
+      <div class="adv-group-title">
+        <i class="fa fa-bullhorn"></i> {% trans "Call for Proposals (CFP) Templates" %}
+      </div>
+      <div class="template-status-badge">
+        <span class="label label-success">
+          <i class="fa fa-check-circle"></i> {% trans "System wave defaults fit character limits for all enabled platforms" %}
+        </span>
+      </div>
+
+      <!-- System Default Preview -->
+      <div class="default-template-preview">
+        <strong>{% trans "System default copy per wave:" %}</strong>
+        <div class="wave-template-list">
+          <div class="wave-template-item"><span class="wave-label">{% trans "30+ days:" %}</span> {{ form.default_template_preview.cfp.announcement }}</div>
+          <div class="wave-template-item"><span class="wave-label">{% trans "3–29 days:" %}</span> {{ form.default_template_preview.cfp.reminder }}</div>
+          <div class="wave-template-item"><span class="wave-label">{% trans "0–2 days:" %}</span> {{ form.default_template_preview.cfp.final_call }}</div>
+        </div>
+      </div>
+
+      <div class="template-custom-toggle-wrap">
+        <button type="button" class="btn btn-default btn-sm toggle-custom-tpl-btn" data-target="#custom-tpls-cfp">
+          <i class="fa fa-pencil"></i> {% trans "Customize CFP Templates" %}
+        </button>
+        <button type="button" class="btn btn-link btn-sm reset-default-btn" data-type="cfp">
+          <i class="fa fa-undo"></i> {% trans "Reset to system default" %}
+        </button>
+      </div>
+
+      <div class="custom-templates-panel" id="custom-tpls-cfp">
+        <!-- Universal Template for all platforms & offsets -->
+        <div class="universal-template-box">
+          <div class="universal-header">
+            <strong><i class="fa fa-globe"></i> {% trans "Universal Template (Optional)" %}</strong>
+            <span class="text-muted small">{% trans "— single template applied across all platforms and offsets" %}</span>
+          </div>
+          {% bootstrap_field form.socialmedia_cfp_template layout="inline" %}
+        </div>
+
+        <div class="platform-custom-divider">
+          <span>{% trans "Or customize per platform (respecting platform format rules & limits):" %}</span>
+        </div>
+
+        <!-- Platform Cards -->
+        <div class="platform-custom-fields">
+          <!-- Twitter -->
+          <div class="platform-custom-field" data-platform="twitter">
+            <div class="plat-header">
+              <span class="plat-badge plat-twitter"><i class="fa fa-twitter"></i> X / Twitter</span>
+              <span class="plat-cap-badge plat-cap-plain"><i class="fa fa-font"></i> {% trans "Plain text" %}</span>
+              <span class="plat-limit">{% trans "≤280 chars" %}</span>
+              <button type="button" class="btn btn-xs btn-default btn-copy-plat" data-src="id_socialmedia_twitter_cfp_template" data-type="cfp">
+                <i class="fa fa-copy"></i> {% trans "Copy to other platforms" %}
+              </button>
+            </div>
+            {% bootstrap_field form.socialmedia_twitter_cfp_template layout="inline" %}
+            <div class="char-count-bar" data-target="id_socialmedia_twitter_cfp_template" data-limit="280"></div>
+          </div>
+
+          <!-- LinkedIn -->
+          <div class="platform-custom-field" data-platform="linkedin">
+            <div class="plat-header">
+              <span class="plat-badge plat-linkedin"><i class="fa fa-linkedin"></i> LinkedIn</span>
+              <span class="plat-cap-badge plat-cap-long"><i class="fa fa-briefcase"></i> {% trans "Long-form story" %}</span>
+              <span class="plat-limit">{% trans "≤3000 chars" %}</span>
+              <button type="button" class="btn btn-xs btn-default btn-copy-plat" data-src="id_socialmedia_linkedin_cfp_template" data-type="cfp">
+                <i class="fa fa-copy"></i> {% trans "Copy to other platforms" %}
+              </button>
+            </div>
+            {% bootstrap_field form.socialmedia_linkedin_cfp_template layout="inline" %}
+            <div class="char-count-bar" data-target="id_socialmedia_linkedin_cfp_template" data-limit="3000"></div>
+          </div>
+
+          <!-- Telegram -->
+          <div class="platform-custom-field" data-platform="telegram">
+            <div class="plat-header">
+              <span class="plat-badge plat-telegram"><i class="fa fa-paper-plane"></i> Telegram</span>
+              <span class="plat-cap-badge plat-cap-markdown"><i class="fa fa-code"></i> {% trans "Markdown supported (*bold*, _italic_, [link](url))" %}</span>
+              <span class="plat-limit">{% trans "≤4096 chars" %}</span>
+              <button type="button" class="btn btn-xs btn-default btn-copy-plat" data-src="id_socialmedia_telegram_cfp_template" data-type="cfp">
+                <i class="fa fa-copy"></i> {% trans "Copy to other platforms" %}
+              </button>
+            </div>
+            {% bootstrap_field form.socialmedia_telegram_cfp_template layout="inline" %}
+            <div class="char-count-bar" data-target="id_socialmedia_telegram_cfp_template" data-limit="4096"></div>
+          </div>
+
+          <!-- Mastodon -->
+          <div class="platform-custom-field" data-platform="mastodon">
+            <div class="plat-header">
+              <span class="plat-badge plat-mastodon"><i class="fa fa-globe"></i> Mastodon</span>
+              <span class="plat-cap-badge plat-cap-fediverse"><i class="fa fa-bullhorn"></i> {% trans "Fediverse text" %}</span>
+              <span class="plat-limit">{% trans "≤500 chars" %}</span>
+              <button type="button" class="btn btn-xs btn-default btn-copy-plat" data-src="id_socialmedia_mastodon_cfp_template" data-type="cfp">
+                <i class="fa fa-copy"></i> {% trans "Copy to other platforms" %}
+              </button>
+            </div>
+            {% bootstrap_field form.socialmedia_mastodon_cfp_template layout="inline" %}
+            <div class="char-count-bar" data-target="id_socialmedia_mastodon_cfp_template" data-limit="500"></div>
+          </div>
+        </div>
+
+        <div class="tokens-container">
+          <span class="tokens-label">{% trans "Insert Placeholders:" %}</span>
+          <span class="token-chip" data-type="cfp">{event_name}</span>
+          <span class="token-chip" data-type="cfp">{cfp_deadline}</span>
+          <span class="token-chip" data-type="cfp">{cfp_link}</span>
+          <span class="token-chip" data-type="cfp">{hashtags}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Speaker Templates -->
+    <div class="adv-group template-group" data-type="speaker">
+      <div class="adv-group-title">
+        <i class="fa fa-user"></i> {% trans "Speaker Templates" %}
+      </div>
+      <div class="template-status-badge">
+        <span class="label label-success">
+          <i class="fa fa-check-circle"></i> {% trans "System wave defaults fit character limits for all enabled platforms" %}
+        </span>
+      </div>
+
+      <!-- System Default Preview -->
+      <div class="default-template-preview">
+        <strong>{% trans "System default copy per wave:" %}</strong>
+        <div class="wave-template-list">
+          <div class="wave-template-item"><span class="wave-label">{% trans "14+ days:" %}</span> {{ form.default_template_preview.speaker.announcement }}</div>
+          <div class="wave-template-item"><span class="wave-label">{% trans "3–13 days:" %}</span> {{ form.default_template_preview.speaker.reminder }}</div>
+          <div class="wave-template-item"><span class="wave-label">{% trans "0–2 days:" %}</span> {{ form.default_template_preview.speaker.final_call }}</div>
+        </div>
+      </div>
+
+      <div class="template-custom-toggle-wrap">
+        <button type="button" class="btn btn-default btn-sm toggle-custom-tpl-btn" data-target="#custom-tpls-speaker">
+          <i class="fa fa-pencil"></i> {% trans "Customize Speaker Templates" %}
+        </button>
+        <button type="button" class="btn btn-link btn-sm reset-default-btn" data-type="speaker">
+          <i class="fa fa-undo"></i> {% trans "Reset to system default" %}
+        </button>
+      </div>
+
+      <div class="custom-templates-panel" id="custom-tpls-speaker">
+        <div class="universal-template-box">
+          <div class="universal-header">
+            <strong><i class="fa fa-globe"></i> {% trans "Universal Template (Optional)" %}</strong>
+            <span class="text-muted small">{% trans "— single template applied across all platforms and offsets" %}</span>
+          </div>
+          {% bootstrap_field form.socialmedia_speaker_template layout="inline" %}
+        </div>
+
+        <div class="platform-custom-divider">
+          <span>{% trans "Or customize per platform (respecting platform format rules & limits):" %}</span>
+        </div>
+
+        <div class="platform-custom-fields">
+          <div class="platform-custom-field" data-platform="twitter">
+            <div class="plat-header">
+              <span class="plat-badge plat-twitter"><i class="fa fa-twitter"></i> X / Twitter</span>
+              <span class="plat-cap-badge plat-cap-plain"><i class="fa fa-font"></i> {% trans "Plain text" %}</span>
+              <span class="plat-limit">{% trans "≤280 chars" %}</span>
+              <button type="button" class="btn btn-xs btn-default btn-copy-plat" data-src="id_socialmedia_twitter_speaker_template" data-type="speaker">
+                <i class="fa fa-copy"></i> {% trans "Copy to other platforms" %}
+              </button>
+            </div>
+            {% bootstrap_field form.socialmedia_twitter_speaker_template layout="inline" %}
+            <div class="char-count-bar" data-target="id_socialmedia_twitter_speaker_template" data-limit="280"></div>
+          </div>
+
+          <div class="platform-custom-field" data-platform="linkedin">
+            <div class="plat-header">
+              <span class="plat-badge plat-linkedin"><i class="fa fa-linkedin"></i> LinkedIn</span>
+              <span class="plat-cap-badge plat-cap-long"><i class="fa fa-briefcase"></i> {% trans "Long-form story" %}</span>
+              <span class="plat-limit">{% trans "≤3000 chars" %}</span>
+              <button type="button" class="btn btn-xs btn-default btn-copy-plat" data-src="id_socialmedia_linkedin_speaker_template" data-type="speaker">
+                <i class="fa fa-copy"></i> {% trans "Copy to other platforms" %}
+              </button>
+            </div>
+            {% bootstrap_field form.socialmedia_linkedin_speaker_template layout="inline" %}
+            <div class="char-count-bar" data-target="id_socialmedia_linkedin_speaker_template" data-limit="3000"></div>
+          </div>
+
+          <div class="platform-custom-field" data-platform="telegram">
+            <div class="plat-header">
+              <span class="plat-badge plat-telegram"><i class="fa fa-paper-plane"></i> Telegram</span>
+              <span class="plat-cap-badge plat-cap-markdown"><i class="fa fa-code"></i> {% trans "Markdown supported (*bold*, _italic_, [link](url))" %}</span>
+              <span class="plat-limit">{% trans "≤4096 chars" %}</span>
+              <button type="button" class="btn btn-xs btn-default btn-copy-plat" data-src="id_socialmedia_telegram_speaker_template" data-type="speaker">
+                <i class="fa fa-copy"></i> {% trans "Copy to other platforms" %}
+              </button>
+            </div>
+            {% bootstrap_field form.socialmedia_telegram_speaker_template layout="inline" %}
+            <div class="char-count-bar" data-target="id_socialmedia_telegram_speaker_template" data-limit="4096"></div>
+          </div>
+
+          <div class="platform-custom-field" data-platform="mastodon">
+            <div class="plat-header">
+              <span class="plat-badge plat-mastodon"><i class="fa fa-globe"></i> Mastodon</span>
+              <span class="plat-cap-badge plat-cap-fediverse"><i class="fa fa-bullhorn"></i> {% trans "Fediverse text" %}</span>
+              <span class="plat-limit">{% trans "≤500 chars" %}</span>
+              <button type="button" class="btn btn-xs btn-default btn-copy-plat" data-src="id_socialmedia_mastodon_speaker_template" data-type="speaker">
+                <i class="fa fa-copy"></i> {% trans "Copy to other platforms" %}
+              </button>
+            </div>
+            {% bootstrap_field form.socialmedia_mastodon_speaker_template layout="inline" %}
+            <div class="char-count-bar" data-target="id_socialmedia_mastodon_speaker_template" data-limit="500"></div>
+          </div>
+        </div>
+
+        <div class="tokens-container">
+          <span class="tokens-label">{% trans "Insert Placeholders:" %}</span>
+          <span class="token-chip" data-type="speaker">{event_name}</span>
+          <span class="token-chip" data-type="speaker">{speaker_name}</span>
+          <span class="token-chip" data-type="speaker">{speaker_social_handle}</span>
+          <span class="token-chip" data-type="speaker">{speaker_twitter}</span>
+          <span class="token-chip" data-type="speaker">{speaker_linkedin}</span>
+          <span class="token-chip" data-type="speaker">{speaker_github}</span>
+          <span class="token-chip" data-type="speaker">{speaker_link}</span>
+          <span class="token-chip" data-type="speaker">{talk_title}</span>
+          <span class="token-chip" data-type="speaker">{hashtags}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Session Templates -->
+    <div class="adv-group template-group" data-type="session">
+      <div class="adv-group-title">
+        <i class="fa fa-calendar"></i> {% trans "Session Templates" %}
+      </div>
+      <div class="template-status-badge">
+        <span class="label label-success">
+          <i class="fa fa-check-circle"></i> {% trans "System wave defaults fit character limits for all enabled platforms" %}
+        </span>
+      </div>
+
+      <div class="default-template-preview">
+        <strong>{% trans "System default copy per wave:" %}</strong>
+        <div class="wave-template-list">
+          <div class="wave-template-item"><span class="wave-label">{% trans "1440+ min:" %}</span> {{ form.default_template_preview.session.announcement }}</div>
+          <div class="wave-template-item"><span class="wave-label">{% trans "60–1439 min:" %}</span> {{ form.default_template_preview.session.reminder }}</div>
+          <div class="wave-template-item"><span class="wave-label">{% trans "0–59 min:" %}</span> {{ form.default_template_preview.session.final_call }}</div>
+        </div>
+      </div>
+
+      <div class="template-custom-toggle-wrap">
+        <button type="button" class="btn btn-default btn-sm toggle-custom-tpl-btn" data-target="#custom-tpls-session">
+          <i class="fa fa-pencil"></i> {% trans "Customize Session Templates" %}
+        </button>
+        <button type="button" class="btn btn-link btn-sm reset-default-btn" data-type="session">
+          <i class="fa fa-undo"></i> {% trans "Reset to system default" %}
+        </button>
+      </div>
+
+      <div class="custom-templates-panel" id="custom-tpls-session">
+        <div class="universal-template-box">
+          <div class="universal-header">
+            <strong><i class="fa fa-globe"></i> {% trans "Universal Template (Optional)" %}</strong>
+            <span class="text-muted small">{% trans "— single template applied across all platforms and offsets" %}</span>
+          </div>
+          {% bootstrap_field form.socialmedia_session_template layout="inline" %}
+        </div>
+
+        <div class="platform-custom-divider">
+          <span>{% trans "Or customize per platform (respecting platform format rules & limits):" %}</span>
+        </div>
+
+        <div class="platform-custom-fields">
+          <div class="platform-custom-field" data-platform="twitter">
+            <div class="plat-header">
+              <span class="plat-badge plat-twitter"><i class="fa fa-twitter"></i> X / Twitter</span>
+              <span class="plat-cap-badge plat-cap-plain"><i class="fa fa-font"></i> {% trans "Plain text" %}</span>
+              <span class="plat-limit">{% trans "≤280 chars" %}</span>
+              <button type="button" class="btn btn-xs btn-default btn-copy-plat" data-src="id_socialmedia_twitter_session_template" data-type="session">
+                <i class="fa fa-copy"></i> {% trans "Copy to other platforms" %}
+              </button>
+            </div>
+            {% bootstrap_field form.socialmedia_twitter_session_template layout="inline" %}
+            <div class="char-count-bar" data-target="id_socialmedia_twitter_session_template" data-limit="280"></div>
+          </div>
+
+          <div class="platform-custom-field" data-platform="linkedin">
+            <div class="plat-header">
+              <span class="plat-badge plat-linkedin"><i class="fa fa-linkedin"></i> LinkedIn</span>
+              <span class="plat-cap-badge plat-cap-long"><i class="fa fa-briefcase"></i> {% trans "Long-form story" %}</span>
+              <span class="plat-limit">{% trans "≤3000 chars" %}</span>
+              <button type="button" class="btn btn-xs btn-default btn-copy-plat" data-src="id_socialmedia_linkedin_session_template" data-type="session">
+                <i class="fa fa-copy"></i> {% trans "Copy to other platforms" %}
+              </button>
+            </div>
+            {% bootstrap_field form.socialmedia_linkedin_session_template layout="inline" %}
+            <div class="char-count-bar" data-target="id_socialmedia_linkedin_session_template" data-limit="3000"></div>
+          </div>
+
+          <div class="platform-custom-field" data-platform="telegram">
+            <div class="plat-header">
+              <span class="plat-badge plat-telegram"><i class="fa fa-paper-plane"></i> Telegram</span>
+              <span class="plat-cap-badge plat-cap-markdown"><i class="fa fa-code"></i> {% trans "Markdown supported (*bold*, _italic_, [link](url))" %}</span>
+              <span class="plat-limit">{% trans "≤4096 chars" %}</span>
+              <button type="button" class="btn btn-xs btn-default btn-copy-plat" data-src="id_socialmedia_telegram_session_template" data-type="session">
+                <i class="fa fa-copy"></i> {% trans "Copy to other platforms" %}
+              </button>
+            </div>
+            {% bootstrap_field form.socialmedia_telegram_session_template layout="inline" %}
+            <div class="char-count-bar" data-target="id_socialmedia_telegram_session_template" data-limit="4096"></div>
+          </div>
+
+          <div class="platform-custom-field" data-platform="mastodon">
+            <div class="plat-header">
+              <span class="plat-badge plat-mastodon"><i class="fa fa-globe"></i> Mastodon</span>
+              <span class="plat-cap-badge plat-cap-fediverse"><i class="fa fa-bullhorn"></i> {% trans "Fediverse text" %}</span>
+              <span class="plat-limit">{% trans "≤500 chars" %}</span>
+              <button type="button" class="btn btn-xs btn-default btn-copy-plat" data-src="id_socialmedia_mastodon_session_template" data-type="session">
+                <i class="fa fa-copy"></i> {% trans "Copy to other platforms" %}
+              </button>
+            </div>
+            {% bootstrap_field form.socialmedia_mastodon_session_template layout="inline" %}
+            <div class="char-count-bar" data-target="id_socialmedia_mastodon_session_template" data-limit="500"></div>
+          </div>
+        </div>
+
+        <div class="tokens-container">
+          <span class="tokens-label">{% trans "Insert Placeholders:" %}</span>
+          <span class="token-chip" data-type="session">{event_name}</span>
+          <span class="token-chip" data-type="session">{talk_title}</span>
+          <span class="token-chip" data-type="session">{talk_room}</span>
+          <span class="token-chip" data-type="session">{talk_start_time}</span>
+          <span class="token-chip" data-type="session">{speaker_names}</span>
+          <span class="token-chip" data-type="session">{talk_link}</span>
+          <span class="token-chip" data-type="session">{hashtags}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Ticket Templates -->
+    <div class="adv-group template-group" data-type="ticket">
+      <div class="adv-group-title">
+        <i class="fa fa-ticket"></i> {% trans "Ticket Templates" %}
+      </div>
+      <div class="template-status-badge">
+        <span class="label label-success">
+          <i class="fa fa-check-circle"></i> {% trans "System wave defaults fit character limits for all enabled platforms" %}
+        </span>
+      </div>
+
+      <div class="default-template-preview">
+        <strong>{% trans "System default copy per wave:" %}</strong>
+        <div class="wave-template-list">
+          <div class="wave-template-item"><span class="wave-label">{% trans "14+ days:" %}</span> {{ form.default_template_preview.ticket.announcement }}</div>
+          <div class="wave-template-item"><span class="wave-label">{% trans "3–13 days:" %}</span> {{ form.default_template_preview.ticket.reminder }}</div>
+          <div class="wave-template-item"><span class="wave-label">{% trans "0–2 days:" %}</span> {{ form.default_template_preview.ticket.final_call }}</div>
+        </div>
+      </div>
+
+      <div class="template-custom-toggle-wrap">
+        <button type="button" class="btn btn-default btn-sm toggle-custom-tpl-btn" data-target="#custom-tpls-ticket">
+          <i class="fa fa-pencil"></i> {% trans "Customize Ticket Templates" %}
+        </button>
+        <button type="button" class="btn btn-link btn-sm reset-default-btn" data-type="ticket">
+          <i class="fa fa-undo"></i> {% trans "Reset to system default" %}
+        </button>
+      </div>
+
+      <div class="custom-templates-panel" id="custom-tpls-ticket">
+        <div class="universal-template-box">
+          <div class="universal-header">
+            <strong><i class="fa fa-globe"></i> {% trans "Universal Template (Optional)" %}</strong>
+            <span class="text-muted small">{% trans "— single template applied across all platforms and offsets" %}</span>
+          </div>
+          {% bootstrap_field form.socialmedia_ticket_template layout="inline" %}
+        </div>
+
+        <div class="platform-custom-divider">
+          <span>{% trans "Or customize per platform (respecting platform format rules & limits):" %}</span>
+        </div>
+
+        <div class="platform-custom-fields">
+          <div class="platform-custom-field" data-platform="twitter">
+            <div class="plat-header">
+              <span class="plat-badge plat-twitter"><i class="fa fa-twitter"></i> X / Twitter</span>
+              <span class="plat-cap-badge plat-cap-plain"><i class="fa fa-font"></i> {% trans "Plain text" %}</span>
+              <span class="plat-limit">{% trans "≤280 chars" %}</span>
+              <button type="button" class="btn btn-xs btn-default btn-copy-plat" data-src="id_socialmedia_twitter_ticket_template" data-type="ticket">
+                <i class="fa fa-copy"></i> {% trans "Copy to other platforms" %}
+              </button>
+            </div>
+            {% bootstrap_field form.socialmedia_twitter_ticket_template layout="inline" %}
+            <div class="char-count-bar" data-target="id_socialmedia_twitter_ticket_template" data-limit="280"></div>
+          </div>
+
+          <div class="platform-custom-field" data-platform="linkedin">
+            <div class="plat-header">
+              <span class="plat-badge plat-linkedin"><i class="fa fa-linkedin"></i> LinkedIn</span>
+              <span class="plat-cap-badge plat-cap-long"><i class="fa fa-briefcase"></i> {% trans "Long-form story" %}</span>
+              <span class="plat-limit">{% trans "≤3000 chars" %}</span>
+              <button type="button" class="btn btn-xs btn-default btn-copy-plat" data-src="id_socialmedia_linkedin_ticket_template" data-type="ticket">
+                <i class="fa fa-copy"></i> {% trans "Copy to other platforms" %}
+              </button>
+            </div>
+            {% bootstrap_field form.socialmedia_linkedin_ticket_template layout="inline" %}
+            <div class="char-count-bar" data-target="id_socialmedia_linkedin_ticket_template" data-limit="3000"></div>
+          </div>
+
+          <div class="platform-custom-field" data-platform="telegram">
+            <div class="plat-header">
+              <span class="plat-badge plat-telegram"><i class="fa fa-paper-plane"></i> Telegram</span>
+              <span class="plat-cap-badge plat-cap-markdown"><i class="fa fa-code"></i> {% trans "Markdown supported (*bold*, _italic_, [link](url))" %}</span>
+              <span class="plat-limit">{% trans "≤4096 chars" %}</span>
+              <button type="button" class="btn btn-xs btn-default btn-copy-plat" data-src="id_socialmedia_telegram_ticket_template" data-type="ticket">
+                <i class="fa fa-copy"></i> {% trans "Copy to other platforms" %}
+              </button>
+            </div>
+            {% bootstrap_field form.socialmedia_telegram_ticket_template layout="inline" %}
+            <div class="char-count-bar" data-target="id_socialmedia_telegram_ticket_template" data-limit="4096"></div>
+          </div>
+
+          <div class="platform-custom-field" data-platform="mastodon">
+            <div class="plat-header">
+              <span class="plat-badge plat-mastodon"><i class="fa fa-globe"></i> Mastodon</span>
+              <span class="plat-cap-badge plat-cap-fediverse"><i class="fa fa-bullhorn"></i> {% trans "Fediverse text" %}</span>
+              <span class="plat-limit">{% trans "≤500 chars" %}</span>
+              <button type="button" class="btn btn-xs btn-default btn-copy-plat" data-src="id_socialmedia_mastodon_ticket_template" data-type="ticket">
+                <i class="fa fa-copy"></i> {% trans "Copy to other platforms" %}
+              </button>
+            </div>
+            {% bootstrap_field form.socialmedia_mastodon_ticket_template layout="inline" %}
+            <div class="char-count-bar" data-target="id_socialmedia_mastodon_ticket_template" data-limit="500"></div>
+          </div>
+        </div>
+
+        <div class="tokens-container">
+          <span class="tokens-label">{% trans "Insert Placeholders:" %}</span>
+          <span class="token-chip" data-type="ticket">{event_name}</span>
+          <span class="token-chip" data-type="ticket">{ticket_name}</span>
+          <span class="token-chip" data-type="ticket">{ticket_price}</span>
+          <span class="token-chip" data-type="ticket">{ticket_link}</span>
+          <span class="token-chip" data-type="ticket">{hashtags}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. Schedule Templates -->
+    <div class="adv-group template-group" data-type="schedule">
+      <div class="adv-group-title">
+        <i class="fa fa-list-alt"></i> {% trans "Schedule Announcement Templates" %}
+      </div>
+      <div class="template-status-badge">
+        <span class="label label-success">
+          <i class="fa fa-check-circle"></i> {% trans "System wave defaults fit character limits for all enabled platforms" %}
+        </span>
+      </div>
+
+      <div class="default-template-preview">
+        <strong>{% trans "System default copy per wave:" %}</strong>
+        <div class="wave-template-list">
+          <div class="wave-template-item"><span class="wave-label">{% trans "7+ days:" %}</span> {{ form.default_template_preview.schedule.announcement }}</div>
+          <div class="wave-template-item"><span class="wave-label">{% trans "0–6 days:" %}</span> {{ form.default_template_preview.schedule.reminder }}</div>
+        </div>
+      </div>
+
+      <div class="template-custom-toggle-wrap">
+        <button type="button" class="btn btn-default btn-sm toggle-custom-tpl-btn" data-target="#custom-tpls-schedule">
+          <i class="fa fa-pencil"></i> {% trans "Customize Schedule Templates" %}
+        </button>
+        <button type="button" class="btn btn-link btn-sm reset-default-btn" data-type="schedule">
+          <i class="fa fa-undo"></i> {% trans "Reset to system default" %}
+        </button>
+      </div>
+
+      <div class="custom-templates-panel" id="custom-tpls-schedule">
+        <div class="universal-template-box">
+          <div class="universal-header">
+            <strong><i class="fa fa-globe"></i> {% trans "Universal Template (Optional)" %}</strong>
+            <span class="text-muted small">{% trans "— single template applied across all platforms and offsets" %}</span>
+          </div>
+          {% bootstrap_field form.socialmedia_schedule_template layout="inline" %}
+        </div>
+
+        <div class="platform-custom-divider">
+          <span>{% trans "Or customize per platform (respecting platform format rules & limits):" %}</span>
+        </div>
+
+        <div class="platform-custom-fields">
+          <div class="platform-custom-field" data-platform="twitter">
+            <div class="plat-header">
+              <span class="plat-badge plat-twitter"><i class="fa fa-twitter"></i> X / Twitter</span>
+              <span class="plat-cap-badge plat-cap-plain"><i class="fa fa-font"></i> {% trans "Plain text" %}</span>
+              <span class="plat-limit">{% trans "≤280 chars" %}</span>
+              <button type="button" class="btn btn-xs btn-default btn-copy-plat" data-src="id_socialmedia_twitter_schedule_template" data-type="schedule">
+                <i class="fa fa-copy"></i> {% trans "Copy to other platforms" %}
+              </button>
+            </div>
+            {% bootstrap_field form.socialmedia_twitter_schedule_template layout="inline" %}
+            <div class="char-count-bar" data-target="id_socialmedia_twitter_schedule_template" data-limit="280"></div>
+          </div>
+
+          <div class="platform-custom-field" data-platform="linkedin">
+            <div class="plat-header">
+              <span class="plat-badge plat-linkedin"><i class="fa fa-linkedin"></i> LinkedIn</span>
+              <span class="plat-cap-badge plat-cap-long"><i class="fa fa-briefcase"></i> {% trans "Long-form story" %}</span>
+              <span class="plat-limit">{% trans "≤3000 chars" %}</span>
+              <button type="button" class="btn btn-xs btn-default btn-copy-plat" data-src="id_socialmedia_linkedin_schedule_template" data-type="schedule">
+                <i class="fa fa-copy"></i> {% trans "Copy to other platforms" %}
+              </button>
+            </div>
+            {% bootstrap_field form.socialmedia_linkedin_schedule_template layout="inline" %}
+            <div class="char-count-bar" data-target="id_socialmedia_linkedin_schedule_template" data-limit="3000"></div>
+          </div>
+
+          <div class="platform-custom-field" data-platform="telegram">
+            <div class="plat-header">
+              <span class="plat-badge plat-telegram"><i class="fa fa-paper-plane"></i> Telegram</span>
+              <span class="plat-cap-badge plat-cap-markdown"><i class="fa fa-code"></i> {% trans "Markdown supported (*bold*, _italic_, [link](url))" %}</span>
+              <span class="plat-limit">{% trans "≤4096 chars" %}</span>
+              <button type="button" class="btn btn-xs btn-default btn-copy-plat" data-src="id_socialmedia_telegram_schedule_template" data-type="schedule">
+                <i class="fa fa-copy"></i> {% trans "Copy to other platforms" %}
+              </button>
+            </div>
+            {% bootstrap_field form.socialmedia_telegram_schedule_template layout="inline" %}
+            <div class="char-count-bar" data-target="id_socialmedia_telegram_schedule_template" data-limit="4096"></div>
+          </div>
+
+          <div class="platform-custom-field" data-platform="mastodon">
+            <div class="plat-header">
+              <span class="plat-badge plat-mastodon"><i class="fa fa-globe"></i> Mastodon</span>
+              <span class="plat-cap-badge plat-cap-fediverse"><i class="fa fa-bullhorn"></i> {% trans "Fediverse text" %}</span>
+              <span class="plat-limit">{% trans "≤500 chars" %}</span>
+              <button type="button" class="btn btn-xs btn-default btn-copy-plat" data-src="id_socialmedia_mastodon_schedule_template" data-type="schedule">
+                <i class="fa fa-copy"></i> {% trans "Copy to other platforms" %}
+              </button>
+            </div>
+            {% bootstrap_field form.socialmedia_mastodon_schedule_template layout="inline" %}
+            <div class="char-count-bar" data-target="id_socialmedia_mastodon_schedule_template" data-limit="500"></div>
+          </div>
+        </div>
+
+        <div class="tokens-container">
+          <span class="tokens-label">{% trans "Insert Placeholders:" %}</span>
+          <span class="token-chip" data-type="schedule">{event_name}</span>
+          <span class="token-chip" data-type="schedule">{schedule_link}</span>
+          <span class="token-chip" data-type="schedule">{hashtags}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="sm-preview-actions">
+      <button type="submit" name="action" value="save" class="btn btn-primary">
+        <i class="fa fa-save"></i> {% trans "Save Templates" %}
+      </button>
+      <button type="submit" name="action" value="save_and_generate" class="btn btn-success" id="btn-save-generate">
+        <i class="fa fa-magic"></i> {% trans "Save & Generate Posts" %}
+      </button>
+    </div>
+  </form>
+</div><!-- /sm-page -->
+
+<!-- Workflow Guide Modal -->
+<div class="modal fade" id="sm-workflow-guide-modal" tabindex="-1" role="dialog" aria-labelledby="sm-workflow-guide-title">
+  <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-content sm-workflow-modal">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="sm-workflow-guide-title">
+          <i class="fa fa-map-signs text-primary"></i> {% trans "Social Media Workflow Guide" %}
+        </h4>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted" style="margin-bottom: 20px;">
+          {% trans "Welcome to Eventyay Social Media! Follow this simple 4-step journey to automate and schedule posts for your event." %}
+        </p>
+
+        <div class="workflow-steps-container">
+          <div class="workflow-step-card">
+            <div class="step-badge">1</div>
+            <div class="step-content">
+              <h4>{% trans "1. Settings" %}</h4>
+              <p>{% trans "Enable your desired platforms (X/Twitter, LinkedIn, Telegram, Mastodon), set your default hashtags, and configure timing offsets for when posts should trigger before milestones." %}</p>
+            </div>
+          </div>
+
+          <div class="workflow-step-card">
+            <div class="step-badge">2</div>
+            <div class="step-content">
+              <h4>{% trans "2. Templates" %}</h4>
+              <p>{% trans "Posts use smart, milestone-aware system wave defaults out of the box (fits all platform limits). Optionally set a Universal template or write platform-specific copy (with rich Markdown support for Telegram)." %}</p>
+            </div>
+          </div>
+
+          <div class="workflow-step-card">
+            <div class="step-badge">3</div>
+            <div class="step-content">
+              <h4>{% trans "3. Posts Queue" %}</h4>
+              <p>{% trans "Click 'Generate Posts' to build your queue. Filter by Content-Type or Status, edit text inline, view live mockup cards, and select posts for bulk scheduling, bulk discard, or bulk retry." %}</p>
+            </div>
+          </div>
+
+          <div class="workflow-step-card">
+            <div class="step-badge">4</div>
+            <div class="step-content">
+              <h4>{% trans "4. Publishing & Log" %}</h4>
+              <p>{% trans "Automated workers publish scheduled posts at the exact time to your connected accounts. Monitor real-time status and error reports in the Publishing Log." %}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-dismiss="modal">{% trans "Got It" %}</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="{% static 'socialmedia/js/settings.js' %}"></script>
+{% endblock %}

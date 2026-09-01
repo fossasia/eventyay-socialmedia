@@ -21,8 +21,13 @@ from eventyay.control.views.organizer_views.organizer_detail_view_mixin import (
     OrganizerDetailViewMixin,
 )
 
-from .export import build_posts, generate_csv_from_posts, sync_posts_to_db
-from .forms import PROVIDER_FORMS, SocialMediaSettingsForm
+from .export import (
+    PLATFORMS,
+    build_posts,
+    generate_csv_from_posts,
+    sync_posts_to_db,
+)
+from .forms import PROVIDER_FORMS, SocialMediaSettingsForm, SocialMediaTemplatesForm
 from .models import SocialMediaAccount, SocialMediaPost, SocialMediaPostStatus
 from .providers.registry import get_provider, get_provider_class
 
@@ -44,8 +49,13 @@ logger = logging.getLogger(__name__)
 
 
 def _check_plugin_active(request):
-    if "socialmedia" not in request.event.get_plugins():
-        raise Http404("Social Media plugin is not enabled for this event.")
+    plugins = getattr(request.event, "get_plugins", None)
+    if plugins:
+        active = "socialmedia" in request.event.get_plugins()
+    else:
+        active = "socialmedia" in (request.event.plugins or "").split(",")
+    if not active:
+        raise Http404(_("Social media plugin is not enabled for this event."))
 
 
 def _check_permission(request):
@@ -98,8 +108,32 @@ class SocialMediaSettingsView(DecoupleMixin, FormView):
         ctx = super().get_context_data(**kwargs)
         ctx["event"] = self.request.event
         ctx["organizer"] = self.request.event.organizer
+        ctx["has_generated_posts"] = SocialMediaPost.objects.filter(
+            event=self.request.event
+        ).exists()
         ctx["preview_url"] = reverse(
             "plugins:socialmedia:preview",
+            kwargs={
+                "organizer": self.request.event.organizer.slug,
+                "event": self.request.event.slug,
+            },
+        )
+        ctx["templates_url"] = reverse(
+            "plugins:socialmedia:templates",
+            kwargs={
+                "organizer": self.request.event.organizer.slug,
+                "event": self.request.event.slug,
+            },
+        )
+        ctx["generate_url"] = reverse(
+            "plugins:socialmedia:generate_posts",
+            kwargs={
+                "organizer": self.request.event.organizer.slug,
+                "event": self.request.event.slug,
+            },
+        )
+        ctx["bulk_action_url"] = reverse(
+            "plugins:socialmedia:bulk_action",
             kwargs={
                 "organizer": self.request.event.organizer.slug,
                 "event": self.request.event.slug,
@@ -131,7 +165,6 @@ class SocialMediaSettingsView(DecoupleMixin, FormView):
                 user=self.request.user,
                 data={k: form.cleaned_data.get(k) for k in form.changed_data},
             )
-        sync_posts_to_db(self.request.event, self.request)
         messages.success(self.request, _("Your changes have been saved."))
         return super().form_valid(form)
 
@@ -145,7 +178,7 @@ class SocialMediaSettingsView(DecoupleMixin, FormView):
 
 class SocialMediaPostSettingsView(DecoupleMixin, FormView):
     """
-    Dedicated Settings page — platform toggles, templates, offsets, hashtags.
+    Dedicated Settings page — platform toggles, timing offsets, hashtags, auto-publish.
     Lives at /social/event/<org>/<event>/settings/
     """
 
@@ -177,6 +210,13 @@ class SocialMediaPostSettingsView(DecoupleMixin, FormView):
         ctx = super().get_context_data(**kwargs)
         ctx["event"] = self.request.event
         ctx["organizer"] = self.request.event.organizer
+        ctx["templates_url"] = reverse(
+            "plugins:socialmedia:templates",
+            kwargs={
+                "organizer": self.request.event.organizer.slug,
+                "event": self.request.event.slug,
+            },
+        )
         return ctx
 
     @transaction.atomic
@@ -189,10 +229,180 @@ class SocialMediaPostSettingsView(DecoupleMixin, FormView):
                 user=self.request.user,
                 data={k: form.cleaned_data.get(k) for k in form.changed_data},
             )
-        sync_posts_to_db(self.request.event, self.request)
-        messages.success(self.request, _("Your changes have been saved."))
+        messages.success(self.request, _("Your settings have been saved."))
 
-        if self.request.POST.get("action") == "save_and_preview":
+        action = self.request.POST.get("action")
+        if action == "save_and_templates":
+            return redirect(
+                reverse(
+                    "plugins:socialmedia:templates",
+                    kwargs={
+                        "organizer": self.request.event.organizer.slug,
+                        "event": self.request.event.slug,
+                    },
+                )
+            )
+        return super().form_valid(form)
+
+    def form_invalid(self, form):
+        messages.error(
+            self.request,
+            _("We could not save your changes. See below for details."),
+        )
+        return super().form_invalid(form)
+
+
+class SocialMediaTemplatesView(DecoupleMixin, FormView):
+    """
+    Dedicated Templates page — customize post templates per content type and platform.
+    Lives at /social/event/<org>/<event>/templates/
+    """
+
+    form_class = SocialMediaTemplatesForm
+    template_name = "socialmedia/templates.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            raise PermissionDenied()
+        _check_plugin_active(request)
+        _check_permission(request)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["obj"] = self.request.event
+        return kwargs
+
+    def get_success_url(self):
+        return reverse(
+            "plugins:socialmedia:templates",
+            kwargs={
+                "organizer": self.request.event.organizer.slug,
+                "event": self.request.event.slug,
+            },
+        )
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["event"] = self.request.event
+        ctx["organizer"] = self.request.event.organizer
+        ctx["has_generated_posts"] = SocialMediaPost.objects.filter(
+            event=self.request.event
+        ).exists()
+        ctx["posts_url"] = reverse(
+            "plugins:socialmedia:posts",
+            kwargs={
+                "organizer": self.request.event.organizer.slug,
+                "event": self.request.event.slug,
+            },
+        )
+        ctx["settings_url"] = reverse(
+            "plugins:socialmedia:plugin_settings",
+            kwargs={
+                "organizer": self.request.event.organizer.slug,
+                "event": self.request.event.slug,
+            },
+        )
+
+        enabled_platforms = []
+        for p in ["twitter", "linkedin", "telegram", "mastodon"]:
+            is_enabled = self.request.event.settings.get(
+                f"socialmedia_{p}_enabled", as_type=bool, default=False
+            )
+            enabled_platforms.append(
+                {
+                    "id": p,
+                    "label": PLATFORMS.get(p, p.title()),
+                    "enabled": is_enabled,
+                }
+            )
+        ctx["platform_list"] = enabled_platforms
+
+        # Content types metadata for easy rendering
+        ctx["content_types"] = [
+            {
+                "id": "cfp",
+                "label": _("CFP"),
+                "icon": "fa-bullhorn",
+                "generic_field": "socialmedia_cfp_template",
+                "tokens": [
+                    "{event_name}",
+                    "{cfp_deadline}",
+                    "{cfp_link}",
+                    "{hashtags}",
+                ],
+            },
+            {
+                "id": "speaker",
+                "label": _("Speaker"),
+                "icon": "fa-user",
+                "generic_field": "socialmedia_speaker_template",
+                "tokens": [
+                    "{event_name}",
+                    "{speaker_name}",
+                    "{speaker_social_handle}",
+                    "{speaker_twitter}",
+                    "{speaker_linkedin}",
+                    "{speaker_github}",
+                    "{speaker_link}",
+                    "{talk_title}",
+                    "{hashtags}",
+                ],
+            },
+            {
+                "id": "session",
+                "label": _("Session"),
+                "icon": "fa-calendar",
+                "generic_field": "socialmedia_session_template",
+                "tokens": [
+                    "{event_name}",
+                    "{talk_title}",
+                    "{talk_room}",
+                    "{talk_start_time}",
+                    "{speaker_names}",
+                    "{talk_link}",
+                    "{hashtags}",
+                ],
+            },
+            {
+                "id": "ticket",
+                "label": _("Ticket"),
+                "icon": "fa-ticket",
+                "generic_field": "socialmedia_ticket_template",
+                "tokens": [
+                    "{event_name}",
+                    "{ticket_name}",
+                    "{ticket_price}",
+                    "{ticket_link}",
+                    "{hashtags}",
+                ],
+            },
+            {
+                "id": "schedule",
+                "label": _("Schedule"),
+                "icon": "fa-list-alt",
+                "generic_field": "socialmedia_schedule_template",
+                "tokens": ["{event_name}", "{schedule_link}", "{hashtags}"],
+            },
+        ]
+        return ctx
+
+    @transaction.atomic
+    def form_valid(self, form):
+        self._save_decoupled(form)
+        form.save()
+        if form.has_changed():
+            self.request.event.log_action(
+                "eventyay.event.settings",
+                user=self.request.user,
+                data={k: form.cleaned_data.get(k) for k in form.changed_data},
+            )
+        messages.success(self.request, _("Templates have been saved."))
+
+        action = self.request.POST.get("action")
+        if action == "save_and_generate":
+            sync_posts_to_db(self.request.event, self.request)
+            messages.success(self.request, _("Posts generated successfully."))
             return redirect(
                 reverse(
                     "plugins:socialmedia:posts",
@@ -207,7 +417,7 @@ class SocialMediaPostSettingsView(DecoupleMixin, FormView):
     def form_invalid(self, form):
         messages.error(
             self.request,
-            _("We could not save your changes. See below for details."),
+            _("We could not save your templates. See below for details."),
         )
         return super().form_invalid(form)
 
@@ -280,6 +490,16 @@ class PublishingLogView(DecoupleMixin, FormView):
         return self.render_to_response(
             self.get_context_data(
                 posts=page_obj,
+                has_generated_posts=SocialMediaPost.objects.filter(
+                    event=request.event
+                ).exists(),
+                templates_url=reverse(
+                    "plugins:socialmedia:templates",
+                    kwargs={
+                        "organizer": request.event.organizer.slug,
+                        "event": request.event.slug,
+                    },
+                ),
                 status_filter=status_filter,
                 total_count=counts["total"],
                 published_count=counts["published"],
@@ -295,18 +515,35 @@ class PublishingLogView(DecoupleMixin, FormView):
 def preview_posts(request, organizer, event):
     """AJAX GET — returns JSON list of generated posts merged with DB state.
 
-    Syncs generated schedule posts to DB via sync_posts_to_db() and returns
-    full preview metadata (status badges, media URLs, custom schedule text).
+    Syncs generated schedule posts to DB via sync_posts_to_db() when generated
+    and returns full preview metadata (status badges, media URLs, account handles).
     """
     _check_permission(request)
     _check_plugin_active(request)
     try:
-        sync_posts_to_db(request.event, request)
+        force_generate = (
+            request.GET.get("generate") == "true" or request.GET.get("force") == "true"
+        )
+        has_posts = SocialMediaPost.objects.filter(event=request.event).exists()
+
+        if not has_posts and not force_generate:
+            return JsonResponse({"posts": [], "has_generated_posts": False})
+
+        if force_generate or has_posts:
+            sync_posts_to_db(request.event, request)
+
         raw_posts = build_posts(request.event, request)
         db_posts = {
             (p.post_type, p.entity_id, p.offset_days): p
             for p in SocialMediaPost.objects.filter(event=request.event)
         }
+
+        # Fetch connected accounts for this organizer (Issue #61)
+        accounts = list(
+            SocialMediaAccount.objects.filter(organizer=request.event.organizer)
+        )
+        accounts_map = {acc.provider: acc for acc in accounts}
+
         posts = []
         for p in raw_posts:
             entity_id = str(p["id"])
@@ -328,11 +565,124 @@ def preview_posts(request, organizer, event):
                 p["status"] = "scheduled"
                 p["error_message"] = ""
                 p["media_url"] = p.get("media_url") or ""
+
+            # Determine platform & connected account details (Issue #61)
+            platform = p.get("platform", "")
+            if not platform:
+                for prov in ["twitter", "linkedin", "telegram", "mastodon"]:
+                    if entity_id.endswith(f"_{prov}"):
+                        platform = prov
+                        break
+            p["platform"] = platform
+
+            acc = accounts_map.get(platform)
+            if acc:
+                p["account_handle"] = acc.platform_username
+                p["account_is_active"] = acc.is_active
+                p["account_status"] = "connected" if acc.is_active else "inactive"
+            else:
+                p["account_handle"] = ""
+                p["account_is_active"] = False
+                p["account_status"] = "disconnected"
+
             posts.append(p)
     except Exception as exc:  # pragma: no cover
         logger.exception("Error generating preview posts: %s", exc)
         return JsonResponse({"error": "Internal server error"}, status=500)
-    return JsonResponse({"posts": posts})
+    return JsonResponse({"posts": posts, "has_generated_posts": True})
+
+
+@require_POST
+def generate_posts_view(request, organizer, event):
+    """AJAX POST — explicitly trigger initial or full post generation."""
+    _check_permission(request)
+    _check_plugin_active(request)
+    try:
+        sync_posts_to_db(request.event, request)
+        return JsonResponse(
+            {
+                "success": True,
+                "message": str(_("Posts generated successfully.")),
+            }
+        )
+    except Exception as exc:
+        logger.exception("Error generating posts: %s", exc)
+        return JsonResponse({"success": False, "error": str(exc)}, status=500)
+
+
+@require_POST
+def bulk_post_action(request, organizer, event):
+    """AJAX POST — perform bulk operations (discard, retry) on posts."""
+    _check_permission(request)
+    _check_plugin_active(request)
+    try:
+        data = json.loads(request.body)
+        action = data.get("action")
+        post_ids = data.get("post_ids", [])
+        db_ids = data.get("db_ids", [])
+        provider = data.get("provider")
+
+        if action == "discard":
+            qs = SocialMediaPost.objects.filter(event=request.event)
+            if db_ids:
+                qs = qs.filter(pk__in=db_ids)
+            elif post_ids:
+                qs = qs.filter(entity_id__in=[str(pid) for pid in post_ids])
+            if provider:
+                qs = qs.filter(entity_id__endswith=f"_{provider}")
+
+            updated_count = qs.update(
+                status=SocialMediaPostStatus.EXCLUDED,
+                updated_at=timezone.now(),
+            )
+            return JsonResponse(
+                {
+                    "success": True,
+                    "action": "discard",
+                    "count": updated_count,
+                    "message": str(
+                        _("Discarded %(count)d post(s).") % {"count": updated_count}
+                    ),
+                }
+            )
+
+        elif action == "retry":
+            qs = SocialMediaPost.objects.filter(
+                event=request.event,
+                status=SocialMediaPostStatus.FAILED,
+            )
+            if db_ids:
+                qs = qs.filter(pk__in=db_ids)
+            elif post_ids:
+                qs = qs.filter(entity_id__in=[str(pid) for pid in post_ids])
+            if provider:
+                qs = qs.filter(entity_id__endswith=f"_{provider}")
+
+            retried_count = 0
+            for post in qs:
+                post.status = SocialMediaPostStatus.SCHEDULED
+                post.error_message = ""
+                post.save(update_fields=["status", "error_message", "updated_at"])
+                retried_count += 1
+
+            return JsonResponse(
+                {
+                    "success": True,
+                    "action": "retry",
+                    "count": retried_count,
+                    "message": str(
+                        _("Re-queued %(count)d failed post(s).")
+                        % {"count": retried_count}
+                    ),
+                }
+            )
+
+        return JsonResponse(
+            {"success": False, "error": str(_("Unknown action."))}, status=400
+        )
+    except Exception as exc:
+        logger.exception("Error executing bulk action: %s", exc)
+        return JsonResponse({"success": False, "error": str(exc)}, status=500)
 
 
 @require_POST
@@ -636,9 +986,7 @@ class OrganizerAccountDeleteView(
         has_active = active_posts.filter(
             entity_id__endswith=f"_{account.provider}"
         ).exists()
-        count = active_posts.filter(
-            entity_id__endswith=f"_{account.provider}"
-        ).count()
+        count = active_posts.filter(entity_id__endswith=f"_{account.provider}").count()
 
         ctx["has_active_posts"] = has_active
         ctx["active_posts_count"] = count

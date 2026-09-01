@@ -5,7 +5,12 @@ from typing import Any
 
 import requests
 
-from .base import BaseSocialProvider, PublishingError, _safe_fetch_url, _try_local_media_fallback
+from .base import (
+    BaseSocialProvider,
+    PublishingError,
+    _safe_fetch_url,
+    _try_local_media_fallback,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +72,9 @@ class LinkedInProvider(BaseSocialProvider):
             )
         except Exception:
             logger.debug(
-                "_resolve_person_urn: request failed for member_id=%s", member_id, exc_info=True
+                "_resolve_person_urn: request failed for member_id=%s",
+                member_id,
+                exc_info=True,
             )
         return None
 
@@ -173,7 +180,10 @@ class LinkedInProvider(BaseSocialProvider):
         real_candidate = os.path.realpath(candidate)
         real_root = os.path.realpath(media_root)
 
-        if not real_candidate.startswith(real_root + os.sep) and real_candidate != real_root:
+        if (
+            not real_candidate.startswith(real_root + os.sep)
+            and real_candidate != real_root
+        ):
             raise PublishingError(
                 f"Access denied: {media_item!r} resolves outside MEDIA_ROOT."
             )
@@ -478,6 +488,3 @@ class LinkedInProvider(BaseSocialProvider):
                 "The access token will be generated automatically."
             ),
         ]
-
-
-
