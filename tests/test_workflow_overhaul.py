@@ -397,3 +397,169 @@ def test_publishing_log_view_empty_and_active_state(
     resp_after = logged_in_organizer_client.get(log_url)
     assert resp_after.status_code == 200
     assert resp_after.context["has_generated_posts"] is True
+
+
+@pytest.mark.django_db
+def test_wave_level_template_and_offset_override(
+    logged_in_organizer_client, organizer, event, settings
+):
+    """Test customizing individual wave copy and wave offset days via Templates view."""
+    from socialmedia.export import build_posts
+
+    settings.SITE_URL = "https://testserver"
+
+    url = reverse(
+        "plugins:socialmedia:templates",
+        kwargs={"organizer": organizer.slug, "event": event.slug},
+    )
+    payload = {
+        "socialmedia_cfp_announcement_enabled": True,
+        "socialmedia_cfp_announcement_offset": 45,
+        "socialmedia_cfp_announcement_template": "Early CFP Announcement: {cfp_link}",
+        "socialmedia_cfp_reminder_enabled": True,
+        "socialmedia_cfp_reminder_offset": 10,
+        "socialmedia_cfp_reminder_template": "Custom Reminder: {cfp_deadline}",
+        "socialmedia_cfp_final_call_enabled": True,
+        "socialmedia_cfp_final_call_offset": 1,
+    }
+    response = logged_in_organizer_client.post(url, payload)
+    assert response.status_code == 302
+
+    with scope(organizer=organizer, event=event):
+        event = event.__class__.objects.get(pk=event.pk)
+        event.settings.flush()
+        assert event.settings.get("socialmedia_cfp_announcement_template") == "Early CFP Announcement: {cfp_link}"
+        assert event.settings.get("socialmedia_cfp_reminder_template") == "Custom Reminder: {cfp_deadline}"
+        assert event.settings.get("socialmedia_cfp_announcement_offset", as_type=int) == 45
+        assert event.settings.get("socialmedia_cfp_reminder_offset", as_type=int) == 10
+
+        # Enable CFP and build posts
+        event.settings.set("socialmedia_cfp_enabled", True)
+        if hasattr(event, "cfp"):
+            event.cfp.deadline = now() + timedelta(days=60)
+            event.cfp.save()
+
+        posts = build_posts(event)
+        cfp_posts = [p for p in posts if p.get("type") == "cfp"]
+        assert len(cfp_posts) == 3
+        # Announcement wave should have early text
+        announcement_post = [p for p in cfp_posts if p.get("offset_days") == 45][0]
+        assert "Early CFP Announcement:" in announcement_post["post_text"]
+        # Reminder wave should have custom reminder text
+        reminder_post = [p for p in cfp_posts if p.get("offset_days") == 10][0]
+        assert "Custom Reminder:" in reminder_post["post_text"]
+
+
+@pytest.mark.django_db
+def test_wave_disable_and_selective_generation(
+    logged_in_organizer_client, organizer, event, settings
+):
+    """Test that disabling Wave 1 and only keeping Waves 2 & 3 generates only 2 posts."""
+    from socialmedia.export import build_posts
+
+    settings.SITE_URL = "https://testserver"
+
+    url = reverse(
+        "plugins:socialmedia:templates",
+        kwargs={"organizer": organizer.slug, "event": event.slug},
+    )
+    # Disable Announcement (Wave 1), keep Reminder (Wave 2) and Final Call (Wave 3)
+    payload = {
+        "socialmedia_cfp_announcement_enabled": False,
+        "socialmedia_cfp_reminder_enabled": True,
+        "socialmedia_cfp_reminder_offset": 7,
+        "socialmedia_cfp_final_call_enabled": True,
+        "socialmedia_cfp_final_call_offset": 1,
+    }
+    response = logged_in_organizer_client.post(url, payload)
+    assert response.status_code == 302
+
+    with scope(organizer=organizer, event=event):
+        event = event.__class__.objects.get(pk=event.pk)
+        event.settings.flush()
+        event.settings.set("socialmedia_cfp_enabled", True)
+        if hasattr(event, "cfp"):
+            event.cfp.deadline = now() + timedelta(days=20)
+            event.cfp.save()
+
+        posts = build_posts(event)
+        cfp_posts = [p for p in posts if p.get("type") == "cfp"]
+        # Only 2 posts generated (Reminder at 7d and Final Call at 1d)
+        assert len(cfp_posts) == 2
+        offsets = [p["offset_days"] for p in cfp_posts]
+        assert 30 not in offsets
+        assert 7 in offsets
+        assert 1 in offsets
+
+
+@pytest.mark.django_db
+def test_add_custom_wave_and_generation(
+    logged_in_organizer_client, organizer, event, settings
+):
+    """Test adding custom organizer-defined waves via JSON storage and generating posts."""
+    import json
+    from socialmedia.export import build_posts
+
+    settings.SITE_URL = "https://testserver"
+
+    url = reverse(
+        "plugins:socialmedia:templates",
+        kwargs={"organizer": organizer.slug, "event": event.slug},
+    )
+
+    custom_waves = [
+        {
+            "id": "wave_custom_early",
+            "label": "Early Bird Call",
+            "offset": 60,
+            "enabled": True,
+            "template": "Early Bird Call! Submit to {event_name}: {cfp_link}",
+        },
+        {
+            "id": "wave_custom_mid",
+            "label": "Midway Check",
+            "offset": 15,
+            "enabled": True,
+            "template": "Midway reminder for {event_name}! {cfp_link}",
+        },
+    ]
+
+    payload = {
+        "socialmedia_cfp_announcement_enabled": True,
+        "socialmedia_cfp_announcement_offset": 30,
+        "socialmedia_cfp_reminder_enabled": True,
+        "socialmedia_cfp_reminder_offset": 7,
+        "socialmedia_cfp_final_call_enabled": True,
+        "socialmedia_cfp_final_call_offset": 1,
+        "socialmedia_cfp_custom_waves": json.dumps(custom_waves),
+    }
+
+    response = logged_in_organizer_client.post(url, payload)
+    assert response.status_code == 302
+
+    with scope(organizer=organizer, event=event):
+        event = event.__class__.objects.get(pk=event.pk)
+        event.settings.flush()
+        event.settings.set("socialmedia_cfp_enabled", True)
+        if hasattr(event, "cfp"):
+            event.cfp.deadline = now() + timedelta(days=90)
+            event.cfp.save()
+
+        posts = build_posts(event)
+        cfp_posts = [p for p in posts if p.get("type") == "cfp"]
+        # Total 5 posts: 3 default waves (30d, 7d, 1d) + 2 custom waves (60d, 15d)
+        assert len(cfp_posts) == 5
+        offsets = [p["offset_days"] for p in cfp_posts]
+        assert 60 in offsets
+        assert 30 in offsets
+        assert 15 in offsets
+        assert 7 in offsets
+        assert 1 in offsets
+
+        early_post = [p for p in cfp_posts if p.get("offset_days") == 60][0]
+        assert "Early Bird Call! Submit to" in early_post["post_text"]
+
+        mid_post = [p for p in cfp_posts if p.get("offset_days") == 15][0]
+        assert "Midway reminder for" in mid_post["post_text"]
+
+

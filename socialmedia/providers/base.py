@@ -16,14 +16,14 @@ _MAX_MEDIA_BYTES = 10 * 1024 * 1024  # 10 MB
 
 # Private / link-local / loopback networks that should never be fetched.
 _BLOCKED_NETWORKS = [
-    ipaddress.ip_network("127.0.0.0/8"),  # loopback
-    ipaddress.ip_network("10.0.0.0/8"),  # RFC1918
+    ipaddress.ip_network("127.0.0.0/8"),    # loopback
+    ipaddress.ip_network("10.0.0.0/8"),     # RFC1918
     ipaddress.ip_network("172.16.0.0/12"),  # RFC1918
-    ipaddress.ip_network("192.168.0.0/16"),  # RFC1918
-    ipaddress.ip_network("169.254.0.0/16"),  # link-local (IMDS)
-    ipaddress.ip_network("::1/128"),  # IPv6 loopback
-    ipaddress.ip_network("fc00::/7"),  # IPv6 unique-local
-    ipaddress.ip_network("fe80::/10"),  # IPv6 link-local
+    ipaddress.ip_network("192.168.0.0/16"), # RFC1918
+    ipaddress.ip_network("169.254.0.0/16"), # link-local (IMDS)
+    ipaddress.ip_network("::1/128"),        # IPv6 loopback
+    ipaddress.ip_network("fc00::/7"),       # IPv6 unique-local
+    ipaddress.ip_network("fe80::/10"),      # IPv6 link-local
 ]
 
 
@@ -40,7 +40,6 @@ def _safe_fetch_url(url: str, timeout: int = 20) -> requests.Response:
     # DEBUG shortcut: serve own-server media from disk, skip network entirely.
     try:
         from django.conf import settings as _settings
-
         _debug = bool(getattr(_settings, "DEBUG", False))
     except Exception:
         _debug = False
@@ -104,6 +103,7 @@ def _safe_fetch_url(url: str, timeout: int = 20) -> requests.Response:
     return resp
 
 
+
 def _try_local_media_fallback(url: str) -> tuple[bytes, str] | None:
     """Try to serve a media URL by reading the file directly from MEDIA_ROOT.
 
@@ -136,17 +136,14 @@ def _try_local_media_fallback(url: str) -> tuple[bytes, str] | None:
     # Strip MEDIA_URL prefix to get the relative path within MEDIA_ROOT.
     if not path.startswith(media_url):
         return None
-    rel = path[len(media_url) :]  # e.g. avatars/foo.jpg
+    rel = path[len(media_url):]  # e.g. avatars/foo.jpg
 
     candidate = os.path.join(media_root, rel)
     real_candidate = os.path.realpath(candidate)
     real_root = os.path.realpath(media_root)
 
     # Reject traversal outside MEDIA_ROOT.
-    if (
-        not real_candidate.startswith(real_root + os.sep)
-        and real_candidate != real_root
-    ):
+    if not real_candidate.startswith(real_root + os.sep) and real_candidate != real_root:
         logger.warning(
             "_try_local_media_fallback: %r resolves outside MEDIA_ROOT, skipping.",
             url,
@@ -162,17 +159,14 @@ def _try_local_media_fallback(url: str) -> tuple[bytes, str] | None:
         with open(real_candidate, "rb") as f:
             content = f.read()
     except OSError as exc:
-        logger.debug(
-            "_try_local_media_fallback: could not read %r: %s", real_candidate, exc
-        )
+        logger.debug("_try_local_media_fallback: could not read %r: %s", real_candidate, exc)
         return None
 
     logger.debug(
-        "_try_local_media_fallback: served %r from local disk (%d bytes)",
-        url,
-        len(content),
+        "_try_local_media_fallback: served %r from local disk (%d bytes)", url, len(content)
     )
     return content, mime_type or "image/jpeg"
+
 
 
 class PublishingError(Exception):

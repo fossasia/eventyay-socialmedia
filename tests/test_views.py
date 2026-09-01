@@ -193,7 +193,6 @@ def test_update_post_reschedule_draft_to_future_becomes_scheduled(
     settings.SITE_URL = "https://testserver"
     import pytz
     from django.utils import timezone
-
     from socialmedia.models import SocialMediaPost, SocialMediaPostStatus
 
     event_tz = pytz.timezone(getattr(event, "timezone", None) or "UTC")
@@ -556,9 +555,9 @@ def test_no_platforms_fallback(organizer, event):
         posts = build_posts(event)
 
     for post in posts:
-        assert post.get("platform") is None, (
-            f"Expected no platform on post {post['id']}, got {post['platform']!r}"
-        )
+        assert (
+            post.get("platform") is None
+        ), f"Expected no platform on post {post['id']}, got {post['platform']!r}"
 
 
 @pytest.mark.django_db
@@ -772,6 +771,9 @@ def test_post_error_message_persistence(organizer, event):
         )
         post.refresh_from_db()
         assert post.error_message == "API Connection Timeout"
+
+
+
 
 
 @pytest.mark.django_db

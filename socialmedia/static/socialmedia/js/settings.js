@@ -1783,20 +1783,6 @@
           }
         });
       }
-
-      // Preset buttons clicks
-      document.querySelectorAll(".presets-container .preset-btn").forEach(btn => {
-        btn.addEventListener("click", function () {
-          handlePresetClick(this);
-        });
-      });
-
-      // Token chips clicks
-      document.querySelectorAll(".token-chip").forEach(chip => {
-        chip.addEventListener("click", function () {
-          insertToken(this);
-        });
-      });
     }
   };
 
@@ -1811,13 +1797,19 @@
   // ---- Token & Preset UI Helpers ----
   function insertToken(chip) {
     const targetId = chip.dataset.target;
-    const token = chip.textContent;
+    const token = chip.textContent.trim();
     let input = lastFocusedInput;
     if (!input || !document.body.contains(input)) {
       input = targetId ? document.getElementById(targetId) : null;
     }
     if (!input && targetId) {
       input = document.getElementById(targetId);
+    }
+    if (!input) {
+      const parentCard = chip.closest(".template-group, .adv-group, .custom-templates-panel");
+      if (parentCard) {
+        input = parentCard.querySelector("textarea, input[type='text']");
+      }
     }
     if (!input) return;
 
@@ -1839,13 +1831,8 @@
       }
     }
 
-    const evtInput = document.createEvent("HTMLEvents");
-    evtInput.initEvent("input", true, true);
-    input.dispatchEvent(evtInput);
-
-    const evtChange = document.createEvent("HTMLEvents");
-    evtChange.initEvent("change", true, true);
-    input.dispatchEvent(evtChange);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
   }
 
   function handlePresetClick(btn) {
@@ -1853,13 +1840,13 @@
     if (!container) return;
 
     const targetId = container.dataset.target;
-    const val = parseInt(btn.dataset.val);
+    const val = parseInt(btn.dataset.val, 10);
     const input = document.getElementById(targetId);
     if (!input || isNaN(val)) return;
 
-    let offsets = input.value
+    let offsets = (input.value || "")
       .split(",")
-      .map(x => parseInt(x.trim()))
+      .map(x => parseInt(x.trim(), 10))
       .filter(x => !isNaN(x));
 
     const idx = offsets.indexOf(val);
@@ -1872,16 +1859,11 @@
     offsets.sort((a, b) => b - a);
     input.value = offsets.join(", ");
 
-    const evtInput = document.createEvent("HTMLEvents");
-    evtInput.initEvent("input", true, true);
-    input.dispatchEvent(evtInput);
-
-    const evtChange = document.createEvent("HTMLEvents");
-    evtChange.initEvent("change", true, true);
-    input.dispatchEvent(evtChange);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
   }
 
-  // Document-level event delegation for token chips & preset buttons
+  // Document-level event delegation for token chips & preset buttons (single listener)
   document.addEventListener("click", (e) => {
     const chip = e.target.closest(".token-chip");
     if (chip) {
@@ -1896,6 +1878,7 @@
       return;
     }
   });
+
 
   function updatePresetsUI(container, currentOffsets) {
     container.querySelectorAll(".preset-btn").forEach(btn => {
@@ -2036,7 +2019,116 @@
       input.addEventListener("input", updateBar);
       updateBar();
     });
+
+    // Custom Waves Dynamic Handler
+    const serializeCustomWaves = (type) => {
+      const container = document.getElementById(`custom-waves-list-${type}`);
+      const hiddenInput = document.getElementById(`id_socialmedia_${type}_custom_waves`);
+      if (!container || !hiddenInput) return;
+
+      const waves = [];
+      container.querySelectorAll(".wave-card-custom").forEach(card => {
+        const enabled = card.querySelector(".custom-wave-enable")?.checked ?? true;
+        const label = card.querySelector(".custom-wave-label")?.value?.trim() || "Custom Wave";
+        const offset = parseInt(card.querySelector(".custom-wave-offset")?.value, 10);
+        const template = card.querySelector(".custom-wave-template")?.value || "";
+        if (!isNaN(offset)) {
+          waves.push({
+            id: card.dataset.waveId || `wave_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+            label: label,
+            offset: offset,
+            enabled: enabled,
+            template: template
+          });
+        }
+      });
+      hiddenInput.value = JSON.stringify(waves);
+    };
+
+    document.querySelectorAll(".btn-add-custom-wave").forEach(btn => {
+      btn.addEventListener("click", function () {
+        const type = this.dataset.type;
+        const unitLabel = this.dataset.unit || "Days before milestone:";
+        const container = document.getElementById(`custom-waves-list-${type}`);
+        if (!container) return;
+
+        const waveId = `wave_custom_${Date.now()}`;
+        const newCard = document.createElement("div");
+        newCard.className = "wave-card wave-card-custom";
+        newCard.dataset.waveId = waveId;
+        newCard.innerHTML = `
+          <div class="wave-card-header">
+            <div class="wave-toggle-wrap">
+              <input type="checkbox" class="custom-wave-enable" checked>
+              <span class="wave-badge wave-custom-badge"><i class="fa fa-sparkles"></i> Custom Wave:</span>
+              <input type="text" class="form-control input-sm custom-wave-label" value="Custom Wave" placeholder="e.g. Early Call" style="width: 150px; display: inline-block; height: 26px; padding: 2px 6px;">
+            </div>
+            <div class="wave-offset-wrap">
+              <span class="wave-offset-label">${unitLabel}</span>
+              <input type="number" class="form-control input-sm custom-wave-offset" value="15" style="width: 70px; height: 28px; text-align: center;">
+              <button type="button" class="btn btn-danger btn-xs btn-remove-wave" title="Remove this wave">
+                <i class="fa fa-trash"></i>
+              </button>
+            </div>
+          </div>
+          <div class="wave-card-body">
+            <div class="wave-custom-input">
+              <label class="small text-muted">Custom Wave Copy:</label>
+              <textarea class="form-control custom-wave-template" rows="2" placeholder="Write custom copy for this wave..."></textarea>
+            </div>
+          </div>
+        `;
+        container.appendChild(newCard);
+        serializeCustomWaves(type);
+      });
+    });
+
+    document.addEventListener("click", function (e) {
+      const rmBtn = e.target.closest(".btn-remove-wave");
+      if (rmBtn) {
+        const card = rmBtn.closest(".wave-card-custom");
+        const container = card?.closest(".custom-waves-list");
+        if (card && container) {
+          const type = container.id.replace("custom-waves-list-", "");
+          card.remove();
+          serializeCustomWaves(type);
+        }
+      }
+    });
+
+    document.addEventListener("input", function (e) {
+      const customCard = e.target.closest(".wave-card-custom");
+      if (customCard) {
+        const container = customCard.closest(".custom-waves-list");
+        if (container) {
+          const type = container.id.replace("custom-waves-list-", "");
+          serializeCustomWaves(type);
+        }
+      }
+    });
+
+    document.addEventListener("change", function (e) {
+      const customCard = e.target.closest(".wave-card-custom");
+      if (customCard) {
+        const container = customCard.closest(".custom-waves-list");
+        if (container) {
+          const type = container.id.replace("custom-waves-list-", "");
+          serializeCustomWaves(type);
+        }
+      }
+    });
+
+    // Form submission serialization
+    const form = document.querySelector(".sm-templates-form");
+    if (form) {
+      form.addEventListener("submit", () => {
+        ["cfp", "speaker", "session", "ticket", "schedule"].forEach(t => serializeCustomWaves(t));
+      });
+    }
+
+    ["cfp", "speaker", "session", "ticket", "schedule"].forEach(t => serializeCustomWaves(t));
   }
+
 
   // Run on load
   if (document.readyState === "loading") {

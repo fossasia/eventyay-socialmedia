@@ -658,40 +658,133 @@ def event_absolute_url(path, request=None):
     return f"{base}{path}" if base else path
 
 
-def _get_template(event, key, context="announcement"):
+# ---------------------------------------------------------------------------
+# Wave definitions per content type: (wave_key, wave_label, default_offset, unit)
+# ---------------------------------------------------------------------------
+CONTENT_TYPE_WAVES = {
+    "cfp": [
+        ("announcement", "Announcement", 30, "days"),
+        ("reminder", "Reminder", 7, "days"),
+        ("final_call", "Final Call", 1, "days"),
+    ],
+    "speaker": [
+        ("announcement", "Announcement", 14, "days"),
+        ("reminder", "Reminder", 3, "days"),
+        ("final_call", "Final Call", 1, "days"),
+    ],
+    "session": [
+        ("announcement", "Day Before", 1440, "min"),
+        ("reminder", "Hour Before", 60, "min"),
+        ("final_call", "Starting Soon", 15, "min"),
+    ],
+    "ticket": [
+        ("announcement", "Ticket Launch", 14, "days"),
+        ("reminder", "Reminder", 3, "days"),
+        ("final_call", "Last Chance", 1, "days"),
+    ],
+    "schedule": [
+        ("announcement", "Schedule Release", 7, "days"),
+        ("reminder", "Schedule Reminder", 2, "days"),
+    ],
+}
+
+
+def _get_custom_waves(event, key):
+    """Return list of organizer-created custom waves for content type `key`."""
+    import json
+    raw = event.settings.get(f"socialmedia_{key}_custom_waves")
+    if not raw:
+        return []
+    if isinstance(raw, list):
+        return raw
+    try:
+        data = json.loads(raw)
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+
+def _get_template(event, key, context="announcement", offset_value=None):
     """Return saved custom template or fall back to baked-in contextual default.
 
-    NOTE: If a custom template is set by the organizer, it overrides all contextual
-    waves (announcement, reminder, final_call) with the exact same text, resulting in
-    identical copy across different offsets.
+    Cascade:
+    1. Custom wave match: template specified on organizer's custom wave
+    2. Per-wave generic custom override: socialmedia_{key}_{context}_template
+    3. Universal generic custom template: socialmedia_{key}_template
+    4. Baked-in contextual default: DEFAULT_TEMPLATES[key][context]
     """
+    if offset_value is not None:
+        for cw in _get_custom_waves(event, key):
+            if cw.get("enabled", True):
+                try:
+                    if int(cw.get("offset")) == int(offset_value) and cw.get("template"):
+                        return cw.get("template")
+                except (ValueError, TypeError):
+                    pass
+
+    # 2. Per-wave generic custom override
+    custom_wave = event.settings.get(f"socialmedia_{key}_{context}_template")
+    if custom_wave:
+        return custom_wave
+
+    # 3. Universal generic custom template
     custom = event.settings.get(f"socialmedia_{key}_template")
     if custom:
         return custom
+
+    # 4. Baked-in contextual default
     tpl = DEFAULT_TEMPLATES.get(key, {})
     if isinstance(tpl, dict):
         return tpl.get(context) or tpl.get("announcement") or list(tpl.values())[0]
     return tpl
 
 
-def _get_platform_template(event, key, platform, context="announcement"):
+def _get_platform_template(event, key, platform, context="announcement", offset_value=None):
     """Return a platform-specific template, cascading through:
-    1. Organizer-saved per-platform custom override
-    2. Organizer-saved generic custom template
-    3. Baked-in platform-specific default
-    4. Baked-in generic default template
+    1. Custom wave platform override: platform copy on organizer's custom wave
+    2. Per-platform per-wave custom override: socialmedia_{platform}_{key}_{context}_template
+    3. Per-platform generic custom override: socialmedia_{platform}_{key}_template
+    4. Per-wave generic custom override: socialmedia_{key}_{context}_template
+    5. Universal generic custom template: socialmedia_{key}_template
+    6. Baked-in platform-specific wave default: PLATFORM_DEFAULT_TEMPLATES[platform][key][context]
+    7. Baked-in generic default template: DEFAULT_TEMPLATES[key][context]
     """
-    # 1. Organizer-saved per-platform custom override
+    if offset_value is not None:
+        for cw in _get_custom_waves(event, key):
+            if cw.get("enabled", True):
+                try:
+                    if int(cw.get("offset")) == int(offset_value):
+                        plat_templates = cw.get("platforms", {})
+                        if plat_templates.get(platform):
+                            return plat_templates[platform]
+                        if cw.get("template"):
+                            return cw.get("template")
+                except (ValueError, TypeError):
+                    pass
+
+    # 2. Per-platform per-wave custom override
+    custom_plat_wave = event.settings.get(
+        f"socialmedia_{platform}_{key}_{context}_template"
+    )
+    if custom_plat_wave:
+        return custom_plat_wave
+
+    # 3. Per-platform generic custom override
     custom_plat = event.settings.get(f"socialmedia_{platform}_{key}_template")
     if custom_plat:
         return custom_plat
 
-    # 2. Organizer-saved generic custom template
+    # 4. Per-wave generic custom override
+    custom_wave = event.settings.get(f"socialmedia_{key}_{context}_template")
+    if custom_wave:
+        return custom_wave
+
+    # 5. Universal generic custom template
     custom_gen = event.settings.get(f"socialmedia_{key}_template")
     if custom_gen:
         return custom_gen
 
-    # 3. Baked-in platform-specific default
+    # 6. Baked-in platform-specific default
     plat_tpls = PLATFORM_DEFAULT_TEMPLATES.get(platform, {})
     plat_tpl = plat_tpls.get(key, {})
     if isinstance(plat_tpl, dict):
@@ -699,21 +792,72 @@ def _get_platform_template(event, key, platform, context="announcement"):
         if result:
             return result
 
-    # 4. Fall back to generic default
-    return _get_template(event, key, context)
+    # 7. Fall back to generic default
+    return _get_template(event, key, context, offset_value=offset_value)
 
 
 def _get_template_for_offset(event, key, offset_value):
     """Return the template matching the distance-based wave for this offset."""
+    for cw in _get_custom_waves(event, key):
+        if cw.get("enabled", True):
+            try:
+                if int(cw.get("offset")) == int(offset_value):
+                    ctx_name = cw.get("name") or cw.get("label") or "custom"
+                    return cw.get("template") or _get_template(event, key, "announcement"), ctx_name
+            except (ValueError, TypeError):
+                pass
     context = resolve_template_context(key, offset_value)
-    return _get_template(event, key, context), context
+    return _get_template(event, key, context, offset_value=offset_value), context
 
 
 def _get_offset(event, key, default):
-    return _get_offsets(event, key, default)[0]
+    offsets = _get_offsets(event, key, default)
+    return offsets[0] if offsets else default
 
 
 def _get_offsets(event, key, default):
+    """Return list of active offset integers for content type `key`.
+    Checks wave-level settings and custom waves first:
+    If any wave toggle exists (e.g. socialmedia_{key}_announcement_enabled)
+    or custom waves are configured, it collects the offsets for all enabled waves.
+    Otherwise falls back to comma-separated socialmedia_{key}_offset or default.
+    """
+    waves = CONTENT_TYPE_WAVES.get(key)
+    custom_waves = _get_custom_waves(event, key)
+
+    if waves or custom_waves:
+        has_wave_config = (
+            any(
+                event.settings.get(f"socialmedia_{key}_{wkey}_enabled") is not None
+                for wkey, _, _, _ in (waves or [])
+            )
+            or bool(custom_waves)
+        )
+        if has_wave_config:
+            active_offsets = []
+            for wkey, _, def_off, _ in (waves or []):
+                is_enabled = event.settings.get(
+                    f"socialmedia_{key}_{wkey}_enabled", default=True, as_type=bool
+                )
+                if is_enabled:
+                    off_val = event.settings.get(
+                        f"socialmedia_{key}_{wkey}_offset", default=def_off, as_type=int
+                    )
+                    active_offsets.append(off_val)
+
+            # Include enabled custom waves
+            for cw in custom_waves:
+                if cw.get("enabled", True) and cw.get("offset") is not None:
+                    try:
+                        active_offsets.append(int(cw["offset"]))
+                    except (ValueError, TypeError):
+                        pass
+
+            if active_offsets:
+                return sorted(set(active_offsets), reverse=True)
+            return []
+
+
     raw = event.settings.get(f"socialmedia_{key}_offset")
     if raw is None or raw == "":
         return [default]
@@ -737,6 +881,7 @@ def _get_offsets(event, key, default):
         except (ValueError, TypeError):
             pass
     return sorted(set(offsets), reverse=True) if offsets else [default]
+
 
 
 # ---------------------------------------------------------------------------
@@ -785,7 +930,7 @@ def build_posts(event, request=None):
             for platform in platform_iter:
                 if platform:
                     text_formatted = _get_platform_template(
-                        event, "cfp", platform, template_ctx
+                        event, "cfp", platform, template_ctx, offset_value=cfp_off
                     )
                 else:
                     text_formatted = text
@@ -836,7 +981,7 @@ def build_posts(event, request=None):
             for platform in platform_iter:
                 if platform:
                     text_formatted = _get_platform_template(
-                        event, "schedule", platform, template_ctx
+                        event, "schedule", platform, template_ctx, offset_value=sched_off
                     )
                 else:
                     text_formatted = text
@@ -898,7 +1043,7 @@ def build_posts(event, request=None):
                 for platform in platform_iter:
                     if platform:
                         text_formatted = _get_platform_template(
-                            event, "ticket", platform, template_ctx
+                            event, "ticket", platform, template_ctx, offset_value=tkt_off
                         )
                     else:
                         text_formatted = text
@@ -1024,7 +1169,7 @@ def build_posts(event, request=None):
                                 )
                                 if platform:
                                     text_formatted = _get_platform_template(
-                                        event, "speaker", platform, template_ctx
+                                        event, "speaker", platform, template_ctx, offset_value=spk_off
                                     )
                                 else:
                                     text_formatted = text
@@ -1118,7 +1263,7 @@ def build_posts(event, request=None):
 
                             if platform:
                                 text_formatted = _get_platform_template(
-                                    event, "session", platform, template_ctx
+                                    event, "session", platform, template_ctx, offset_value=sess_off
                                 )
                             else:
                                 text_formatted = text

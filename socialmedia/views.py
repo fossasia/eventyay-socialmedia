@@ -385,12 +385,52 @@ class SocialMediaTemplatesView(DecoupleMixin, FormView):
                 "tokens": ["{event_name}", "{schedule_link}", "{hashtags}"],
             },
         ]
+        from .export import _get_custom_waves
+
+        ctx["custom_waves"] = {
+            ptype: _get_custom_waves(self.request.event, ptype)
+            for ptype in ["cfp", "speaker", "session", "ticket", "schedule"]
+        }
         return ctx
 
     @transaction.atomic
     def form_valid(self, form):
+        import json
+        from .export import CONTENT_TYPE_WAVES
+
         self._save_decoupled(form)
         form.save()
+
+        # Synchronize comma-separated offset settings from enabled waves and custom waves
+        for ptype, waves in CONTENT_TYPE_WAVES.items():
+            active_offs = []
+            has_wave_setting = False
+            for wkey, wlabel, def_off, wunit in waves:
+                en_key = f"socialmedia_{ptype}_{wkey}_enabled"
+                off_key = f"socialmedia_{ptype}_{wkey}_offset"
+                if en_key in form.cleaned_data:
+                    has_wave_setting = True
+                    if form.cleaned_data.get(en_key):
+                        val = form.cleaned_data.get(off_key)
+                        active_offs.append(str(val if val is not None else def_off))
+
+            # Include custom waves offsets
+            cw_raw = form.cleaned_data.get(f"socialmedia_{ptype}_custom_waves")
+            if cw_raw:
+                try:
+                    c_list = json.loads(cw_raw) if isinstance(cw_raw, str) else cw_raw
+                    for cw in c_list:
+                        if cw.get("enabled", True) and cw.get("offset") is not None:
+                            active_offs.append(str(cw["offset"]))
+                except Exception:
+                    pass
+
+            if has_wave_setting:
+                self.request.event.settings.set(
+                    f"socialmedia_{ptype}_offset",
+                    ", ".join(active_offs) if active_offs else "0",
+                )
+
         if form.has_changed():
             self.request.event.log_action(
                 "eventyay.event.settings",
