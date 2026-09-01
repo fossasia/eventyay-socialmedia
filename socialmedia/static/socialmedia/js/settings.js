@@ -519,10 +519,11 @@
         naSpan.textContent = "Generic";
         tdPlat.appendChild(naSpan);
       }
+      tr.appendChild(tdPlat);
 
-      // Add status badge
-      const statusDiv = document.createElement("div");
-      statusDiv.className = "status-badge-wrap";
+      // Dedicated Status column
+      const tdStatus = document.createElement("td");
+      tdStatus.className = "post-status-cell";
 
       const statusVal = p.status || "draft";
       const statusBadge = document.createElement("span");
@@ -542,10 +543,9 @@
         statusBadge.textContent = statusLabel;
       }
 
-      statusDiv.appendChild(statusBadge);
-      tdPlat.appendChild(statusDiv);
+      tdStatus.appendChild(statusBadge);
+      tr.appendChild(tdStatus);
 
-      tr.appendChild(tdPlat);
 
       const tdSched = document.createElement("td");
       tdSched.className = "event-schedule-cell";
@@ -556,10 +556,11 @@
           this.setWithIcon(spanUn, "Unscheduled", "fa fa-clock-o");
           tdSched.appendChild(spanUn);
         } else if (p.event_schedule_display) {
-          const parts = p.event_schedule_display.split(" ");
-          if (parts.length >= 3) {
-            const dateStr = parts.slice(0, 3).join(" ");
-            const timeStr = parts.slice(3).join(" ");
+          const rawSched = p.event_schedule_display.trim();
+          const parts = rawSched.split(/\s+/);
+          if (parts.length >= 2) {
+            const dateStr = parts.slice(0, parts.length - 1).join(" ");
+            const timeStr = parts[parts.length - 1];
 
             const box = document.createElement("div");
             box.className = "sched-box sched-active";
@@ -578,7 +579,7 @@
           } else {
             const spanAct = document.createElement("span");
             spanAct.className = "sched-badge sched-active";
-            this.setWithIcon(spanAct, p.event_schedule_display, "fa fa-calendar");
+            this.setWithIcon(spanAct, rawSched, "fa fa-calendar");
             tdSched.appendChild(spanAct);
           }
         }
@@ -622,7 +623,7 @@
           saveTime.dataset.postId = p.id;
           saveTime.type = "button";
           saveTime.title = "Save schedule time to database";
-          this.setWithIcon(saveTime, "Save Schedule", "fa fa-check");
+          this.setWithIcon(saveTime, "Save", "fa fa-check");
           wrap.appendChild(saveTime);
         }
 
@@ -632,9 +633,10 @@
           revTime.dataset.postId = p.id;
           revTime.type = "button";
           revTime.title = "Revert to default timing";
-          this.setWithIcon(revTime, "", "fa fa-undo");
+          this.setWithIcon(revTime, "Revert", "fa fa-undo");
           wrap.appendChild(revTime);
         }
+
       }
 
       if (isPast) {
@@ -729,43 +731,50 @@
       tr.appendChild(tdContent);
 
       const tdActions = document.createElement("td");
+      tdActions.className = "actions-cell";
+      const actStack = document.createElement("div");
+      actStack.className = "actions-buttons-stack";
+
       if (p.status === "excluded") {
         const restoreBtn = document.createElement("button");
-        restoreBtn.className = "btn-restore-post";
+        restoreBtn.className = "btn-action-tile btn-restore-post";
         restoreBtn.dataset.postId = p.id;
         restoreBtn.type = "button";
-        restoreBtn.title = "Restore post to preview";
-        this.setWithIcon(restoreBtn, "", "fa fa-undo");
-        tdActions.appendChild(restoreBtn);
+        restoreBtn.title = "Restore post to preview queue";
+        restoreBtn.innerHTML = '<i class="fa fa-undo"></i><span class="action-label">Restore</span>';
+        actStack.appendChild(restoreBtn);
       } else {
         const prevBtn = document.createElement("button");
-        prevBtn.className = "btn-preview-post";
+        prevBtn.className = "btn-action-tile btn-preview-post";
         prevBtn.dataset.postId = p.id;
         prevBtn.type = "button";
         prevBtn.title = "Preview post live card";
-        this.setWithIcon(prevBtn, "", "fa fa-eye");
-        tdActions.appendChild(prevBtn);
+        prevBtn.innerHTML = '<i class="fa fa-eye"></i><span class="action-label">Preview</span>';
+        actStack.appendChild(prevBtn);
 
         if (p.status !== "published" && p.status !== "exported") {
           const pubBtn = document.createElement("button");
-          pubBtn.className = "btn-publish-now";
+          pubBtn.className = "btn-action-tile btn-publish-now";
           pubBtn.dataset.postId = p.id;
           pubBtn.dataset.dbId = p.db_id || "";
           pubBtn.type = "button";
           pubBtn.title = p.status === "failed" ? "Retry publishing" : "Publish now";
-          this.setWithIcon(pubBtn, "", "fa fa-paper-plane");
-          tdActions.appendChild(pubBtn);
+          pubBtn.innerHTML = `<i class="fa fa-paper-plane"></i><span class="action-label">${p.status === "failed" ? "Retry" : "Publish"}</span>`;
+          actStack.appendChild(pubBtn);
         }
 
         const delBtn = document.createElement("button");
-        delBtn.className = "btn-delete-post";
+        delBtn.className = "btn-action-tile btn-delete-post";
         delBtn.dataset.postId = p.id;
         delBtn.type = "button";
-        delBtn.title = "Remove post from preview";
-        this.setWithIcon(delBtn, "", "fa fa-trash");
-        tdActions.appendChild(delBtn);
+        delBtn.title = "Discard post";
+        delBtn.innerHTML = '<i class="fa fa-trash"></i><span class="action-label">Discard</span>';
+        actStack.appendChild(delBtn);
       }
+      tdActions.appendChild(actStack);
       tr.appendChild(tdActions);
+
+
 
       return tr;
     },
@@ -852,39 +861,42 @@
       header.appendChild(avatar);
 
       const authorBox = document.createElement("div");
+      authorBox.className = "sm-preview-author-box";
       const nameDiv = document.createElement("div");
       nameDiv.className = "sm-preview-author";
       nameDiv.textContent = post.event_name || "Event Official";
       const handleDiv = document.createElement("div");
       handleDiv.className = "sm-preview-handle";
-      handleDiv.textContent = `@eventyay_${platformKey}`;
+      handleDiv.textContent = post.account_handle ? (post.account_handle.startsWith("@") ? post.account_handle : `@${post.account_handle}`) : `@${platformKey}_account`;
       authorBox.appendChild(nameDiv);
       authorBox.appendChild(handleDiv);
       header.appendChild(authorBox);
 
       const tag = document.createElement("span");
-      tag.className = `sm-preview-platform-tag platform-badge ${meta.colorClass || ''}`;
-      tag.textContent = meta.label;
+      tag.className = `sm-preview-platform-badge platform-badge ${meta.colorClass || ''}`;
+      tag.innerHTML = `${meta.iconClass ? `<i class="${meta.iconClass}"></i> ` : ''}${meta.label || platformKey}`;
       header.appendChild(tag);
 
       previewBox.appendChild(header);
 
       // Body Text
       const textDiv = document.createElement("div");
-      textDiv.className = "sm-preview-text";
+      textDiv.className = "sm-preview-body";
       textDiv.textContent = post.post_text;
       previewBox.appendChild(textDiv);
 
       // Media Attachment (if media_url exists)
       if (post.media_url) {
         const mediaBox = document.createElement("div");
-        mediaBox.className = "sm-preview-media";
+        mediaBox.className = "sm-preview-image-wrap";
         const mediaImg = document.createElement("img");
         mediaImg.src = post.media_url;
+        mediaImg.className = "sm-preview-image";
         mediaImg.alt = "Post Media Attachment";
         mediaBox.appendChild(mediaImg);
         previewBox.appendChild(mediaBox);
       }
+
 
       // Speaker Social Links Section (if present)
       if (post.speaker_social_links && post.speaker_social_links.length > 0) {

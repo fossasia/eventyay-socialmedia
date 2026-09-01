@@ -100,55 +100,70 @@
 
     <!-- Action bar -->
     <div class="sm-actions">
-      <!-- Bulk schedule preset dropdown -->
-      <div class="bulk-schedule-wrap">
-        <select id="bulk-schedule-preset" class="form-control input-sm bulk-schedule-select">
-          <option value="">{% trans "Schedule preset..." %}</option>
-          <option value="default">{% trans "Revert to default timing" %}</option>
-          <option value="0">{% trans "On event / session day" %}</option>
-          <option value="-1">{% trans "1 day before" %}</option>
-          <option value="-2">{% trans "2 days before" %}</option>
-          <option value="-3">{% trans "3 days before" %}</option>
-          <option value="-5">{% trans "5 days before" %}</option>
-          <option value="-7">{% trans "1 week before (7 days)" %}</option>
-          <option value="-14">{% trans "2 weeks before (14 days)" %}</option>
-          <option value="-30">{% trans "1 month before (30 days)" %}</option>
-          <option value="custom">{% trans "Custom..." %}</option>
-        </select>
-        <div id="bulk-schedule-custom-inputs" class="bulk-schedule-custom-inputs hidden">
-          <input type="date" id="bulk-schedule-custom-date" class="form-control input-sm">
-          <input type="time" id="bulk-schedule-custom-time" class="form-control input-sm" value="09:00">
+      <div class="sm-actions-left">
+        <!-- Bulk schedule preset dropdown -->
+        <div class="bulk-schedule-wrap">
+          <select id="bulk-schedule-preset" class="form-control input-sm bulk-schedule-select">
+            <option value="">{% trans "Schedule preset..." %}</option>
+            <option value="default">{% trans "Revert to default timing" %}</option>
+            <option value="0">{% trans "On event / session day" %}</option>
+            <option value="-1">{% trans "1 day before" %}</option>
+            <option value="-2">{% trans "2 days before" %}</option>
+            <option value="-3">{% trans "3 days before" %}</option>
+            <option value="-5">{% trans "5 days before" %}</option>
+            <option value="-7">{% trans "1 week before (7 days)" %}</option>
+            <option value="-14">{% trans "2 weeks before (14 days)" %}</option>
+            <option value="-30">{% trans "1 month before (30 days)" %}</option>
+            <option value="custom">{% trans "Custom..." %}</option>
+          </select>
+          <div id="bulk-schedule-custom-inputs" class="bulk-schedule-custom-inputs hidden">
+            <input type="date" id="bulk-schedule-custom-date" class="form-control input-sm">
+            <input type="time" id="bulk-schedule-custom-time" class="form-control input-sm" value="09:00">
+          </div>
+          <button id="btn-apply-schedule" class="btn btn-default btn-sm" type="button">
+            {% trans "Apply" %}
+          </button>
         </div>
-        <button id="btn-apply-schedule" class="btn btn-default btn-sm" type="button">
-          {% trans "Apply" %}
+
+        <!-- Bulk Discard Button (Issue #62) -->
+        <button id="btn-bulk-discard" class="btn btn-default btn-sm" type="button" title="{% trans 'Move selected posts to Excluded' %}">
+          <i class="fa fa-trash text-danger"></i> {% trans "Discard Selected" %}
         </button>
+
+        <!-- Bulk Retry Button & Platform Shortcut (Issue #64) -->
+        <div class="btn-group bulk-retry-group">
+          <button id="btn-bulk-retry" class="btn btn-default btn-sm" type="button" title="{% trans 'Re-attempt failed posts' %}">
+            <i class="fa fa-refresh text-warning"></i> {% trans "Retry Failed" %}
+          </button>
+          <button type="button" class="btn btn-default btn-sm dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            <span class="caret"></span>
+            <span class="sr-only">Toggle Dropdown</span>
+          </button>
+          <ul class="dropdown-menu">
+            <li><a href="#" class="retry-platform-link" data-platform="">{% trans "Retry All Failed Posts" %}</a></li>
+            <li role="separator" class="divider"></li>
+            <li><a href="#" class="retry-platform-link" data-platform="twitter"><i class="fa fa-twitter"></i> {% trans "Retry Failed on X / Twitter" %}</a></li>
+            <li><a href="#" class="retry-platform-link" data-platform="linkedin"><i class="fa fa-linkedin"></i> {% trans "Retry Failed on LinkedIn" %}</a></li>
+            <li><a href="#" class="retry-platform-link" data-platform="telegram"><i class="fa fa-paper-plane"></i> {% trans "Retry Failed on Telegram" %}</a></li>
+            <li><a href="#" class="retry-platform-link" data-platform="mastodon"><i class="fa fa-globe"></i> {% trans "Retry Failed on Mastodon" %}</a></li>
+          </ul>
+        </div>
       </div>
 
-      <!-- Bulk Discard Button (Issue #62) -->
-      <button id="btn-bulk-discard" class="btn btn-default btn-sm" type="button" title="{% trans 'Move selected posts to Excluded' %}">
-        <i class="fa fa-trash text-danger"></i> {% trans "Discard Selected" %}
-      </button>
-
-      <!-- Bulk Retry Button & Platform Shortcut (Issue #64) -->
-      <div class="btn-group bulk-retry-group">
-        <button id="btn-bulk-retry" class="btn btn-default btn-sm" type="button" title="{% trans 'Re-attempt failed posts' %}">
-          <i class="fa fa-refresh text-warning"></i> {% trans "Retry Failed" %}
-        </button>
-        <button type="button" class="btn btn-default btn-sm dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-          <span class="caret"></span>
-          <span class="sr-only">Toggle Dropdown</span>
-        </button>
-        <ul class="dropdown-menu">
-          <li><a href="#" class="retry-platform-link" data-platform="">{% trans "Retry All Failed Posts" %}</a></li>
-          <li role="separator" class="divider"></li>
-          <li><a href="#" class="retry-platform-link" data-platform="twitter"><i class="fa fa-twitter"></i> {% trans "Retry Failed on X / Twitter" %}</a></li>
-          <li><a href="#" class="retry-platform-link" data-platform="linkedin"><i class="fa fa-linkedin"></i> {% trans "Retry Failed on LinkedIn" %}</a></li>
-          <li><a href="#" class="retry-platform-link" data-platform="telegram"><i class="fa fa-paper-plane"></i> {% trans "Retry Failed on Telegram" %}</a></li>
-          <li><a href="#" class="retry-platform-link" data-platform="mastodon"><i class="fa fa-globe"></i> {% trans "Retry Failed on Mastodon" %}</a></li>
-        </ul>
+      <div class="sm-actions-right">
+        <span class="sm-count" id="selected-count">–</span>
+        <div class="export-controls-wrap">
+          <select id="export-preset-select" class="form-control input-sm export-preset-select">
+            <option value="generic">{% trans "Generic CSV" %}</option>
+            <option value="postiz">{% trans "Postiz CSV" %}</option>
+            <option value="buffer">{% trans "Buffer CSV" %}</option>
+            <option value="hootsuite">{% trans "Hootsuite CSV" %}</option>
+          </select>
+          <button id="btn-export" class="btn btn-primary btn-sm btn-export">
+            <i class="fa fa-download"></i> {% trans "Export CSV" %}
+          </button>
+        </div>
       </div>
-
-      <span class="sm-count" id="selected-count">–</span>
     </div>
 
     <div id="validation-alert-container" style="display: none; margin-bottom: 12px;"></div>
@@ -161,6 +176,7 @@
             <th><input type="checkbox" id="chk-all" title="{% trans 'Toggle all' %}"></th>
             <th>{% trans "Type" %}</th>
             <th>{% trans "Platform & Account" %}</th>
+            <th>{% trans "Status" %}</th>
             <th><span title="{% trans 'Official date & time of the session on the event agenda schedule.' %}" class="help-tooltip">{% trans "Schedule Date & Time" %}</span></th>
             <th>
               <span title="{% trans 'The date & time this social media post is scheduled to be published.' %}" class="help-tooltip">{% trans "Post Date & Time" %}</span>
@@ -177,6 +193,7 @@
             <td><div class="skeleton-bar skeleton-col-check"></div></td>
             <td><div class="skeleton-bar skeleton-col-type"></div></td>
             <td><div class="skeleton-bar skeleton-col-platform"></div></td>
+            <td><div class="skeleton-bar skeleton-col-status"></div></td>
             <td><div class="skeleton-bar skeleton-col-date"></div></td>
             <td><div class="skeleton-bar skeleton-col-postdate"></div></td>
             <td><div class="skeleton-bar skeleton-col-content"></div></td>
@@ -186,23 +203,8 @@
         </tbody>
       </table>
     </div>
-
-    <!-- Export bar (below table, right-aligned) -->
-    <div class="export-bar">
-      <span class="selected-count" id="export-count">0 {% trans "posts selected" %}</span>
-      <div style="display: inline-flex; align-items: center; gap: 8px;">
-        <select id="export-preset-select" class="form-control input-sm" style="width: 150px; display: inline-block;">
-          <option value="generic">{% trans "Generic CSV" %}</option>
-          <option value="postiz">{% trans "Postiz CSV" %}</option>
-          <option value="buffer">{% trans "Buffer CSV" %}</option>
-          <option value="hootsuite">{% trans "Hootsuite CSV" %}</option>
-        </select>
-        <button id="btn-export" class="btn btn-primary btn-export">
-          <i class="fa fa-download"></i> {% trans "Export CSV" %}
-        </button>
-      </div>
-    </div>
   </div>
+
 
   <!-- Live Card Preview Modal -->
   <div class="modal fade" id="sm-preview-modal" tabindex="-1" role="dialog" aria-labelledby="sm-preview-modal-label">
