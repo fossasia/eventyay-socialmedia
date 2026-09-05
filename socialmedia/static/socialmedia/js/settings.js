@@ -15,6 +15,9 @@
       PREVIEW_URL: config.previewUrl || "",
       EXPORT_URL: config.exportUrl || "",
       UPDATE_URL: config.updateUrl || "",
+      GENERATE_URL: config.generateUrl || "",
+      BULK_ACTION_URL: config.bulkActionUrl || "",
+      TEMPLATES_URL: config.templatesUrl || "",
       PUBLISH_NOW_URL: config.publishNowUrl || (config.updateUrl ? config.updateUrl.replace(/\/update\/?$/, "/publish-now/") : null),
       CSRF_TOKEN: config.csrfToken || (document.querySelector("input[name=csrfmiddlewaretoken]") ? document.querySelector("input[name=csrfmiddlewaretoken]").value : ""),
       TRANS_CLICK_TO_EDIT: config.transClickToEdit || "Click to edit · Ctrl+Enter to save",
@@ -56,6 +59,7 @@
   const PostState = (function () {
     let posts = [];
     let activeFilter = "all";
+    let activeStatusFilter = "all";
 
     return {
       init(incomingPosts) {
@@ -68,17 +72,30 @@
         return posts;
       },
       getFiltered() {
+        let list = posts;
         if (activeFilter === "excluded") {
-          return posts.filter(p => p.status === "excluded");
+          list = posts.filter(p => p.status === "excluded");
+        } else {
+          list = activeFilter === "all" ? posts : posts.filter(p => p.type === activeFilter);
+          list = list.filter(p => p.status !== "excluded");
         }
-        const list = activeFilter === "all" ? posts : posts.filter(p => p.type === activeFilter);
-        return list.filter(p => p.status !== "excluded");
+
+        if (activeStatusFilter !== "all") {
+          list = list.filter(p => p.status === activeStatusFilter);
+        }
+        return list;
       },
       getFilter() {
         return activeFilter;
       },
       setFilter(filter) {
         activeFilter = filter;
+      },
+      getStatusFilter() {
+        return activeStatusFilter;
+      },
+      setStatusFilter(status) {
+        activeStatusFilter = status;
       },
       update(id, updates) {
         const post = this.get(id);
@@ -151,11 +168,44 @@
 
   // ---- API Client module ----
   const APIClient = {
-    fetchPreview() {
-      return fetch(Config.PREVIEW_URL, {
+    fetchPreview(force = false) {
+      const url = force
+        ? `${Config.PREVIEW_URL}${Config.PREVIEW_URL.includes("?") ? "&" : "?"}generate=true`
+        : Config.PREVIEW_URL;
+      return fetch(url, {
         headers: { "X-Requested-With": "XMLHttpRequest" }
       }).then(r => {
         if (!r.ok) throw new Error(`HTTP error ${r.status}`);
+        return r.json();
+      });
+    },
+    generatePosts() {
+      if (!Config.GENERATE_URL) {
+        return this.fetchPreview(true);
+      }
+      return fetch(Config.GENERATE_URL, {
+        method: "POST",
+        headers: {
+          "X-CSRFToken": Config.CSRF_TOKEN,
+          "X-Requested-With": "XMLHttpRequest",
+        }
+      }).then(r => {
+        if (!r.ok) throw new Error(`Generate failed: ${r.status}`);
+        return r.json();
+      });
+    },
+    bulkAction(action, data) {
+      if (!Config.BULK_ACTION_URL) return Promise.reject(new Error("Bulk action URL not configured"));
+      return fetch(Config.BULK_ACTION_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": Config.CSRF_TOKEN,
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: JSON.stringify({ action, ...data })
+      }).then(r => {
+        if (!r.ok) throw new Error(`Bulk action failed: ${r.status}`);
         return r.json();
       });
     },
@@ -427,8 +477,9 @@
       tdType.appendChild(typeSpan);
       tr.appendChild(tdType);
 
-      // Platform column
+      // Platform & Account column (Issue #61)
       const tdPlat = document.createElement("td");
+      tdPlat.className = "platform-account-cell";
       if (p.platform) {
         const meta = PLATFORM_META[p.platform];
         const platSpan = document.createElement("span");
@@ -442,16 +493,37 @@
           platSpan.textContent = p.platform_label || p.platform;
         }
         tdPlat.appendChild(platSpan);
+
+        if (p.account_handle) {
+          const handleDiv = document.createElement("div");
+          handleDiv.className = "plat-account-handle";
+          const hIcon = document.createElement("i");
+          hIcon.className = "fa fa-user-circle-o";
+          handleDiv.appendChild(hIcon);
+          const handleText = p.account_handle.startsWith("@") ? p.account_handle : `@${p.account_handle}`;
+          handleDiv.appendChild(document.createTextNode(" " + handleText));
+          tdPlat.appendChild(handleDiv);
+        } else if (p.account_status === "disconnected" || !p.account_handle) {
+          const missingDiv = document.createElement("div");
+          missingDiv.className = "plat-account-missing text-warning";
+          missingDiv.title = "No active account connected for this platform";
+          const wIcon = document.createElement("i");
+          wIcon.className = "fa fa-exclamation-triangle";
+          missingDiv.appendChild(wIcon);
+          missingDiv.appendChild(document.createTextNode(" Not connected"));
+          tdPlat.appendChild(missingDiv);
+        }
       } else {
         const naSpan = document.createElement("span");
         naSpan.className = "platform-badge plat-generic";
         naSpan.textContent = "Generic";
         tdPlat.appendChild(naSpan);
       }
+      tr.appendChild(tdPlat);
 
-      // Add status badge
-      const statusDiv = document.createElement("div");
-      statusDiv.className = "status-badge-wrap";
+      // Dedicated Status column
+      const tdStatus = document.createElement("td");
+      tdStatus.className = "post-status-cell";
 
       const statusVal = p.status || "draft";
       const statusBadge = document.createElement("span");
@@ -471,10 +543,9 @@
         statusBadge.textContent = statusLabel;
       }
 
-      statusDiv.appendChild(statusBadge);
-      tdPlat.appendChild(statusDiv);
+      tdStatus.appendChild(statusBadge);
+      tr.appendChild(tdStatus);
 
-      tr.appendChild(tdPlat);
 
       const tdSched = document.createElement("td");
       tdSched.className = "event-schedule-cell";
@@ -485,10 +556,11 @@
           this.setWithIcon(spanUn, "Unscheduled", "fa fa-clock-o");
           tdSched.appendChild(spanUn);
         } else if (p.event_schedule_display) {
-          const parts = p.event_schedule_display.split(" ");
-          if (parts.length >= 3) {
-            const dateStr = parts.slice(0, 3).join(" ");
-            const timeStr = parts.slice(3).join(" ");
+          const rawSched = p.event_schedule_display.trim();
+          const parts = rawSched.split(/\s+/);
+          if (parts.length >= 2) {
+            const dateStr = parts.slice(0, parts.length - 1).join(" ");
+            const timeStr = parts[parts.length - 1];
 
             const box = document.createElement("div");
             box.className = "sched-box sched-active";
@@ -507,7 +579,7 @@
           } else {
             const spanAct = document.createElement("span");
             spanAct.className = "sched-badge sched-active";
-            this.setWithIcon(spanAct, p.event_schedule_display, "fa fa-calendar");
+            this.setWithIcon(spanAct, rawSched, "fa fa-calendar");
             tdSched.appendChild(spanAct);
           }
         }
@@ -551,7 +623,7 @@
           saveTime.dataset.postId = p.id;
           saveTime.type = "button";
           saveTime.title = "Save schedule time to database";
-          this.setWithIcon(saveTime, "Save Schedule", "fa fa-check");
+          this.setWithIcon(saveTime, "Save", "fa fa-check");
           wrap.appendChild(saveTime);
         }
 
@@ -561,9 +633,10 @@
           revTime.dataset.postId = p.id;
           revTime.type = "button";
           revTime.title = "Revert to default timing";
-          this.setWithIcon(revTime, "", "fa fa-undo");
+          this.setWithIcon(revTime, "Revert", "fa fa-undo");
           wrap.appendChild(revTime);
         }
+
       }
 
       if (isPast) {
@@ -582,6 +655,7 @@
       viewSpan.className = `post-text-view${isTextModified ? ' is-modified' : ''}`;
       viewSpan.dataset.postId = p.id;
       viewSpan.tabIndex = 0;
+      viewSpan.title = "Click to edit text";
       viewSpan.textContent = p.post_text;
       tdContent.appendChild(viewSpan);
 
@@ -592,6 +666,8 @@
       editArea.className = `post-text-edit${hasPlaceholder ? ' has-warning' : ''}${exceedsLimit ? ' has-error' : ''}`;
       editArea.dataset.postId = p.id;
       editArea.value = p.post_text;
+      editArea.rows = 3;
+      tdContent.appendChild(editArea);
 
       const cWrap = document.createElement("div");
       cWrap.className = "char-count-wrap";
@@ -652,63 +728,76 @@
         tdContent.appendChild(linksDiv);
       }
 
-      tdContent.appendChild(editArea);
       tr.appendChild(tdContent);
 
       const tdActions = document.createElement("td");
+      tdActions.className = "actions-cell";
+      const actStack = document.createElement("div");
+      actStack.className = "actions-buttons-stack";
+
       if (p.status === "excluded") {
         const restoreBtn = document.createElement("button");
-        restoreBtn.className = "btn-restore-post";
+        restoreBtn.className = "btn-action-tile btn-restore-post";
         restoreBtn.dataset.postId = p.id;
         restoreBtn.type = "button";
-        restoreBtn.title = "Restore post to preview";
-        this.setWithIcon(restoreBtn, "", "fa fa-undo");
-        tdActions.appendChild(restoreBtn);
+        restoreBtn.title = "Restore post to preview queue";
+        restoreBtn.innerHTML = '<i class="fa fa-undo"></i><span class="action-label">Restore</span>';
+        actStack.appendChild(restoreBtn);
       } else {
         const prevBtn = document.createElement("button");
-        prevBtn.className = "btn-preview-post";
+        prevBtn.className = "btn-action-tile btn-preview-post";
         prevBtn.dataset.postId = p.id;
         prevBtn.type = "button";
         prevBtn.title = "Preview post live card";
-        this.setWithIcon(prevBtn, "", "fa fa-eye");
-        tdActions.appendChild(prevBtn);
+        prevBtn.innerHTML = '<i class="fa fa-eye"></i><span class="action-label">Preview</span>';
+        actStack.appendChild(prevBtn);
 
         if (p.status !== "published" && p.status !== "exported") {
           const pubBtn = document.createElement("button");
-          pubBtn.className = "btn-publish-now";
+          pubBtn.className = "btn-action-tile btn-publish-now";
           pubBtn.dataset.postId = p.id;
           pubBtn.dataset.dbId = p.db_id || "";
           pubBtn.type = "button";
           pubBtn.title = p.status === "failed" ? "Retry publishing" : "Publish now";
-          this.setWithIcon(pubBtn, "", "fa fa-paper-plane");
-          tdActions.appendChild(pubBtn);
+          pubBtn.innerHTML = `<i class="fa fa-paper-plane"></i><span class="action-label">${p.status === "failed" ? "Retry" : "Publish"}</span>`;
+          actStack.appendChild(pubBtn);
         }
 
         const delBtn = document.createElement("button");
-        delBtn.className = "btn-delete-post";
+        delBtn.className = "btn-action-tile btn-delete-post";
         delBtn.dataset.postId = p.id;
         delBtn.type = "button";
-        delBtn.title = "Remove post from preview";
-        this.setWithIcon(delBtn, "", "fa fa-trash");
-        tdActions.appendChild(delBtn);
+        delBtn.title = "Discard post";
+        delBtn.innerHTML = '<i class="fa fa-trash"></i><span class="action-label">Discard</span>';
+        actStack.appendChild(delBtn);
       }
+      tdActions.appendChild(actStack);
       tr.appendChild(tdActions);
+
+
 
       return tr;
     },
 
     renderTable(posts, filter) {
+      const emptyStateEl = document.getElementById("sm-empty-setup-state");
+      const mainContentEl = document.getElementById("sm-posts-main-content");
+      const allPosts = PostState.getAll();
+
+      if (allPosts.length === 0 && emptyStateEl && mainContentEl) {
+        emptyStateEl.style.display = "block";
+        mainContentEl.style.display = "none";
+        return;
+      } else if (emptyStateEl && mainContentEl) {
+        emptyStateEl.style.display = "none";
+        mainContentEl.style.display = "block";
+      }
+
       const tbody = document.getElementById("posts-tbody");
       if (!tbody) return;
       tbody.textContent = "";
 
-      let visible;
-      if (filter === "excluded") {
-        visible = posts.filter(p => p.status === "excluded");
-      } else {
-        visible = filter === "all" ? posts : posts.filter(p => p.type === filter);
-        visible = visible.filter(p => p.status !== "excluded");
-      }
+      const visible = PostState.getFiltered();
 
       if (!visible.length) {
         const tr = document.createElement("tr");
@@ -723,11 +812,11 @@
         emptyDiv.appendChild(icon);
 
         const heading = document.createElement("div");
-        heading.textContent = "No posts found for this filter.";
+        heading.textContent = "No posts found for the selected filters.";
         emptyDiv.appendChild(heading);
 
         const desc = document.createElement("small");
-        desc.textContent = "Check that your event has the relevant data (CFP deadline, sessions, tickets).";
+        desc.textContent = "Try switching the content type or status filter above.";
         emptyDiv.appendChild(desc);
 
         td.appendChild(emptyDiv);
@@ -772,39 +861,42 @@
       header.appendChild(avatar);
 
       const authorBox = document.createElement("div");
+      authorBox.className = "sm-preview-author-box";
       const nameDiv = document.createElement("div");
       nameDiv.className = "sm-preview-author";
       nameDiv.textContent = post.event_name || "Event Official";
       const handleDiv = document.createElement("div");
       handleDiv.className = "sm-preview-handle";
-      handleDiv.textContent = `@eventyay_${platformKey}`;
+      handleDiv.textContent = post.account_handle ? (post.account_handle.startsWith("@") ? post.account_handle : `@${post.account_handle}`) : `@${platformKey}_account`;
       authorBox.appendChild(nameDiv);
       authorBox.appendChild(handleDiv);
       header.appendChild(authorBox);
 
       const tag = document.createElement("span");
-      tag.className = `sm-preview-platform-tag platform-badge ${meta.colorClass || ''}`;
-      tag.textContent = meta.label;
+      tag.className = `sm-preview-platform-badge platform-badge ${meta.colorClass || ''}`;
+      tag.innerHTML = `${meta.iconClass ? `<i class="${meta.iconClass}"></i> ` : ''}${meta.label || platformKey}`;
       header.appendChild(tag);
 
       previewBox.appendChild(header);
 
       // Body Text
       const textDiv = document.createElement("div");
-      textDiv.className = "sm-preview-text";
+      textDiv.className = "sm-preview-body";
       textDiv.textContent = post.post_text;
       previewBox.appendChild(textDiv);
 
       // Media Attachment (if media_url exists)
       if (post.media_url) {
         const mediaBox = document.createElement("div");
-        mediaBox.className = "sm-preview-media";
+        mediaBox.className = "sm-preview-image-wrap";
         const mediaImg = document.createElement("img");
         mediaImg.src = post.media_url;
+        mediaImg.className = "sm-preview-image";
         mediaImg.alt = "Post Media Attachment";
         mediaBox.appendChild(mediaImg);
         previewBox.appendChild(mediaBox);
       }
+
 
       // Speaker Social Links Section (if present)
       if (post.speaker_social_links && post.speaker_social_links.length > 0) {
@@ -910,6 +1002,33 @@
       const cntExcluded = document.getElementById("cnt-excluded");
       if (cntExcluded) cntExcluded.textContent = excludedPosts.length;
 
+      // Status badges counts (Issue #66)
+      const currentType = PostState.getFilter();
+      const relevantPosts = currentType === "all"
+        ? activePosts
+        : (currentType === "excluded" ? excludedPosts : activePosts.filter(p => p.type === currentType));
+
+      const cntStatusAll = document.getElementById("cnt-status-all");
+      if (cntStatusAll) cntStatusAll.textContent = relevantPosts.length;
+
+      const statuses = ["scheduled", "published", "failed", "draft"];
+      statuses.forEach(st => {
+        const el = document.getElementById(`cnt-status-${st}`);
+        if (el) el.textContent = relevantPosts.filter(p => p.status === st).length;
+      });
+
+      // Update bulk button disabled states
+      const selected = PostState.getFiltered().filter(p => p.enabled);
+      const btnDiscard = document.getElementById("btn-bulk-discard");
+      if (btnDiscard) {
+        btnDiscard.disabled = selected.length === 0;
+      }
+      const failedCount = relevantPosts.filter(p => p.status === "failed").length;
+      const btnRetry = document.getElementById("btn-bulk-retry");
+      if (btnRetry) {
+        btnRetry.disabled = failedCount === 0;
+      }
+
       this.updateSelectedCount();
     },
 
@@ -928,6 +1047,11 @@
       if (allChk) {
         allChk.checked = n === total && total > 0;
         allChk.indeterminate = n > 0 && n < total;
+      }
+
+      const btnDiscard = document.getElementById("btn-bulk-discard");
+      if (btnDiscard) {
+        btnDiscard.disabled = n === 0;
       }
     },
 
@@ -1112,20 +1236,43 @@
     init() {
       this.bindEvents();
       initHelperUIs();
-      this.loadInitialData();
+      initTemplatesPage();
+      if (Config.PREVIEW_URL) {
+        this.loadInitialData();
+      }
     },
 
-    loadInitialData() {
+    loadInitialData(force = false) {
       const btn = document.getElementById("btn-regenerate");
       if (btn) {
         btn.disabled = true;
-        UI.setWithIcon(btn, "Loading…", "fa fa-refresh");
+        UI.setWithIcon(btn, "Loading…", "fa fa-refresh fa-spin");
       }
       UI.showSkeleton();
 
-      APIClient.fetchPreview()
+      APIClient.fetchPreview(force)
         .then(data => {
           const incoming = data.posts || [];
+          const hasGenerated = data.has_generated_posts !== false;
+
+          const emptyStateEl = document.getElementById("sm-empty-setup-state");
+          const mainContentEl = document.getElementById("sm-posts-main-content");
+
+          if (!hasGenerated || (incoming.length === 0 && !force)) {
+            PostState.init([]);
+            if (emptyStateEl && mainContentEl) {
+              emptyStateEl.style.display = "block";
+              mainContentEl.style.display = "none";
+            }
+            UI.updateCounts();
+            return;
+          }
+
+          if (emptyStateEl && mainContentEl) {
+            emptyStateEl.style.display = "none";
+            mainContentEl.style.display = "block";
+          }
+
           const oldMap = {};
           PostState.getAll().forEach(p => {
             if (p.id) oldMap[p.id] = p;
@@ -1179,6 +1326,108 @@
         });
     },
 
+    generatePosts() {
+      const btn = document.getElementById("btn-initial-generate") || document.getElementById("btn-regenerate");
+      if (btn) {
+        btn.disabled = true;
+        UI.setWithIcon(btn, "Generating…", "fa fa-spinner fa-spin");
+      }
+      APIClient.generatePosts()
+        .then(res => {
+          UI.showToast(res.message || "Posts generated successfully!", "success");
+          this.loadInitialData(true);
+        })
+        .catch(err => {
+          UI.showToast("Post generation failed: " + err.message, "warning");
+        })
+        .finally(() => {
+          if (btn) {
+            btn.disabled = false;
+            if (btn.id === "btn-initial-generate") {
+              UI.setWithIcon(btn, "Generate Posts", "fa fa-magic");
+            } else {
+              UI.setWithIcon(btn, "Regenerate", "fa fa-refresh");
+            }
+          }
+        });
+    },
+
+    bulkDiscard() {
+      const selected = PostState.getFiltered().filter(p => p.enabled && p.status !== "excluded");
+      if (!selected.length) {
+        UI.showToast("Please select at least one post to discard.", "warning");
+        return;
+      }
+
+      const dbIds = selected.map(p => p.db_id).filter(Boolean);
+      const postIds = selected.map(p => p.id);
+
+      APIClient.bulkAction("discard", { db_ids: dbIds, post_ids: postIds })
+        .then(res => {
+          if (res.success) {
+            const previousStates = selected.map(p => ({ post: p, oldStatus: p.status }));
+            selected.forEach(p => {
+              p.status = "excluded";
+              p.enabled = false;
+            });
+            UI.renderTable(PostState.getAll(), PostState.getFilter());
+            UI.updateCounts();
+            UI.showToast(
+              `Discarded ${res.count || selected.length} post(s).`,
+              "success",
+              () => {
+                previousStates.forEach(({ post, oldStatus }) => {
+                  post.status = oldStatus;
+                  APIClient.updatePostStatus(post, oldStatus);
+                });
+                UI.renderTable(PostState.getAll(), PostState.getFilter());
+                UI.updateCounts();
+                UI.showToast("Discard undone.", "success");
+              }
+            );
+          } else {
+            UI.showToast("Failed to discard posts: " + (res.error || "Unknown error"), "warning");
+          }
+        })
+        .catch(err => {
+          console.error("Bulk discard failed:", err);
+          UI.showToast("Bulk discard error: " + err.message, "warning");
+        });
+    },
+
+    bulkRetry(provider = null) {
+      let failedPosts = PostState.getFiltered().filter(p => p.status === "failed");
+      if (provider) {
+        failedPosts = failedPosts.filter(p => p.platform === provider || (p.id && String(p.id).endsWith(`_${provider}`)));
+      }
+      if (!failedPosts.length) {
+        UI.showToast(provider ? `No failed posts found on ${provider}.` : "No failed posts found in current view.", "info");
+        return;
+      }
+
+      const dbIds = failedPosts.map(p => p.db_id).filter(Boolean);
+      const postIds = failedPosts.map(p => p.id);
+
+      APIClient.bulkAction("retry", { provider, db_ids: dbIds, post_ids: postIds })
+        .then(res => {
+          if (res.success) {
+            failedPosts.forEach(p => {
+              p.status = "scheduled";
+              p.error_message = "";
+            });
+            UI.renderTable(PostState.getAll(), PostState.getFilter());
+            UI.updateCounts();
+            UI.showToast(`Re-queued ${res.count || failedPosts.length} failed post(s).`, "success");
+          } else {
+            UI.showToast("Failed to retry posts: " + (res.error || "Unknown error"), "warning");
+          }
+        })
+        .catch(err => {
+          console.error("Bulk retry failed:", err);
+          UI.showToast("Bulk retry error: " + err.message, "warning");
+        });
+    },
+
     triggerValidation() {
       const { pastCount, placeholderCount, limitExceededCount } = PostState.validate();
       UI.renderValidationAlert(pastCount, placeholderCount, limitExceededCount);
@@ -1189,7 +1438,7 @@
       const btn = document.getElementById("btn-save-regenerate");
       if (!btn) return;
       btn.disabled = true;
-      UI.setWithIcon(btn, "Saving…", "fa fa-refresh");
+      UI.setWithIcon(btn, "Saving…", "fa fa-refresh fa-spin");
 
       const form = btn.closest("form");
       const formData = new FormData(form);
@@ -1197,7 +1446,7 @@
       APIClient.saveSettings(formData)
         .then(() => {
           UI.showToast("Settings saved successfully.", "success");
-          this.loadInitialData();
+          this.loadInitialData(true);
         })
         .catch(() => {
           form.submit();
@@ -1300,6 +1549,7 @@
             error_message: ""
           });
           UI.renderTable(PostState.getAll(), PostState.getFilter());
+          UI.updateCounts();
         })
         .catch(err => {
           UI.showToast(`Publishing failed: ${err.message}`, "warning");
@@ -1308,6 +1558,7 @@
             error_message: err.message
           });
           UI.renderTable(PostState.getAll(), PostState.getFilter());
+          UI.updateCounts();
         })
         .finally(() => {
           if (button) {
@@ -1323,7 +1574,10 @@
 
     bindEvents() {
       const btnRegen = document.getElementById("btn-regenerate");
-      if (btnRegen) btnRegen.addEventListener("click", () => this.loadInitialData());
+      if (btnRegen) btnRegen.addEventListener("click", () => this.generatePosts());
+
+      const btnInitGen = document.getElementById("btn-initial-generate");
+      if (btnInitGen) btnInitGen.addEventListener("click", () => this.generatePosts());
 
       const filterPills = document.getElementById("filter-pills");
       if (filterPills) {
@@ -1334,10 +1588,44 @@
             document.querySelectorAll(".sm-filter-btn").forEach(b => b.classList.remove("active"));
             btn.classList.add("active");
             UI.renderTable(PostState.getAll(), PostState.getFilter());
+            UI.updateCounts();
             this.triggerValidation();
           }
         });
       }
+
+      const statusPills = document.getElementById("status-filter-pills");
+      if (statusPills) {
+        statusPills.addEventListener("click", (e) => {
+          const btn = e.target.closest(".sm-status-btn");
+          if (btn) {
+            PostState.setStatusFilter(btn.dataset.status);
+            document.querySelectorAll(".sm-status-btn").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            UI.renderTable(PostState.getAll(), PostState.getFilter());
+            UI.updateCounts();
+            this.triggerValidation();
+          }
+        });
+      }
+
+      const btnBulkDiscard = document.getElementById("btn-bulk-discard");
+      if (btnBulkDiscard) {
+        btnBulkDiscard.addEventListener("click", () => this.bulkDiscard());
+      }
+
+      const btnBulkRetry = document.getElementById("btn-bulk-retry");
+      if (btnBulkRetry) {
+        btnBulkRetry.addEventListener("click", () => this.bulkRetry());
+      }
+
+      document.querySelectorAll(".retry-platform-link").forEach(link => {
+        link.addEventListener("click", (e) => {
+          e.preventDefault();
+          const plat = link.dataset.platform || null;
+          this.bulkRetry(plat);
+        });
+      });
 
       const chkAll = document.getElementById("chk-all");
       if (chkAll) {
@@ -1507,20 +1795,6 @@
           }
         });
       }
-
-      // Preset buttons clicks
-      document.querySelectorAll(".presets-container .preset-btn").forEach(btn => {
-        btn.addEventListener("click", function () {
-          handlePresetClick(this);
-        });
-      });
-
-      // Token chips clicks
-      document.querySelectorAll(".token-chip").forEach(chip => {
-        chip.addEventListener("click", function () {
-          insertToken(this);
-        });
-      });
     }
   };
 
@@ -1535,13 +1809,19 @@
   // ---- Token & Preset UI Helpers ----
   function insertToken(chip) {
     const targetId = chip.dataset.target;
-    const token = chip.textContent;
+    const token = chip.textContent.trim();
     let input = lastFocusedInput;
     if (!input || !document.body.contains(input)) {
       input = targetId ? document.getElementById(targetId) : null;
     }
     if (!input && targetId) {
       input = document.getElementById(targetId);
+    }
+    if (!input) {
+      const parentCard = chip.closest(".template-group, .adv-group, .custom-templates-panel");
+      if (parentCard) {
+        input = parentCard.querySelector("textarea, input[type='text']");
+      }
     }
     if (!input) return;
 
@@ -1563,13 +1843,8 @@
       }
     }
 
-    const evtInput = document.createEvent("HTMLEvents");
-    evtInput.initEvent("input", true, true);
-    input.dispatchEvent(evtInput);
-
-    const evtChange = document.createEvent("HTMLEvents");
-    evtChange.initEvent("change", true, true);
-    input.dispatchEvent(evtChange);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
   }
 
   function handlePresetClick(btn) {
@@ -1577,13 +1852,13 @@
     if (!container) return;
 
     const targetId = container.dataset.target;
-    const val = parseInt(btn.dataset.val);
+    const val = parseInt(btn.dataset.val, 10);
     const input = document.getElementById(targetId);
     if (!input || isNaN(val)) return;
 
-    let offsets = input.value
+    let offsets = (input.value || "")
       .split(",")
-      .map(x => parseInt(x.trim()))
+      .map(x => parseInt(x.trim(), 10))
       .filter(x => !isNaN(x));
 
     const idx = offsets.indexOf(val);
@@ -1596,16 +1871,11 @@
     offsets.sort((a, b) => b - a);
     input.value = offsets.join(", ");
 
-    const evtInput = document.createEvent("HTMLEvents");
-    evtInput.initEvent("input", true, true);
-    input.dispatchEvent(evtInput);
-
-    const evtChange = document.createEvent("HTMLEvents");
-    evtChange.initEvent("change", true, true);
-    input.dispatchEvent(evtChange);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
   }
 
-  // Document-level event delegation for token chips & preset buttons
+  // Document-level event delegation for token chips & preset buttons (single listener)
   document.addEventListener("click", (e) => {
     const chip = e.target.closest(".token-chip");
     if (chip) {
@@ -1620,6 +1890,7 @@
       return;
     }
   });
+
 
   function updatePresetsUI(container, currentOffsets) {
     container.querySelectorAll(".preset-btn").forEach(btn => {
@@ -1688,6 +1959,189 @@
       checkbox.addEventListener("change", syncVisibility);
     });
   }
+
+  function initTemplatesPage() {
+    // Accordion toggle
+    document.querySelectorAll(".toggle-custom-tpl-btn").forEach(btn => {
+      btn.addEventListener("click", function () {
+        const targetSelector = this.dataset.target;
+        const panel = document.querySelector(targetSelector);
+        if (panel) {
+          panel.classList.toggle("active");
+        }
+      });
+    });
+
+    // Copy to other platforms
+    document.querySelectorAll(".btn-copy-plat").forEach(btn => {
+      btn.addEventListener("click", function () {
+        const srcId = this.dataset.src;
+        const srcInput = document.getElementById(srcId);
+        if (!srcInput) return;
+        const text = srcInput.value;
+
+        const panel = this.closest(".custom-templates-panel");
+        if (panel) {
+          panel.querySelectorAll("textarea").forEach(ta => {
+            if (ta !== srcInput) {
+              ta.value = text;
+              const evt = document.createEvent("HTMLEvents");
+              evt.initEvent("input", true, true);
+              ta.dispatchEvent(evt);
+            }
+          });
+          UI.showToast("Copied template copy to other platforms.", "info");
+        }
+      });
+    });
+
+    // Reset to default
+    document.querySelectorAll(".reset-default-btn").forEach(btn => {
+      btn.addEventListener("click", function () {
+        const type = this.dataset.type;
+        const panel = document.getElementById(`custom-tpls-${type}`);
+        if (panel) {
+          panel.querySelectorAll("textarea").forEach(ta => {
+            ta.value = "";
+            const evt = document.createEvent("HTMLEvents");
+            evt.initEvent("input", true, true);
+            ta.dispatchEvent(evt);
+          });
+          UI.showToast("Reset templates to system default.", "info");
+        }
+      });
+    });
+
+    // Realtime character count bars
+    document.querySelectorAll(".char-count-bar").forEach(bar => {
+      const targetId = bar.dataset.target;
+      const limit = parseInt(bar.dataset.limit, 10);
+      const input = document.getElementById(targetId);
+      if (!input || isNaN(limit)) return;
+
+      const updateBar = () => {
+        const len = input.value.length;
+        bar.textContent = `${len} / ${limit} chars`;
+        if (len > limit) {
+          bar.classList.add("has-error");
+        } else {
+          bar.classList.remove("has-error");
+        }
+      };
+      input.addEventListener("input", updateBar);
+      updateBar();
+    });
+
+    // Custom Waves Dynamic Handler
+    const serializeCustomWaves = (type) => {
+      const container = document.getElementById(`custom-waves-list-${type}`);
+      const hiddenInput = document.getElementById(`id_socialmedia_${type}_custom_waves`);
+      if (!container || !hiddenInput) return;
+
+      const waves = [];
+      container.querySelectorAll(".wave-card-custom").forEach(card => {
+        const enabled = card.querySelector(".custom-wave-enable")?.checked ?? true;
+        const label = card.querySelector(".custom-wave-label")?.value?.trim() || "Custom Wave";
+        const offset = parseInt(card.querySelector(".custom-wave-offset")?.value, 10);
+        const template = card.querySelector(".custom-wave-template")?.value || "";
+        if (!isNaN(offset)) {
+          waves.push({
+            id: card.dataset.waveId || `wave_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+            label: label,
+            offset: offset,
+            enabled: enabled,
+            template: template
+          });
+        }
+      });
+      hiddenInput.value = JSON.stringify(waves);
+    };
+
+    document.querySelectorAll(".btn-add-custom-wave").forEach(btn => {
+      btn.addEventListener("click", function () {
+        const type = this.dataset.type;
+        const unitLabel = this.dataset.unit || "Days before milestone:";
+        const container = document.getElementById(`custom-waves-list-${type}`);
+        if (!container) return;
+
+        const waveId = `wave_custom_${Date.now()}`;
+        const newCard = document.createElement("div");
+        newCard.className = "wave-card wave-card-custom";
+        newCard.dataset.waveId = waveId;
+        newCard.innerHTML = `
+          <div class="wave-card-header">
+            <div class="wave-toggle-wrap">
+              <input type="checkbox" class="custom-wave-enable" checked>
+              <span class="wave-badge wave-custom-badge"><i class="fa fa-sparkles"></i> Custom Wave:</span>
+              <input type="text" class="form-control input-sm custom-wave-label" value="Custom Wave" placeholder="e.g. Early Call" style="width: 150px; display: inline-block; height: 26px; padding: 2px 6px;">
+            </div>
+            <div class="wave-offset-wrap">
+              <span class="wave-offset-label">${unitLabel}</span>
+              <input type="number" class="form-control input-sm custom-wave-offset" value="15" style="width: 70px; height: 28px; text-align: center;">
+              <button type="button" class="btn btn-danger btn-xs btn-remove-wave" title="Remove this wave">
+                <i class="fa fa-trash"></i>
+              </button>
+            </div>
+          </div>
+          <div class="wave-card-body">
+            <div class="wave-custom-input">
+              <label class="small text-muted">Custom Wave Copy:</label>
+              <textarea class="form-control custom-wave-template" rows="2" placeholder="Write custom copy for this wave..."></textarea>
+            </div>
+          </div>
+        `;
+        container.appendChild(newCard);
+        serializeCustomWaves(type);
+      });
+    });
+
+    document.addEventListener("click", function (e) {
+      const rmBtn = e.target.closest(".btn-remove-wave");
+      if (rmBtn) {
+        const card = rmBtn.closest(".wave-card-custom");
+        const container = card?.closest(".custom-waves-list");
+        if (card && container) {
+          const type = container.id.replace("custom-waves-list-", "");
+          card.remove();
+          serializeCustomWaves(type);
+        }
+      }
+    });
+
+    document.addEventListener("input", function (e) {
+      const customCard = e.target.closest(".wave-card-custom");
+      if (customCard) {
+        const container = customCard.closest(".custom-waves-list");
+        if (container) {
+          const type = container.id.replace("custom-waves-list-", "");
+          serializeCustomWaves(type);
+        }
+      }
+    });
+
+    document.addEventListener("change", function (e) {
+      const customCard = e.target.closest(".wave-card-custom");
+      if (customCard) {
+        const container = customCard.closest(".custom-waves-list");
+        if (container) {
+          const type = container.id.replace("custom-waves-list-", "");
+          serializeCustomWaves(type);
+        }
+      }
+    });
+
+    // Form submission serialization
+    const form = document.querySelector(".sm-templates-form");
+    if (form) {
+      form.addEventListener("submit", () => {
+        ["cfp", "speaker", "session", "ticket", "schedule"].forEach(t => serializeCustomWaves(t));
+      });
+    }
+
+    ["cfp", "speaker", "session", "ticket", "schedule"].forEach(t => serializeCustomWaves(t));
+  }
+
+
   // Run on load
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => AppController.init());

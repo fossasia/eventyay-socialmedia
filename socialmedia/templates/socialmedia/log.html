@@ -16,8 +16,26 @@
       {% trans "Publishing Log" %}
       <small>{{ event.name }}</small>
     </h1>
+    {% if not has_generated_posts %}
+      <a href="{{ templates_url }}" class="btn btn-default">
+        <i class="fa fa-file-text-o"></i> {% trans "Review Templates" %}
+      </a>
+    {% endif %}
   </div>
 
+  {% if not has_generated_posts %}
+    <div class="well text-center sm-empty-onboarding">
+      <h3><i class="fa fa-calendar-check-o text-muted"></i> {% trans "No posts generated yet" %}</h3>
+      <p class="text-muted">
+        {% trans "Posts have not been generated for this event yet. You can review or customize post templates before generating posts." %}
+      </p>
+      <div style="margin-top: 15px;">
+        <a href="{{ templates_url }}" class="btn btn-primary">
+          <i class="fa fa-file-text-o"></i> {% trans "Go to Templates" %}
+        </a>
+      </div>
+    </div>
+  {% else %}
   <!-- Status filter tabs -->
   <div class="sm-filters" id="log-filter-pills">
     <a href="?status=" class="sm-filter-btn {% if not status_filter %}active{% endif %}">
@@ -144,6 +162,7 @@
       {% endif %}
     </ul>
   </div>
+  {% endif %}
   {% endif %}
 
 </div><!-- /sm-page -->
