@@ -236,16 +236,66 @@
         if (!r.ok) throw new Error(`Export failed: ${r.status}`);
         return r.blob();
       });
-    }, savePostToDB(post, button = null) {
+    },
+    _inFlightSaves: {},
+    _inFlightPayloads: {},
+    _pendingSaves: {},
+
+    savePostToDB(post, button = null, showToast = true) {
       if (!Config.UPDATE_URL || !post) return Promise.resolve();
+
+      const currentPayload = {
+        post_text: post.post_text,
+        post_date: post.post_date,
+        post_time: post.post_time
+      };
+
+      // If values match what was already saved and post is marked saved, skip redundant save
+      if (
+        post.is_saved &&
+        post.last_saved_date === currentPayload.post_date &&
+        post.last_saved_time === currentPayload.post_time &&
+        post.last_saved_text === currentPayload.post_text
+      ) {
+        return Promise.resolve();
+      }
+
+      // If a save is already in-flight for this post:
+      if (this._inFlightSaves[post.id]) {
+        const inFlight = this._inFlightPayloads[post.id];
+        // If in-flight request is already persisting these exact values, don't queue a duplicate
+        if (
+          inFlight &&
+          inFlight.post_date === currentPayload.post_date &&
+          inFlight.post_time === currentPayload.post_time &&
+          inFlight.post_text === currentPayload.post_text
+        ) {
+          return this._inFlightSaves[post.id];
+        }
+
+        this._pendingSaves[post.id] = { button, showToast };
+        return this._inFlightSaves[post.id];
+      }
+
       if (button) {
         button.disabled = true;
         UI.setWithIcon(button, "Saving…", "fa fa-spinner fa-spin");
       }
+      const row = document.querySelector(`tr[data-post-id="${post.id}"]`);
+      const savingStatus = row ? row.querySelector(".sched-saving-status") : null;
+      if (savingStatus) {
+        savingStatus.className = "sched-saving-status status-saving";
+        savingStatus.style.display = "inline-flex";
+        savingStatus.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving…';
+      }
+
       const isPinned = (post.post_text !== post.default_text) ||
         (post.post_date !== post.original_post_date) ||
         (post.post_time !== post.original_post_time);
-      return fetch(Config.UPDATE_URL, {
+
+      this._inFlightPayloads[post.id] = currentPayload;
+
+      const savePromise = fetch(Config.UPDATE_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -269,30 +319,74 @@
         .then(res => {
           if (res.db_id) post.db_id = res.db_id;
           post.is_pinned = res.is_pinned;
-          post.is_saved = true;
-          post.last_saved_date = post.post_date;
-          post.last_saved_time = post.post_time;
+          post.last_saved_date = currentPayload.post_date;
+          post.last_saved_time = currentPayload.post_time;
+          post.last_saved_text = currentPayload.post_text;
+          post.is_saved = (
+            post.post_date === currentPayload.post_date &&
+            post.post_time === currentPayload.post_time &&
+            post.post_text === currentPayload.post_text
+          );
           if (res.post_status) {
             post.status = res.post_status;
             post.error_message = "";
           }
 
-          // Unconditionally refresh row state so Save button disappears and status badge updates
+          // Refresh row state and counts so status badge updates immediately
           UI.updateRow(post.id);
+          UI.updateCounts();
 
-          if (res.scheduled_at) {
-            UI.showToast(`Schedule saved (${res.scheduled_at}). Status updated to Scheduled!`, "success");
+          // Flash saved indicator on the updated row
+          const updatedRow = document.querySelector(`tr[data-post-id="${post.id}"]`);
+          const updatedStatus = updatedRow ? updatedRow.querySelector(".sched-saving-status") : null;
+          if (updatedStatus) {
+            updatedStatus.className = "sched-saving-status status-saved";
+            updatedStatus.style.display = "inline-flex";
+            updatedStatus.innerHTML = '<i class="fa fa-check"></i> Saved';
+            setTimeout(() => {
+              updatedStatus.style.opacity = "0";
+              setTimeout(() => {
+                updatedStatus.style.display = "none";
+                updatedStatus.style.opacity = "1";
+              }, 300);
+            }, 2000);
+          }
+
+          if (showToast && res.scheduled_at) {
+            UI.showToast(`Schedule saved (${res.scheduled_at}). Status updated to ${post.status}.`, "success");
           }
           return res;
         })
         .catch(err => {
           console.error("Failed to save post to DB:", err);
+          if (savingStatus) {
+            savingStatus.style.display = "none";
+          }
           UI.showToast("Failed to save schedule update: " + err.message, "warning");
           if (button) {
             button.disabled = false;
-            UI.setWithIcon(button, "Save Schedule", "fa fa-check");
+            UI.setWithIcon(button, "Save", "fa fa-check");
+          }
+        })
+        .finally(() => {
+          delete this._inFlightSaves[post.id];
+          delete this._inFlightPayloads[post.id];
+          if (this._pendingSaves[post.id]) {
+            const next = this._pendingSaves[post.id];
+            delete this._pendingSaves[post.id];
+            if (
+              !post.is_saved ||
+              post.post_date !== post.last_saved_date ||
+              post.post_time !== post.last_saved_time ||
+              post.post_text !== post.last_saved_text
+            ) {
+              this.savePostToDB(post, next.button, next.showToast);
+            }
           }
         });
+
+      this._inFlightSaves[post.id] = savePromise;
+      return savePromise;
     },
 
     updatePostStatus(post, status) {
@@ -595,55 +689,83 @@
       const wrap = document.createElement("div");
       wrap.className = "post-schedule-cell-wrap";
 
+      const isPublished = p.status === "published";
+
       const dateIn = document.createElement("input");
       dateIn.type = "date";
       dateIn.className = `form-control input-sm sm-date-input${isDateModified ? ' is-modified' : ''}`;
       dateIn.dataset.postId = p.id;
       dateIn.value = p.post_date;
-      wrap.appendChild(dateIn);
 
       const timeIn = document.createElement("input");
       timeIn.type = "time";
       timeIn.className = `form-control input-sm sm-time-input${isTimeModified ? ' is-modified' : ''}`;
       timeIn.dataset.postId = p.id;
       timeIn.value = p.post_time;
-      wrap.appendChild(timeIn);
 
-      const isUnsaved = p.is_saved === false;
+      if (isPublished) {
+        dateIn.disabled = true;
+        dateIn.readOnly = true;
+        dateIn.classList.add("input-locked");
+        dateIn.title = "Published posts cannot be rescheduled";
 
-      if (isDateModified || isTimeModified || isUnsaved) {
-        const mod = document.createElement("div");
-        mod.className = "is-modified-label";
-        mod.textContent = isUnsaved ? "Unsaved changes" : "Modified";
-        wrap.appendChild(mod);
+        timeIn.disabled = true;
+        timeIn.readOnly = true;
+        timeIn.classList.add("input-locked");
+        timeIn.title = "Published posts cannot be rescheduled";
 
-        if (isUnsaved) {
-          const saveTime = document.createElement("button");
-          saveTime.className = "btn-save-time";
-          saveTime.dataset.postId = p.id;
-          saveTime.type = "button";
-          saveTime.title = "Save schedule time to database";
-          this.setWithIcon(saveTime, "Save", "fa fa-check");
-          wrap.appendChild(saveTime);
+        wrap.appendChild(dateIn);
+        wrap.appendChild(timeIn);
+
+        const lockBadge = document.createElement("span");
+        lockBadge.className = "sched-locked-badge";
+        lockBadge.title = "This post has already been published to social media and cannot be rescheduled.";
+        this.setWithIcon(lockBadge, "Published (Locked)", "fa fa-lock");
+        wrap.appendChild(lockBadge);
+      } else {
+        wrap.appendChild(dateIn);
+        wrap.appendChild(timeIn);
+
+        const savingStatus = document.createElement("span");
+        savingStatus.className = "sched-saving-status";
+        savingStatus.style.display = "none";
+        wrap.appendChild(savingStatus);
+
+        const isUnsaved = p.is_saved === false;
+
+        if (isDateModified || isTimeModified || isUnsaved) {
+          const mod = document.createElement("div");
+          mod.className = isUnsaved ? "is-modified-label" : "sched-custom-timing-badge";
+          mod.textContent = isUnsaved ? "Unsaved changes" : "Custom timing";
+          wrap.appendChild(mod);
+
+          if (isUnsaved) {
+            const saveTime = document.createElement("button");
+            saveTime.className = "btn-save-time";
+            saveTime.dataset.postId = p.id;
+            saveTime.type = "button";
+            saveTime.title = "Save schedule time to database";
+            this.setWithIcon(saveTime, "Save", "fa fa-check");
+            wrap.appendChild(saveTime);
+          }
+
+          if (isDateModified || isTimeModified) {
+            const revTime = document.createElement("button");
+            revTime.className = "btn-revert-time";
+            revTime.dataset.postId = p.id;
+            revTime.type = "button";
+            revTime.title = "Revert to default timing";
+            this.setWithIcon(revTime, "Revert", "fa fa-undo");
+            wrap.appendChild(revTime);
+          }
         }
 
-        if (isDateModified || isTimeModified) {
-          const revTime = document.createElement("button");
-          revTime.className = "btn-revert-time";
-          revTime.dataset.postId = p.id;
-          revTime.type = "button";
-          revTime.title = "Revert to default timing";
-          this.setWithIcon(revTime, "Revert", "fa fa-undo");
-          wrap.appendChild(revTime);
+        if (isPast) {
+          const warn = document.createElement("div");
+          warn.className = "validation-warning-badge";
+          this.setWithIcon(warn, "Scheduled in past", "fa fa-exclamation-triangle");
+          wrap.appendChild(warn);
         }
-
-      }
-
-      if (isPast) {
-        const warn = document.createElement("div");
-        warn.className = "validation-warning-badge";
-        this.setWithIcon(warn, "Scheduled in past", "fa fa-exclamation-triangle");
-        wrap.appendChild(warn);
       }
       tdPostSched.appendChild(wrap);
       tr.appendChild(tdPostSched);
@@ -1157,21 +1279,28 @@
       const post = PostState.get(id);
       if (!post) return;
 
+      let modLabel = wrap.querySelector(".is-modified-label, .sched-custom-timing-badge");
+      let saveBtn = wrap.querySelector(".btn-save-time");
+      let revBtn = wrap.querySelector(".btn-revert-time");
+
+      if (post.status === "published") {
+        if (modLabel) modLabel.remove();
+        if (saveBtn) saveBtn.remove();
+        if (revBtn) revBtn.remove();
+        return;
+      }
+
       const isDateModified = post.post_date !== post.original_post_date;
       const isTimeModified = post.post_time !== post.original_post_time;
       const isUnsaved = post.is_saved === false;
 
-      let modLabel = wrap.querySelector(".is-modified-label");
-      let saveBtn = wrap.querySelector(".btn-save-time");
-      let revBtn = wrap.querySelector(".btn-revert-time");
-
       if (isDateModified || isTimeModified || isUnsaved) {
         if (!modLabel) {
           modLabel = document.createElement("div");
-          modLabel.className = "is-modified-label";
           wrap.appendChild(modLabel);
         }
-        modLabel.textContent = isUnsaved ? "Unsaved changes" : "Modified";
+        modLabel.className = isUnsaved ? "is-modified-label" : "sched-custom-timing-badge";
+        modLabel.textContent = isUnsaved ? "Unsaved changes" : "Custom timing";
 
         if (isUnsaved) {
           if (!saveBtn) {
@@ -1180,7 +1309,7 @@
             saveBtn.dataset.postId = id;
             saveBtn.type = "button";
             saveBtn.title = "Save schedule time to database";
-            this.setWithIcon(saveBtn, "Save Schedule", "fa fa-check");
+            this.setWithIcon(saveBtn, "Save", "fa fa-check");
             if (revBtn) {
               wrap.insertBefore(saveBtn, revBtn);
             } else {
@@ -1198,7 +1327,7 @@
             revBtn.dataset.postId = id;
             revBtn.type = "button";
             revBtn.title = "Revert to default timing";
-            this.setWithIcon(revBtn, "", "fa fa-undo");
+            this.setWithIcon(revBtn, "Revert", "fa fa-undo");
             wrap.appendChild(revBtn);
           }
         } else {
@@ -1286,10 +1415,21 @@
                 post_text: old.post_text !== old.default_text ? old.post_text : p.post_text,
                 post_date: old.post_date !== old.original_post_date ? old.post_date : p.post_date,
                 post_time: old.post_time !== old.original_post_time ? old.post_time : p.post_time,
+                last_saved_date: old.last_saved_date || p.post_date,
+                last_saved_time: old.last_saved_time || p.post_time,
+                last_saved_text: old.last_saved_text || p.post_text,
+                is_saved: old.is_saved !== undefined ? old.is_saved : true,
                 enabled: old.enabled
               };
             }
-            return { ...p, enabled: true };
+            return {
+              ...p,
+              last_saved_date: p.post_date,
+              last_saved_time: p.post_time,
+              last_saved_text: p.post_text,
+              is_saved: true,
+              enabled: true
+            };
           });
 
           PostState.init(posts);
@@ -1727,22 +1867,95 @@
           }
         });
 
+        const scheduleDebounceTimers = {};
+
+        const saveScheduleForPost = (postId) => {
+          const post = PostState.get(postId);
+          if (!post || post.status === "published") return;
+          const lastSavedDate = post.last_saved_date || post.original_post_date || post.post_date;
+          const lastSavedTime = post.last_saved_time || post.original_post_time || post.post_time;
+          if (
+            post.is_saved &&
+            post.post_date === lastSavedDate &&
+            post.post_time === lastSavedTime
+          ) {
+            return;
+          }
+          APIClient.savePostToDB(post, null, false);
+        };
+
+        const handleScheduleChange = (target, isBlur = false) => {
+          const postId = target.dataset.postId;
+          if (!postId) return;
+          const post = PostState.get(postId);
+          if (!post || post.status === "published") return;
+
+          const row = target.closest("tr");
+          if (!row) return;
+          const dateInput = row.querySelector(".sm-date-input");
+          const timeInput = row.querySelector(".sm-time-input");
+          if (!dateInput || !timeInput) return;
+
+          const newDate = dateInput.value;
+          const newTime = timeInput.value;
+
+          if (!newDate || !newTime) return;
+
+          const lastSavedDate = post.last_saved_date || post.original_post_date || post.post_date;
+          const lastSavedTime = post.last_saved_time || post.original_post_time || post.post_time;
+          const hasChangedFromState = (post.post_date !== newDate) || (post.post_time !== newTime);
+          const hasUnsavedChanges = (lastSavedDate !== newDate) || (lastSavedTime !== newTime);
+
+          if (isBlur && !hasChangedFromState) {
+            if (scheduleDebounceTimers[postId]) {
+              clearTimeout(scheduleDebounceTimers[postId]);
+              delete scheduleDebounceTimers[postId];
+            }
+            if (hasUnsavedChanges && !post.is_saved) {
+              saveScheduleForPost(postId);
+            }
+            return;
+          }
+
+          if (hasChangedFromState) {
+            PostState.update(postId, { post_date: newDate, post_time: newTime, is_saved: false });
+            if (post.post_date !== post.original_post_date) {
+              dateInput.classList.add("is-modified");
+            } else {
+              dateInput.classList.remove("is-modified");
+            }
+            if (post.post_time !== post.original_post_time) {
+              timeInput.classList.add("is-modified");
+            } else {
+              timeInput.classList.remove("is-modified");
+            }
+            UI.ensureScheduleControls(postId);
+            AppController.triggerValidation();
+
+            if (scheduleDebounceTimers[postId]) {
+              clearTimeout(scheduleDebounceTimers[postId]);
+              delete scheduleDebounceTimers[postId];
+            }
+
+            if (isBlur) {
+              saveScheduleForPost(postId);
+            } else {
+              scheduleDebounceTimers[postId] = setTimeout(() => {
+                delete scheduleDebounceTimers[postId];
+                saveScheduleForPost(postId);
+              }, 300);
+            }
+          }
+        };
+
         tbody.addEventListener("change", (e) => {
           const postId = e.target.dataset.postId;
           if (!postId) return;
 
           if (e.target.classList.contains("row-chk")) {
             UI.toggleRow(postId, e.target.checked);
-          } else if (e.target.classList.contains("sm-date-input")) {
-            PostState.update(postId, { post_date: e.target.value, is_saved: false });
-            e.target.classList.add("is-modified");
-            UI.ensureScheduleControls(postId);
-            this.triggerValidation();
-          } else if (e.target.classList.contains("sm-time-input")) {
-            PostState.update(postId, { post_time: e.target.value, is_saved: false });
-            e.target.classList.add("is-modified");
-            UI.ensureScheduleControls(postId);
-            this.triggerValidation();
+          } else if (e.target.classList.contains("sm-date-input") || e.target.classList.contains("sm-time-input")) {
+            handleScheduleChange(e.target, false);
           }
         });
 
@@ -1798,6 +2011,8 @@
           if (e.target.classList.contains("post-text-edit")) {
             UI.finishEdit(postId, e.target.value);
             APIClient.savePostToDB(PostState.get(postId));
+          } else if (e.target.classList.contains("sm-date-input") || e.target.classList.contains("sm-time-input")) {
+            handleScheduleChange(e.target, true);
           }
         });
       }
@@ -1824,7 +2039,7 @@
       input = document.getElementById(targetId);
     }
     if (!input) {
-      const parentCard = chip.closest(".template-group, .adv-group, .custom-templates-panel");
+      const parentCard = chip.closest(".template-group, .sm-section-card, .adv-group, .custom-templates-panel");
       if (parentCard) {
         input = parentCard.querySelector("textarea, input[type='text']");
       }
@@ -1967,7 +2182,96 @@
   }
 
   function initTemplatesPage() {
-    // Accordion toggle
+    // Template Section Accordion (Issue #71)
+    const templateGroups = document.querySelectorAll(".template-group");
+    templateGroups.forEach(group => {
+      const header = group.querySelector(".template-group-header");
+      if (!header) return;
+
+      const toggleGroup = (expand) => {
+        const isCurrentlyCollapsed = group.classList.contains("collapsed") || group.classList.contains("collapse");
+        const shouldExpand = expand !== undefined ? expand : isCurrentlyCollapsed;
+
+        group.classList.remove("collapse");
+        group.classList.toggle("collapsed", !shouldExpand);
+        header.setAttribute("aria-expanded", shouldExpand ? "true" : "false");
+        const toggleText = header.querySelector(".toggle-text");
+        if (toggleText) {
+          toggleText.textContent = shouldExpand ? "Collapse" : "Expand";
+        }
+      };
+
+      header.addEventListener("click", () => toggleGroup());
+      header.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          toggleGroup();
+        }
+      });
+    });
+
+    // Expand All / Collapse All buttons
+    const btnExpandAll = document.getElementById("btn-expand-all-templates");
+    if (btnExpandAll) {
+      btnExpandAll.addEventListener("click", () => {
+        templateGroups.forEach(group => {
+          group.classList.remove("collapsed", "collapse");
+          const header = group.querySelector(".template-group-header");
+          if (header) {
+            header.setAttribute("aria-expanded", "true");
+            const toggleText = header.querySelector(".toggle-text");
+            if (toggleText) toggleText.textContent = "Collapse";
+          }
+        });
+      });
+    }
+
+    const btnCollapseAll = document.getElementById("btn-collapse-all-templates");
+    if (btnCollapseAll) {
+      btnCollapseAll.addEventListener("click", () => {
+        templateGroups.forEach(group => {
+          group.classList.remove("collapse");
+          group.classList.add("collapsed");
+          const header = group.querySelector(".template-group-header");
+          if (header) {
+            header.setAttribute("aria-expanded", "false");
+            const toggleText = header.querySelector(".toggle-text");
+            if (toggleText) toggleText.textContent = "Expand";
+          }
+        });
+      });
+    }
+
+    // Auto-expand any group that contains form errors
+    templateGroups.forEach(group => {
+      if (group.querySelector(".has-error, .help-block.text-danger")) {
+        group.classList.remove("collapsed", "collapse");
+        const header = group.querySelector(".template-group-header");
+        if (header) {
+          header.setAttribute("aria-expanded", "true");
+          const toggleText = header.querySelector(".toggle-text");
+          if (toggleText) toggleText.textContent = "Collapse";
+        }
+      }
+    });
+
+    // Deep link support via URL hash (e.g. #cfp, #speaker, #session, #ticket, #schedule)
+    const hash = window.location.hash.replace("#", "").toLowerCase();
+    if (hash) {
+      const targetGroup = document.getElementById(`template-group-${hash}`) || document.querySelector(`.template-group[data-type="${hash}"]`);
+      if (targetGroup) {
+        targetGroup.classList.remove("collapsed", "collapse");
+        const header = targetGroup.querySelector(".template-group-header");
+        if (header) {
+          header.setAttribute("aria-expanded", "true");
+          const toggleText = header.querySelector(".toggle-text");
+          if (toggleText) toggleText.textContent = "Collapse";
+        }
+        setTimeout(() => targetGroup.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+      }
+    }
+
+    // Platform overrides accordion toggle
     document.querySelectorAll(".toggle-custom-tpl-btn").forEach(btn => {
       btn.addEventListener("click", function () {
         const targetSelector = this.dataset.target;

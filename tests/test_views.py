@@ -224,6 +224,89 @@ def test_update_post_reschedule_draft_to_future_becomes_scheduled(
 
 
 @pytest.mark.django_db
+def test_update_post_published_reschedule_rejected(
+    logged_in_organizer_client, organizer, event, settings
+):
+    settings.SITE_URL = "https://testserver"
+    import pytz
+    from django.utils import timezone
+    from socialmedia.models import SocialMediaPost, SocialMediaPostStatus
+
+    event_tz = pytz.timezone(getattr(event, "timezone", None) or "UTC")
+    future_dt = timezone.now().astimezone(event_tz) + timezone.timedelta(days=2)
+
+    with scope(organizer=organizer, event=event):
+        post = SocialMediaPost.objects.create(
+            event=event,
+            post_type="custom",
+            entity_id="published_post_1",
+            scheduled_at=timezone.now() - timezone.timedelta(days=1),
+            post_text="Already published post",
+            status=SocialMediaPostStatus.PUBLISHED,
+            is_pinned=False,
+        )
+
+    url = reverse(
+        "plugins:socialmedia:update",
+        kwargs={"organizer": organizer.slug, "event": event.slug},
+    )
+    payload = {
+        "db_id": post.pk,
+        "post_date": future_dt.strftime("%Y-%m-%d"),
+        "post_time": future_dt.strftime("%H:%M"),
+    }
+    response = logged_in_organizer_client.post(
+        url, data=json.dumps(payload), content_type="application/json"
+    )
+
+    assert response.status_code == 400
+    assert "Published posts cannot be rescheduled" in response.json()["error"]
+
+    with scope(organizer=organizer, event=event):
+        post.refresh_from_db()
+        assert post.status == SocialMediaPostStatus.PUBLISHED
+
+
+@pytest.mark.django_db
+def test_update_post_published_status_change_rejected(
+    logged_in_organizer_client, organizer, event, settings
+):
+    settings.SITE_URL = "https://testserver"
+    from django.utils import timezone
+    from socialmedia.models import SocialMediaPost, SocialMediaPostStatus
+
+    with scope(organizer=organizer, event=event):
+        post = SocialMediaPost.objects.create(
+            event=event,
+            post_type="custom",
+            entity_id="published_post_2",
+            scheduled_at=timezone.now() - timezone.timedelta(days=1),
+            post_text="Already published post",
+            status=SocialMediaPostStatus.PUBLISHED,
+            is_pinned=False,
+        )
+
+    url = reverse(
+        "plugins:socialmedia:update",
+        kwargs={"organizer": organizer.slug, "event": event.slug},
+    )
+    payload = {
+        "db_id": post.pk,
+        "status": SocialMediaPostStatus.SCHEDULED,
+    }
+    response = logged_in_organizer_client.post(
+        url, data=json.dumps(payload), content_type="application/json"
+    )
+
+    assert response.status_code == 400
+    assert "Published posts cannot change status" in response.json()["error"]
+
+    with scope(organizer=organizer, event=event):
+        post.refresh_from_db()
+        assert post.status == SocialMediaPostStatus.PUBLISHED
+
+
+@pytest.mark.django_db
 def test_preview_posts_view(logged_in_organizer_client, organizer, event, settings):
     settings.SITE_URL = "https://testserver"
     url = reverse(

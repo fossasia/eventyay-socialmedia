@@ -46,14 +46,40 @@
     {{ form.socialmedia_ticket_custom_waves }}
     {{ form.socialmedia_schedule_custom_waves }}
 
-    <!-- 1. CFP Templates -->
-    <div class="adv-group template-group" data-type="cfp">
-      <div class="adv-group-title">
-        <i class="fa fa-bullhorn"></i> {% trans "Call for Proposals (CFP) Templates & Waves" %}
+    <!-- Template Accordion Global Controls -->
+    <div class="template-accordion-toolbar">
+      <span class="template-accordion-hint text-muted">
+        <i class="fa fa-folder-open-o"></i> {% trans "Click any section header below to expand or collapse its templates and milestone waves." %}
+      </span>
+      <div class="btn-group btn-group-sm">
+        <button type="button" class="btn btn-default" id="btn-expand-all-templates" title="{% trans 'Expand all sections' %}">
+          <i class="fa fa-angle-double-down"></i> {% trans "Expand All" %}
+        </button>
+        <button type="button" class="btn btn-default" id="btn-collapse-all-templates" title="{% trans 'Collapse all sections' %}">
+          <i class="fa fa-angle-double-up"></i> {% trans "Collapse All" %}
+        </button>
       </div>
-      <p class="adv-group-desc">
-        {% trans "Configure built-in waves, customize copy, or add extra custom waves for your CFP timeline." %}
-      </p>
+    </div>
+
+    <!-- 1. CFP Templates -->
+    <div class="sm-section-card template-group" data-type="cfp" id="template-group-cfp">
+      <div class="template-group-header" role="button" tabindex="0" aria-expanded="true" aria-controls="template-body-cfp">
+        <div class="template-header-left">
+          <div class="sm-section-title">
+            <i class="fa fa-bullhorn"></i> {% trans "Call for Proposals (CFP) Templates & Waves" %}
+          </div>
+          <p class="sm-section-desc">
+            {% trans "Configure built-in waves, customize copy, or add extra custom waves for your CFP timeline." %}
+          </p>
+        </div>
+        <div class="template-header-right">
+          <span class="template-toggle-indicator">
+            <span class="toggle-text">{% trans "Collapse" %}</span>
+            <i class="fa fa-chevron-down template-collapse-icon" aria-hidden="true"></i>
+          </span>
+        </div>
+      </div>
+      <div class="template-group-body" id="template-body-cfp">
 
       <!-- Wave 1: Announcement -->
       <div class="wave-card">
@@ -246,16 +272,28 @@
           <span class="token-chip" data-type="cfp">{hashtags}</span>
         </div>
       </div>
-    </div>
+      </div><!-- /template-group-body -->
+    </div><!-- /template-group -->
 
     <!-- 2. Speaker Templates -->
-    <div class="adv-group template-group" data-type="speaker">
-      <div class="adv-group-title">
-        <i class="fa fa-user"></i> {% trans "Speaker Templates & Waves" %}
+    <div class="sm-section-card template-group collapsed" data-type="speaker" id="template-group-speaker">
+      <div class="template-group-header" role="button" tabindex="0" aria-expanded="false" aria-controls="template-body-speaker">
+        <div class="template-header-left">
+          <div class="sm-section-title">
+            <i class="fa fa-user"></i> {% trans "Speaker Templates & Waves" %}
+          </div>
+          <p class="sm-section-desc">
+            {% trans "Configure speaker milestone waves or add extra custom waves." %}
+          </p>
+        </div>
+        <div class="template-header-right">
+          <span class="template-toggle-indicator">
+            <span class="toggle-text">{% trans "Expand" %}</span>
+            <i class="fa fa-chevron-down template-collapse-icon" aria-hidden="true"></i>
+          </span>
+        </div>
       </div>
-      <p class="adv-group-desc">
-        {% trans "Configure speaker milestone waves or add extra custom waves." %}
-      </p>
+      <div class="template-group-body" id="template-body-speaker">
 
       <!-- Wave 1: Announcement -->
       <div class="wave-card">
@@ -453,16 +491,28 @@
           <span class="token-chip" data-type="speaker">{hashtags}</span>
         </div>
       </div>
-    </div>
+      </div><!-- /template-group-body -->
+    </div><!-- /template-group -->
 
     <!-- 3. Session Templates -->
-    <div class="adv-group template-group" data-type="session">
-      <div class="adv-group-title">
-        <i class="fa fa-calendar"></i> {% trans "Session Templates & Waves" %}
+    <div class="sm-section-card template-group collapsed" data-type="session" id="template-group-session">
+      <div class="template-group-header" role="button" tabindex="0" aria-expanded="false" aria-controls="template-body-session">
+        <div class="template-header-left">
+          <div class="sm-section-title">
+            <i class="fa fa-calendar"></i> {% trans "Session Templates & Waves" %}
+          </div>
+          <p class="sm-section-desc">
+            {% trans "Configure session trigger timing and wave copy or add extra custom waves." %}
+          </p>
+        </div>
+        <div class="template-header-right">
+          <span class="template-toggle-indicator">
+            <span class="toggle-text">{% trans "Expand" %}</span>
+            <i class="fa fa-chevron-down template-collapse-icon" aria-hidden="true"></i>
+          </span>
+        </div>
       </div>
-      <p class="adv-group-desc">
-        {% trans "Configure session trigger timing and wave copy or add extra custom waves." %}
-      </p>
+      <div class="template-group-body" id="template-body-session">
 
       <!-- Wave 1: Day Before -->
       <div class="wave-card">
@@ -657,16 +707,28 @@
           <span class="token-chip" data-type="session">{hashtags}</span>
         </div>
       </div>
-    </div>
+      </div><!-- /template-group-body -->
+    </div><!-- /template-group -->
 
     <!-- 4. Ticket Templates -->
-    <div class="adv-group template-group" data-type="ticket">
-      <div class="adv-group-title">
-        <i class="fa fa-ticket"></i> {% trans "Ticket Templates & Waves" %}
+    <div class="sm-section-card template-group collapsed" data-type="ticket" id="template-group-ticket">
+      <div class="template-group-header" role="button" tabindex="0" aria-expanded="false" aria-controls="template-body-ticket">
+        <div class="template-header-left">
+          <div class="sm-section-title">
+            <i class="fa fa-ticket"></i> {% trans "Ticket Templates & Waves" %}
+          </div>
+          <p class="sm-section-desc">
+            {% trans "Configure ticket release milestone waves or add extra custom waves." %}
+          </p>
+        </div>
+        <div class="template-header-right">
+          <span class="template-toggle-indicator">
+            <span class="toggle-text">{% trans "Expand" %}</span>
+            <i class="fa fa-chevron-down template-collapse-icon" aria-hidden="true"></i>
+          </span>
+        </div>
       </div>
-      <p class="adv-group-desc">
-        {% trans "Configure ticket release milestone waves or add extra custom waves." %}
-      </p>
+      <div class="template-group-body" id="template-body-ticket">
 
       <!-- Wave 1: Announcement -->
       <div class="wave-card">
@@ -859,16 +921,28 @@
           <span class="token-chip" data-type="ticket">{hashtags}</span>
         </div>
       </div>
-    </div>
+      </div><!-- /template-group-body -->
+    </div><!-- /template-group -->
 
     <!-- 5. Schedule Templates -->
-    <div class="adv-group template-group" data-type="schedule">
-      <div class="adv-group-title">
-        <i class="fa fa-list-alt"></i> {% trans "Schedule Announcement Templates & Waves" %}
+    <div class="sm-section-card template-group collapsed" data-type="schedule" id="template-group-schedule">
+      <div class="template-group-header" role="button" tabindex="0" aria-expanded="false" aria-controls="template-body-schedule">
+        <div class="template-header-left">
+          <div class="sm-section-title">
+            <i class="fa fa-list-alt"></i> {% trans "Schedule Announcement Templates & Waves" %}
+          </div>
+          <p class="sm-section-desc">
+            {% trans "Configure schedule announcement waves or add extra custom waves." %}
+          </p>
+        </div>
+        <div class="template-header-right">
+          <span class="template-toggle-indicator">
+            <span class="toggle-text">{% trans "Expand" %}</span>
+            <i class="fa fa-chevron-down template-collapse-icon" aria-hidden="true"></i>
+          </span>
+        </div>
       </div>
-      <p class="adv-group-desc">
-        {% trans "Configure schedule announcement waves or add extra custom waves." %}
-      </p>
+      <div class="template-group-body" id="template-body-schedule">
 
       <!-- Wave 1: Announcement -->
       <div class="wave-card">
@@ -1035,7 +1109,8 @@
           <span class="token-chip" data-type="schedule">{hashtags}</span>
         </div>
       </div>
-    </div>
+      </div><!-- /template-group-body -->
+    </div><!-- /template-group -->
 
     <!-- Actions -->
     <div class="sm-preview-actions">

@@ -751,67 +751,98 @@ def update_post(request, organizer, event):
 
         post_type = data.get("post_type")
 
-        db_post = None
-        if db_id:
-            db_post = SocialMediaPost.objects.filter(
-                pk=db_id, event=request.event
-            ).first()
-        if not db_post and post_id:
-            lookup_filters = {"entity_id": str(post_id), "event": request.event}
-            if post_type:
-                lookup_filters["post_type"] = post_type
-            db_post = SocialMediaPost.objects.filter(**lookup_filters).first()
-
-        if not db_post:
-            return JsonResponse({"error": "Post not found"}, status=404)
-
-        if post_text is not None:
-            db_post.post_text = post_text
-        if status is not None:
-            if status not in SocialMediaPostStatus.values:
-                return JsonResponse({"error": "Invalid status"}, status=400)
-            db_post.status = status
-        if post_date and post_time:
-            tz = pytz.timezone(getattr(request.event, "timezone", None) or "UTC")
-            dt_str = f"{post_date} {post_time}"
-            naive_dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
-            new_scheduled_at = tz.localize(naive_dt)
-            db_post.scheduled_at = new_scheduled_at
-
-            # When the organizer moves a post to a future time, reset any terminal,
-            # draft, or failed status back to SCHEDULED so Celery Beat picks it up.
-            _reschedulable_statuses = (
-                SocialMediaPostStatus.DRAFT,
-                SocialMediaPostStatus.PUBLISHED,
-                SocialMediaPostStatus.EXPORTED,
-                SocialMediaPostStatus.FAILED,
-                SocialMediaPostStatus.EXCLUDED,
-            )
-            if (
-                new_scheduled_at > timezone.now()
-                and db_post.status in _reschedulable_statuses
-                and (status is None or status == SocialMediaPostStatus.SCHEDULED)
-            ):
-                db_post.status = SocialMediaPostStatus.SCHEDULED
-                db_post.error_message = ""
-                logger.info(
-                    "Post %s rescheduled to %s — status reset to SCHEDULED.",
-                    db_post.pk,
-                    new_scheduled_at,
+        with transaction.atomic():
+            db_post = None
+            if db_id:
+                db_post = (
+                    SocialMediaPost.objects.filter(pk=db_id, event=request.event)
+                    .select_for_update()
+                    .first()
                 )
-            elif (
-                new_scheduled_at <= timezone.now()
-                and db_post.status == SocialMediaPostStatus.SCHEDULED
-                and status is None
-            ):
-                db_post.status = SocialMediaPostStatus.DRAFT
+            if not db_post and post_id:
+                lookup_filters = {"entity_id": str(post_id), "event": request.event}
+                if post_type:
+                    lookup_filters["post_type"] = post_type
+                db_post = (
+                    SocialMediaPost.objects.filter(**lookup_filters)
+                    .select_for_update()
+                    .first()
+                )
 
-        if is_pinned is not None:
-            db_post.is_pinned = is_pinned
-        elif post_text is not None or (post_date and post_time):
-            # Auto-pin when the organizer explicitly edits text or reschedules a post
-            db_post.is_pinned = True
-        db_post.save()
+            if not db_post:
+                return JsonResponse({"error": "Post not found"}, status=404)
+
+            update_fields = ["updated_at"]
+            if post_text is not None:
+                db_post.post_text = post_text
+                update_fields.append("post_text")
+            if status is not None:
+                if status not in SocialMediaPostStatus.values:
+                    return JsonResponse({"error": "Invalid status"}, status=400)
+                if (
+                    db_post.status == SocialMediaPostStatus.PUBLISHED
+                    and status != SocialMediaPostStatus.PUBLISHED
+                ):
+                    return JsonResponse(
+                        {"error": str(_("Published posts cannot change status."))},
+                        status=400,
+                    )
+                db_post.status = status
+                update_fields.append("status")
+            if post_date and post_time:
+                if db_post.status == SocialMediaPostStatus.PUBLISHED:
+                    return JsonResponse(
+                        {"error": str(_("Published posts cannot be rescheduled."))},
+                        status=400,
+                    )
+                tz = pytz.timezone(getattr(request.event, "timezone", None) or "UTC")
+                dt_str = f"{post_date} {post_time}"
+                naive_dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
+                new_scheduled_at = tz.localize(naive_dt)
+                db_post.scheduled_at = new_scheduled_at
+                update_fields.append("scheduled_at")
+
+                # When the organizer moves a post to a future time, reset any terminal,
+                # draft, or failed status back to SCHEDULED so Celery Beat picks it up.
+                _reschedulable_statuses = (
+                    SocialMediaPostStatus.DRAFT,
+                    SocialMediaPostStatus.EXPORTED,
+                    SocialMediaPostStatus.FAILED,
+                    SocialMediaPostStatus.EXCLUDED,
+                )
+                if (
+                    new_scheduled_at > timezone.now()
+                    and db_post.status in _reschedulable_statuses
+                    and (status is None or status == SocialMediaPostStatus.SCHEDULED)
+                ):
+                    db_post.status = SocialMediaPostStatus.SCHEDULED
+                    db_post.error_message = ""
+                    if "status" not in update_fields:
+                        update_fields.append("status")
+                    if "error_message" not in update_fields:
+                        update_fields.append("error_message")
+                    logger.info(
+                        "Post %s rescheduled to %s — status reset to SCHEDULED.",
+                        db_post.pk,
+                        new_scheduled_at,
+                    )
+                elif (
+                    new_scheduled_at <= timezone.now()
+                    and db_post.status == SocialMediaPostStatus.SCHEDULED
+                    and status is None
+                ):
+                    db_post.status = SocialMediaPostStatus.DRAFT
+                    if "status" not in update_fields:
+                        update_fields.append("status")
+
+            if is_pinned is not None:
+                db_post.is_pinned = is_pinned
+                update_fields.append("is_pinned")
+            elif post_text is not None or (post_date and post_time):
+                # Auto-pin when the organizer explicitly edits text or reschedules a post
+                db_post.is_pinned = True
+                update_fields.append("is_pinned")
+            db_post.save(update_fields=list(set(update_fields)))
 
         # Return the authoritative post state so the frontend can update the UI
         tz_name = getattr(request.event, "timezone", None) or "UTC"

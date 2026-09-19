@@ -32,7 +32,7 @@
     {% bootstrap_form_errors form %}
 
     <!-- Platforms -->
-    <div class="adv-group">
+    <div class="sm-section-card">
       <div class="adv-group-title"><i class="fa fa-share-alt"></i> {% trans "Platforms" %}</div>
       <p class="adv-group-desc">
         {% trans "Enable the platforms you post to. Each enabled platform generates its own draft row in the preview table with a platform-specific default template. Leave all disabled to generate a single generic draft per content item." %}
@@ -86,7 +86,7 @@
     </div>
 
     <!-- Global -->
-    <div class="adv-group">
+    <div class="sm-section-card">
       <div class="adv-group-title"><i class="fa fa-globe"></i> {% trans "Global Configuration" %}</div>
       {% bootstrap_field form.socialmedia_event_link layout="horizontal" %}
       {% bootstrap_field form.socialmedia_default_hashtags layout="horizontal" %}
@@ -94,7 +94,7 @@
     </div>
 
     <!-- Timing & Schedule Offsets -->
-    <div class="adv-group">
+    <div class="sm-section-card">
       <div class="adv-group-title"><i class="fa fa-clock-o"></i> {% trans "Schedule Timing & Offsets" %}</div>
       <p class="adv-group-desc">
         {% trans "Configure when posts should be scheduled before event milestones. You can enter comma-separated numbers for multiple schedule waves." %}

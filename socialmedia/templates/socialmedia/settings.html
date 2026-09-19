@@ -159,7 +159,7 @@
         {% csrf_token %}
 
         <!-- Platforms -->
-        <div class="adv-group">
+        <div class="sm-section-card">
           <div class="adv-group-title"><i class="fa fa-share-alt"></i> {% trans "Platforms" %}</div>
           <p class="adv-group-desc">
             {% trans "Enable the platforms you post to. Each enabled platform generates its own draft row in the preview table with a platform-specific default template. Leave all disabled to generate a single generic draft per content item." %}
@@ -225,7 +225,7 @@
         </div>
 
         <!-- Global -->
-        <div class="adv-group">
+        <div class="sm-section-card">
           <div class="adv-group-title"><i class="fa fa-globe"></i> {% trans "Global" %}</div>
           {% bootstrap_field form.socialmedia_event_link layout="horizontal" %}
           {% bootstrap_field form.socialmedia_default_hashtags layout="horizontal" %}
@@ -233,7 +233,7 @@
         </div>
 
         <!-- CFP -->
-        <div class="adv-group">
+        <div class="sm-section-card">
           <div class="adv-group-title"><i class="fa fa-bullhorn"></i> {% trans "CFP" %}</div>
           {% bootstrap_field form.socialmedia_cfp_enabled layout="horizontal" %}
           {% bootstrap_field form.socialmedia_cfp_offset layout="horizontal" %}
@@ -273,7 +273,7 @@
         </div>
 
         <!-- Speaker -->
-        <div class="adv-group">
+        <div class="sm-section-card">
           <div class="adv-group-title"><i class="fa fa-user"></i> {% trans "Speaker" %}</div>
           {% bootstrap_field form.socialmedia_speaker_enabled layout="horizontal" %}
           {% bootstrap_field form.socialmedia_speaker_offset layout="horizontal" %}
@@ -321,7 +321,7 @@
         </div>
 
         <!-- Session -->
-        <div class="adv-group">
+        <div class="sm-section-card">
           <div class="adv-group-title"><i class="fa fa-calendar"></i> {% trans "Session" %}</div>
           {% bootstrap_field form.socialmedia_session_enabled layout="horizontal" %}
           {% bootstrap_field form.socialmedia_session_offset layout="horizontal" %}
@@ -364,7 +364,7 @@
         </div>
 
         <!-- Ticket -->
-        <div class="adv-group">
+        <div class="sm-section-card">
           <div class="adv-group-title"><i class="fa fa-ticket"></i> {% trans "Ticket" %}</div>
           {% bootstrap_field form.socialmedia_ticket_enabled layout="horizontal" %}
           {% bootstrap_field form.socialmedia_ticket_offset layout="horizontal" %}
@@ -405,7 +405,7 @@
         </div>
 
         <!-- Schedule -->
-        <div class="adv-group">
+        <div class="sm-section-card">
           <div class="adv-group-title"><i class="fa fa-list-alt"></i> {% trans "Schedule" %}</div>
           {% bootstrap_field form.socialmedia_schedule_enabled layout="horizontal" %}
           {% bootstrap_field form.socialmedia_schedule_offset layout="horizontal" %}
