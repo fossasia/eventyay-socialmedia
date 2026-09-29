@@ -857,7 +857,7 @@ class LinkedInAccountForm(forms.ModelForm):
                         raise forms.ValidationError(
                             _("LinkedIn token exchange failed: %(error)s"),
                             params={"error": resp.text[:200]},
-                        )
+                        ) from None
                     cleaned_data["access_token"] = token_data.get("access_token")
                 else:
                     try:

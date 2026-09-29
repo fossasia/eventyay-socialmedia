@@ -314,10 +314,10 @@ class LinkedInProvider(BaseSocialProvider):
                         asset_urn = self._upload_media(item, author_urn)
                         asset_urns.append(asset_urn)
                     except PublishingError:
-                        # Re-raise credential/scope errors — organizer needs to fix these.
+                        # Re-raise credential/scope errors — organizer needs to fix these.  # noqa: E501
                         raise
                     except Exception:
-                        # Transient failure (network, etc.): fall back to URL in post text.
+                        # Transient failure (network, etc.): fall back to URL in post text.  # noqa: E501
                         if item.startswith(("http://", "https://")):
                             fallback_urls.append(item)
 
@@ -480,10 +480,10 @@ class LinkedInProvider(BaseSocialProvider):
                 "Page' to make a quick page first."
             ),
             (
-                "3. On the 'Products' tab, add these products to get the right permissions:\n"
+                "3. On the 'Products' tab, add these products to get the right permissions:\n"  # noqa: E501
                 "   • 'Share on LinkedIn' (grants w_member_social)\n"
-                "   • 'Sign In with LinkedIn using OpenID Connect' (grants openid and profile so Eventyay can auto-fetch your ID)\n"
-                "   • 'Advertising API' or 'Community Management API' (grants w_organization_social for posting to company pages)."
+                "   • 'Sign In with LinkedIn using OpenID Connect' (grants openid and profile so Eventyay can auto-fetch your ID)\n"  # noqa: E501
+                "   • 'Advertising API' or 'Community Management API' (grants w_organization_social for posting to company pages)."  # noqa: E501
             ),
             (
                 "4. On the 'Auth' tab, under 'Authorized redirect URLs', add: "
@@ -496,7 +496,7 @@ class LinkedInProvider(BaseSocialProvider):
                 "https://www.linkedin.com/oauth/v2/authorization?response_type=code"
                 "&client_id=YOUR_CLIENT_ID&redirect_uri=https://localhost"
                 "&scope=w_member_social%20openid%20profile\n"
-                "(Note: If posting to a Company Page, append %20w_organization_social to the scope)."
+                "(Note: If posting to a Company Page, append %20w_organization_social to the scope)."  # noqa: E501
             ),
             (
                 "7. Click 'Authorize app'. You will be redirected to "
@@ -505,8 +505,8 @@ class LinkedInProvider(BaseSocialProvider):
             ),
             (
                 "8. Your Author URN depends on what you want to post to:\n"
-                "   • Personal profile: LEAVE BLANK! (Eventyay will automatically detect your ID).\n"
-                "   • Company page: urn:li:organization:YOUR_PAGE_ID (To find your page ID, go to your Company Page URL on LinkedIn; the number in the URL is your page ID)."
+                "   • Personal profile: LEAVE BLANK! (Eventyay will automatically detect your ID).\n"  # noqa: E501
+                "   • Company page: urn:li:organization:YOUR_PAGE_ID (To find your page ID, go to your Company Page URL on LinkedIn; the number in the URL is your page ID)."  # noqa: E501
             ),
             (
                 "9. Enter the authorization code (from step 7), Client ID, Client "

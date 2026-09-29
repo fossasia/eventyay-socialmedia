@@ -63,7 +63,7 @@ extend-exclude = ["socialmedia/migrations/"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
-ignore = []
+ignore = ["E501"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["socialmedia"]

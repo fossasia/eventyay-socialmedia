@@ -113,26 +113,42 @@ def _elapsed_ms(started):
     return int((time.monotonic() - started) * 1000)
 
 
-def logged_request(backend, method, url, **kwargs):
-    """Call the matching requests verb, then log status and duration.
+def _send_request(method, url, **kwargs):
+    """Call requests without changing mocks or redirect defaults.
 
-    Verb helpers keep redirect defaults and existing ``requests.get`` or
-    ``requests.post`` mocks. ``ok_statuses`` is not sent to the server; use it
-    when the caller already treats a 4xx response as success.
-    The same exception is re-raised. The URL and body are not logged.
+    A patched ``requests.get`` or ``requests.post`` wins. Otherwise a patched
+    ``requests.request`` wins. Unpatched calls use the verb helper.
+    """
+    import requests
+    import requests.api as requests_api
+
+    verb_name = str(method).lower()
+    if verb_name in _REQUEST_VERBS:
+        patched = getattr(requests, verb_name, None)
+        real = getattr(requests_api, verb_name, None)
+        if patched is not None and patched is not real:
+            return patched(url, **kwargs)  # codeql[py/full-ssrf]
+    if requests.request is not requests_api.request:
+        return requests.request(method, url, **kwargs)  # codeql[py/full-ssrf]
+    if verb_name in _REQUEST_VERBS:
+        real = getattr(requests_api, verb_name)
+        return real(url, **kwargs)  # codeql[py/full-ssrf]
+    return requests_api.request(method, url, **kwargs)  # codeql[py/full-ssrf]
+
+
+def logged_request(backend, method, url, **kwargs):
+    """Log status and duration for one HTTP call.
+
+    ``ok_statuses`` is not sent to the server. Use it when the caller already
+    treats a 4xx response as success. The same exception is re-raised.
+    The URL and body are not logged.
     """
     import requests
 
     ok_statuses = kwargs.pop("ok_statuses", ())
     started = time.monotonic()
-    verb_name = str(method).lower()
     try:
-        if verb_name in _REQUEST_VERBS:
-            # Plugin code supplies the URL. This wrapper does not build it.
-            call = getattr(requests, verb_name)
-            response = call(url, **kwargs)  # codeql[py/full-ssrf]
-        else:
-            response = requests.request(method, url, **kwargs)  # codeql[py/full-ssrf]
+        response = _send_request(method, url, **kwargs)
     except requests.Timeout:
         log_operation(
             "connection.request",

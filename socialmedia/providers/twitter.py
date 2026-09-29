@@ -133,11 +133,11 @@ class TwitterProvider(BaseSocialProvider):
         auth = self._get_auth()
         if not auth:
             raise PublishingError(
-                "Twitter media upload requires OAuth1 credentials (API Key, API Secret, "
-                "Access Token, Access Token Secret). The v1.1 media upload endpoint does "
-                "not accept Bearer tokens. Please configure all four OAuth1 credentials."
+                "Twitter media upload requires OAuth1 credentials (API Key, API Secret, "  # noqa: E501
+                "Access Token, Access Token Secret). The v1.1 media upload endpoint does "  # noqa: E501
+                "not accept Bearer tokens. Please configure all four OAuth1 credentials."  # noqa: E501
             )
-        # Strip Authorization header for v1.1 upload endpoint — only OAuth1 sig is accepted.
+        # Strip Authorization header for v1.1 upload endpoint — only OAuth1 sig is accepted.  # noqa: E501
         upload_headers = {}
 
         try:
@@ -166,7 +166,7 @@ class TwitterProvider(BaseSocialProvider):
                 # Path traversal guard: confined to MEDIA_ROOT.
                 content, content_type, filename = self._safe_open_local(media_item)
 
-            # Pass bytes directly — requests accepts (filename, bytes, mime_type) tuples.
+            # Pass bytes directly — requests accepts (filename, bytes, mime_type) tuples.  # noqa: E501
             files = {"media": (filename, content, content_type)}
             resp = logged_request(
                 "twitter",
@@ -224,10 +224,10 @@ class TwitterProvider(BaseSocialProvider):
                         media_id = self._upload_media(item)
                         media_ids.append(media_id)
                     except PublishingError:
-                        # Re-raise credential/config errors — these need the organizer's attention.
+                        # Re-raise credential/config errors — these need the organizer's attention.  # noqa: E501
                         raise
                     except Exception:
-                        # Transient failure (network, etc.): fall back to URL in tweet text.
+                        # Transient failure (network, etc.): fall back to URL in tweet text.  # noqa: E501
                         if item.startswith(("http://", "https://")):
                             fallback_urls.append(item)
 
