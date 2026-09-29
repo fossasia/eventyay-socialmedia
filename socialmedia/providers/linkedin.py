@@ -60,7 +60,9 @@ class LinkedInProvider(BaseSocialProvider):
         """
         headers = self._get_headers()
         try:
-            resp = logged_request("linkedin", "GET", self.ME_API_URL, headers=headers, timeout=15)
+            resp = logged_request(
+                "linkedin", "GET", self.ME_API_URL, headers=headers, timeout=15
+            )
             if resp.status_code == 200:
                 user_id = resp.json().get("id")
                 if user_id:
@@ -74,7 +76,9 @@ class LinkedInProvider(BaseSocialProvider):
             )
         except Exception:
             logger.debug(
-                "_resolve_person_urn: request failed for member_id=%s", member_id, exc_info=True
+                "_resolve_person_urn: request failed for member_id=%s",
+                member_id,
+                exc_info=True,
             )
         return None
 
@@ -104,7 +108,9 @@ class LinkedInProvider(BaseSocialProvider):
         headers = self._get_headers()
         # Try /v2/me first (returns numeric Person ID for ugcPosts API)
         try:
-            resp = logged_request("linkedin", "GET", self.ME_API_URL, headers=headers, timeout=15)
+            resp = logged_request(
+                "linkedin", "GET", self.ME_API_URL, headers=headers, timeout=15
+            )
             if resp.status_code == 200:
                 user_id = resp.json().get("id")
                 if user_id:
@@ -114,7 +120,9 @@ class LinkedInProvider(BaseSocialProvider):
 
         # Try /v2/userinfo (OpenID Connect)
         try:
-            resp = logged_request("linkedin", "GET", self.USERINFO_API_URL, headers=headers, timeout=15)
+            resp = logged_request(
+                "linkedin", "GET", self.USERINFO_API_URL, headers=headers, timeout=15
+            )
             if resp.status_code == 200:
                 sub = resp.json().get("sub")
                 if sub:
@@ -143,7 +151,9 @@ class LinkedInProvider(BaseSocialProvider):
         last_error = ""
         for url in profile_endpoints:
             try:
-                resp = logged_request("linkedin", "GET", url, headers=headers, timeout=15)
+                resp = logged_request(
+                    "linkedin", "GET", url, headers=headers, timeout=15
+                )
                 if resp.status_code == 200:
                     return True
                 last_error = f"HTTP {resp.status_code}: {resp.text[:200]}"
@@ -180,7 +190,10 @@ class LinkedInProvider(BaseSocialProvider):
         real_candidate = os.path.realpath(candidate)
         real_root = os.path.realpath(media_root)
 
-        if not real_candidate.startswith(real_root + os.sep) and real_candidate != real_root:
+        if (
+            not real_candidate.startswith(real_root + os.sep)
+            and real_candidate != real_root
+        ):
             raise PublishingError(
                 f"Access denied: {media_item!r} resolves outside MEDIA_ROOT."
             )
@@ -210,7 +223,9 @@ class LinkedInProvider(BaseSocialProvider):
         }
 
         try:
-            reg_resp = logged_request("linkedin", "POST", 
+            reg_resp = logged_request(
+                "linkedin",
+                "POST",
                 self.REGISTER_UPLOAD_API_URL,
                 json=register_payload,
                 headers=headers,
@@ -258,8 +273,13 @@ class LinkedInProvider(BaseSocialProvider):
                 "Authorization": headers["Authorization"],
                 "Content-Type": content_type,
             }
-            up_resp = logged_request("linkedin", "PUT", 
-                upload_url, data=content, headers=upload_headers, timeout=30
+            up_resp = logged_request(
+                "linkedin",
+                "PUT",
+                upload_url,
+                data=content,
+                headers=upload_headers,
+                timeout=30,
             )
             if up_resp.status_code in (200, 201):
                 return asset_urn
@@ -345,7 +365,9 @@ class LinkedInProvider(BaseSocialProvider):
         rest_err_msg = None
         try:
             # 1. Try Versioned REST Posts API
-            resp = logged_request("linkedin", "POST", 
+            resp = logged_request(
+                "linkedin",
+                "POST",
                 "https://api.linkedin.com/rest/posts",
                 json=rest_payload,
                 headers=rest_headers,
@@ -355,7 +377,9 @@ class LinkedInProvider(BaseSocialProvider):
                 # Fallback to previous minor version
                 fallback_headers = dict(rest_headers)
                 fallback_headers["LinkedIn-Version"] = "202503"
-                resp = logged_request("linkedin", "POST", 
+                resp = logged_request(
+                    "linkedin",
+                    "POST",
                     "https://api.linkedin.com/rest/posts",
                     json=rest_payload,
                     headers=fallback_headers,
@@ -381,8 +405,13 @@ class LinkedInProvider(BaseSocialProvider):
                 rest_err_msg = resp.text
 
             # 2. Fallback to legacy ugcPosts API
-            resp = logged_request("linkedin", "POST", 
-                self.UGC_POSTS_API_URL, json=payload, headers=headers, timeout=20
+            resp = logged_request(
+                "linkedin",
+                "POST",
+                self.UGC_POSTS_API_URL,
+                json=payload,
+                headers=headers,
+                timeout=20,
             )
             if resp.status_code in (200, 201):
                 data = resp.json()
@@ -485,6 +514,3 @@ class LinkedInProvider(BaseSocialProvider):
                 "The access token will be generated automatically."
             ),
         ]
-
-
-

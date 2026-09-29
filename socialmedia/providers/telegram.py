@@ -27,14 +27,19 @@ class TelegramProvider(BaseSocialProvider):
         if not self.token:
             return False
         try:
-            response = logged_request("telegram", "GET", 
-                f"{self.base_url}getMe", timeout=DEFAULT_REQUEST_TIMEOUT
+            response = logged_request(
+                "telegram",
+                "GET",
+                f"{self.base_url}getMe",
+                timeout=DEFAULT_REQUEST_TIMEOUT,
             )
             if response.status_code != 200 or not response.json().get("ok", False):
                 return False
 
             if self.chat_id:
-                response = logged_request("telegram", "GET", 
+                response = logged_request(
+                    "telegram",
+                    "GET",
                     f"{self.base_url}getChat",
                     params={"chat_id": self._resolve_chat_id()},
                     timeout=DEFAULT_REQUEST_TIMEOUT,
@@ -57,8 +62,8 @@ class TelegramProvider(BaseSocialProvider):
                 "chat_id": self._resolve_chat_id(),
                 "text": "✅ Connection successful from Eventyay!",
             }
-            response = logged_request("telegram", "POST", 
-                url, data=payload, timeout=DEFAULT_REQUEST_TIMEOUT
+            response = logged_request(
+                "telegram", "POST", url, data=payload, timeout=DEFAULT_REQUEST_TIMEOUT
             )
             if response.status_code == 200:
                 result = response.json()
@@ -102,8 +107,11 @@ class TelegramProvider(BaseSocialProvider):
 
     def _get_bot_info(self) -> str:
         try:
-            me_res = logged_request("telegram", "GET", 
-                f"{self.base_url}getMe", timeout=DEFAULT_REQUEST_TIMEOUT
+            me_res = logged_request(
+                "telegram",
+                "GET",
+                f"{self.base_url}getMe",
+                timeout=DEFAULT_REQUEST_TIMEOUT,
             )
             if me_res.status_code == 200:
                 me_data = me_res.json()
@@ -146,16 +154,28 @@ class TelegramProvider(BaseSocialProvider):
                 payload["caption"] = text
                 payload["parse_mode"] = "Markdown"
 
-                def _do_send_photo(current_payload: dict[str, Any]) -> requests.Response:
+                def _do_send_photo(
+                    current_payload: dict[str, Any],
+                ) -> requests.Response:
                     if is_url:
                         try:
-                            r = logged_request("telegram", "GET", media_item, timeout=MEDIA_UPLOAD_TIMEOUT)
+                            r = logged_request(
+                                "telegram",
+                                "GET",
+                                media_item,
+                                timeout=MEDIA_UPLOAD_TIMEOUT,
+                            )
                             r.raise_for_status()
                             content_type = r.headers.get("content-type", "image/jpeg")
                             ext = "png" if "png" in content_type else "jpg"
                             files = {"photo": (f"photo.{ext}", r.content, content_type)}
-                            return logged_request("telegram", "POST", 
-                                url, data=current_payload, files=files, timeout=MEDIA_UPLOAD_TIMEOUT
+                            return logged_request(
+                                "telegram",
+                                "POST",
+                                url,
+                                data=current_payload,
+                                files=files,
+                                timeout=MEDIA_UPLOAD_TIMEOUT,
                             )
                         except Exception as download_err:
                             logger.warning(
@@ -164,14 +184,23 @@ class TelegramProvider(BaseSocialProvider):
                             )
                             photo_payload = dict(current_payload)
                             photo_payload["photo"] = media_item
-                            return logged_request("telegram", "POST", 
-                                url, data=photo_payload, timeout=MEDIA_UPLOAD_TIMEOUT
+                            return logged_request(
+                                "telegram",
+                                "POST",
+                                url,
+                                data=photo_payload,
+                                timeout=MEDIA_UPLOAD_TIMEOUT,
                             )
                     else:
                         with open(media_item, "rb") as f:
                             files = {"photo": f}
-                            return logged_request("telegram", "POST", 
-                                url, data=current_payload, files=files, timeout=MEDIA_UPLOAD_TIMEOUT
+                            return logged_request(
+                                "telegram",
+                                "POST",
+                                url,
+                                data=current_payload,
+                                files=files,
+                                timeout=MEDIA_UPLOAD_TIMEOUT,
                             )
 
                 response = _do_send_photo(payload)
@@ -191,16 +220,24 @@ class TelegramProvider(BaseSocialProvider):
                         "parse_mode": "Markdown",
                     }
                 )
-                response = logged_request("telegram", "POST", 
-                    url, data=payload, timeout=DEFAULT_REQUEST_TIMEOUT
+                response = logged_request(
+                    "telegram",
+                    "POST",
+                    url,
+                    data=payload,
+                    timeout=DEFAULT_REQUEST_TIMEOUT,
                 )
                 if (
                     response.status_code != 200
                     and "can't parse entities" in response.text.lower()
                 ):
                     payload.pop("parse_mode", None)
-                    response = logged_request("telegram", "POST", 
-                        url, data=payload, timeout=DEFAULT_REQUEST_TIMEOUT
+                    response = logged_request(
+                        "telegram",
+                        "POST",
+                        url,
+                        data=payload,
+                        timeout=DEFAULT_REQUEST_TIMEOUT,
                     )
 
             if response.status_code != 200:

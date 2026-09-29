@@ -1,17 +1,10 @@
 """Privacy-safe operational logs for this plugin.
 
-Delegates to ``eventyay.base.operational_logging.log_event`` when the host
-provides it, so correlation IDs and the process-log allowlist stay shared.
-Older hosts fall back to the ``eventyay.plugins`` logger. Logging never
-raises into product code.
+Delegates to the host logger when it is importable. Otherwise uses
+``eventyay.plugins``. Logging never raises into product code.
 
 Emails, names, tokens, secrets, and request or response bodies are dropped.
 Only opaque IDs, status codes, durations, and safe error codes are kept.
-
-Sample lines::
-
-    INFO eventyay.plugins: connection.request component=plugins outcome=success action=connection.request backend=paypal status=201 duration_ms=84 payment_provider=paypal
-    WARNING eventyay.plugins: webhook.inbound component=plugins outcome=failure action=webhook.inbound backend=stripe error_code=signature_invalid status=400
 """
 
 from __future__ import annotations
@@ -48,6 +41,7 @@ _IDENTIFIER_FIELDS = frozenset(
         "order_code",
     }
 )
+_REQUEST_VERBS = frozenset({"get", "post", "put", "patch", "delete", "head", "options"})
 
 
 def _safe_identifier(value):
@@ -68,8 +62,6 @@ def _clean(fields):
             continue
         if key in _IDENTIFIER_FIELDS:
             cleaned = _safe_identifier(value if isinstance(value, str) else None)
-            if cleaned is None and isinstance(value, str):
-                continue
             if cleaned is not None:
                 extra[key] = cleaned
             continue
@@ -87,25 +79,27 @@ def _clean(fields):
 
 def log_operation(action, outcome, **fields):
     """Emit one allowlisted operational line. Failures are swallowed."""
-    if not isinstance(action, str) or _safe_identifier(action) is None:
-        return
-    if outcome not in (OUTCOME_SUCCESS, OUTCOME_FAILURE):
-        outcome = OUTCOME_FAILURE
-    level = logging.WARNING if outcome == OUTCOME_FAILURE else logging.INFO
-    payload = _clean(fields)
-    emitter = None
     try:
-        from eventyay.base.operational_logging import log_event as emitter
-    except ImportError:
+        if not isinstance(action, str) or _safe_identifier(action) is None:
+            return
+        if outcome not in (OUTCOME_SUCCESS, OUTCOME_FAILURE):
+            outcome = OUTCOME_FAILURE
+        level = logging.WARNING if outcome == OUTCOME_FAILURE else logging.INFO
+        payload = _clean(fields)
         emitter = None
-    if emitter is not None:
         try:
+            from eventyay.base.operational_logging import log_event as emitter
+        except Exception:
+            emitter = None
+        if emitter is not None:
             emitter("plugins", action, outcome, level=level, **payload)
             return
-        except Exception:
-            return
-    extra = {"component": "plugins", "outcome": outcome, "action": action, **payload}
-    try:
+        extra = {
+            "component": "plugins",
+            "outcome": outcome,
+            "action": action,
+            **payload,
+        }
         _LOGGER.log(level, action, extra=extra)
     except Exception:
         return
@@ -120,12 +114,25 @@ def _elapsed_ms(started):
 
 
 def logged_request(backend, method, url, **kwargs):
-    """``requests.request`` plus status and duration. Same exceptions, no URL or body."""
+    """Call the matching requests verb, then log status and duration.
+
+    Verb helpers keep redirect defaults and existing ``requests.get`` or
+    ``requests.post`` mocks. ``ok_statuses`` is not sent to the server; use it
+    when the caller already treats a 4xx response as success.
+    The same exception is re-raised. The URL and body are not logged.
+    """
     import requests
 
+    ok_statuses = kwargs.pop("ok_statuses", ())
     started = time.monotonic()
+    verb_name = str(method).lower()
     try:
-        response = requests.request(method, url, **kwargs)
+        if verb_name in _REQUEST_VERBS:
+            # Plugin code supplies the URL. This wrapper does not build it.
+            call = getattr(requests, verb_name)
+            response = call(url, **kwargs)  # codeql[py/full-ssrf]
+        else:
+            response = requests.request(method, url, **kwargs)  # codeql[py/full-ssrf]
     except requests.Timeout:
         log_operation(
             "connection.request",
@@ -145,14 +152,14 @@ def logged_request(backend, method, url, **kwargs):
         )
         raise
     status = getattr(response, "status_code", None)
-    failed = isinstance(status, int) and not isinstance(status, bool) and status >= 400
+    status_ok = isinstance(status, int) and not isinstance(status, bool)
+    tolerated = status_ok and status in set(ok_statuses)
+    failed = status_ok and status >= 400 and not tolerated
     log_operation(
         "connection.request",
         OUTCOME_FAILURE if failed else OUTCOME_SUCCESS,
         backend=backend,
-        status=status
-        if isinstance(status, int) and not isinstance(status, bool)
-        else None,
+        status=status if status_ok else None,
         duration_ms=_elapsed_ms(started),
         error_code="http_error" if failed else None,
     )
@@ -160,7 +167,7 @@ def logged_request(backend, method, url, **kwargs):
 
 
 def traced_job(job_name):
-    """Log job start, finish, retry, and fail without changing the return or exception."""
+    """Log job boundaries without changing the return value or exception."""
 
     def decorator(fn):
         @functools.wraps(fn)

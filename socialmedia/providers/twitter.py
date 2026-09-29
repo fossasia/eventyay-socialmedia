@@ -62,8 +62,13 @@ class TwitterProvider(BaseSocialProvider):
             )
 
         try:
-            resp = logged_request("twitter", "GET", 
-                self.VERIFY_API_URL, auth=auth, headers=headers, timeout=15
+            resp = logged_request(
+                "twitter",
+                "GET",
+                self.VERIFY_API_URL,
+                auth=auth,
+                headers=headers,
+                timeout=15,
             )
             if resp.status_code == 200:
                 return True
@@ -101,7 +106,10 @@ class TwitterProvider(BaseSocialProvider):
         real_candidate = os.path.realpath(candidate)
         real_root = os.path.realpath(media_root)
 
-        if not real_candidate.startswith(real_root + os.sep) and real_candidate != real_root:
+        if (
+            not real_candidate.startswith(real_root + os.sep)
+            and real_candidate != real_root
+        ):
             raise PublishingError(
                 f"Access denied: {media_item!r} resolves outside MEDIA_ROOT."
             )
@@ -160,7 +168,9 @@ class TwitterProvider(BaseSocialProvider):
 
             # Pass bytes directly — requests accepts (filename, bytes, mime_type) tuples.
             files = {"media": (filename, content, content_type)}
-            resp = logged_request("twitter", "POST", 
+            resp = logged_request(
+                "twitter",
+                "POST",
                 self.MEDIA_UPLOAD_URL,
                 files=files,
                 auth=auth,
@@ -230,7 +240,9 @@ class TwitterProvider(BaseSocialProvider):
             payload["media"] = {"media_ids": media_ids}
 
         try:
-            resp = logged_request("twitter", "POST", 
+            resp = logged_request(
+                "twitter",
+                "POST",
                 self.TWEET_API_URL,
                 json=payload,
                 auth=auth,
