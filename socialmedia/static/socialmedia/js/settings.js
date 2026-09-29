@@ -25,6 +25,7 @@
       TRANS_UNDO: config.transUndo || "Undo",
       TRANS_DISCONNECTED: config.transDisconnected || "Account Disconnected",
       TRANS_MISSING: config.transMissing || "No Account Connected",
+      HAS_FORM_ERRORS: config.hasFormErrors || false,
     };
   })();
 
@@ -1217,9 +1218,9 @@
         alertDiv.appendChild(document.createTextNode(parts.join(", ") + ". Review highlighted rows before exporting."));
         alertContainer.textContent = "";
         alertContainer.appendChild(alertDiv);
-        alertContainer.classList.remove("hidden");
+        alertContainer.classList.remove("sm-hidden");
       } else {
-        alertContainer.classList.add("hidden");
+        alertContainer.classList.add("sm-hidden");
         alertContainer.textContent = "";
       }
     },
@@ -1366,8 +1367,24 @@
       this.bindEvents();
       initHelperUIs();
       initTemplatesPage();
+      this.initFormErrors();
       if (Config.PREVIEW_URL) {
         this.loadInitialData();
+      }
+    },
+
+    initFormErrors() {
+      if (!Config.HAS_FORM_ERRORS) return;
+
+      const advBody = document.getElementById("adv-body");
+      const advToggle = document.getElementById("adv-toggle");
+      const errBanner = document.getElementById("sm-form-errors");
+      if (advBody) {
+        advBody.classList.add("open");
+        if (advToggle) advToggle.classList.add("open");
+      }
+      if (errBanner) {
+        errBanner.scrollIntoView({ behavior: "smooth", block: "start" });
       }
     },
 
@@ -1800,7 +1817,7 @@
       const customInputs = document.getElementById("bulk-schedule-custom-inputs");
       if (presetSel && customInputs) {
         presetSel.addEventListener("change", function () {
-          customInputs.style.display = this.value === "custom" ? "inline-flex" : "none";
+          customInputs.classList.toggle("sm-hidden", this.value !== "custom");
         });
       }
 
@@ -2174,7 +2191,7 @@
       if (!checkbox || !tplBlock) return;
 
       const syncVisibility = () => {
-        tplBlock.classList.toggle("hidden", !checkbox.checked);
+        tplBlock.classList.toggle("sm-hidden", !checkbox.checked);
       };
       syncVisibility();
       checkbox.addEventListener("change", syncVisibility);
@@ -2383,11 +2400,11 @@
             <div class="wave-toggle-wrap">
               <input type="checkbox" class="custom-wave-enable" checked>
               <span class="wave-badge wave-custom-badge"><i class="fa fa-sparkles"></i> Custom Wave:</span>
-              <input type="text" class="form-control input-sm custom-wave-label" maxlength="50" value="Custom Wave" placeholder="e.g. Early Call" style="width: 150px; display: inline-block; height: 26px; padding: 2px 6px;">
+              <input type="text" class="form-control input-sm custom-wave-label sm-wave-label-input" maxlength="50" value="Custom Wave" placeholder="e.g. Early Call">
             </div>
             <div class="wave-offset-wrap">
-              <span class="wave-offset-label">${unitLabel}</span>
-              <input type="number" class="form-control input-sm custom-wave-offset" value="15" style="width: 70px; height: 28px; text-align: center;">
+              <span class="wave-offset-label"></span>
+              <input type="number" class="form-control input-sm custom-wave-offset sm-wave-offset-input" value="15">
               <button type="button" class="btn btn-danger btn-xs btn-remove-wave" title="Remove this wave">
                 <i class="fa fa-trash"></i>
               </button>
@@ -2400,6 +2417,10 @@
             </div>
           </div>
         `;
+        const offsetLabel = newCard.querySelector(".wave-offset-label");
+        if (offsetLabel) {
+          offsetLabel.textContent = unitLabel;
+        }
         container.appendChild(newCard);
         serializeCustomWaves(type);
       });

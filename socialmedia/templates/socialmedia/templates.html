@@ -162,11 +162,11 @@
               <div class="wave-toggle-wrap">
                 <input type="checkbox" class="custom-wave-enable" {% if cw.enabled %}checked{% endif %}>
                 <span class="wave-badge wave-custom-badge"><i class="fa fa-sparkles"></i> {% trans "Custom Wave:" %}</span>
-                <input type="text" class="form-control input-sm custom-wave-label" maxlength="50" value="{{ cw.label }}" placeholder="{% trans 'e.g. Early Call' %}" style="width: 150px; display: inline-block; height: 26px; padding: 2px 6px;">
+                <input type="text" class="form-control input-sm custom-wave-label sm-wave-label-input" maxlength="50" value="{{ cw.label }}" placeholder="{% trans 'e.g. Early Call' %}">
               </div>
               <div class="wave-offset-wrap">
                 <span class="wave-offset-label">{% trans "Days before deadline:" %}</span>
-                <input type="number" class="form-control input-sm custom-wave-offset" value="{{ cw.offset }}" style="width: 70px; height: 28px; text-align: center;">
+                <input type="number" class="form-control input-sm custom-wave-offset sm-wave-offset-input" value="{{ cw.offset }}">
                 <button type="button" class="btn btn-danger btn-xs btn-remove-wave" title="{% trans 'Remove this wave' %}">
                   <i class="fa fa-trash"></i>
                 </button>
@@ -181,7 +181,7 @@
           </div>
           {% endfor %}
         </div>
-        <div class="custom-waves-actions" style="margin-bottom: 12px;">
+        <div class="custom-waves-actions">
           <button type="button" class="btn btn-default btn-sm btn-add-custom-wave" data-type="cfp" data-unit="{% trans 'Days before deadline:' %}">
             <i class="fa fa-plus text-success"></i> {% trans "Add Custom Wave" %}
           </button>
@@ -376,11 +376,11 @@
               <div class="wave-toggle-wrap">
                 <input type="checkbox" class="custom-wave-enable" {% if cw.enabled %}checked{% endif %}>
                 <span class="wave-badge wave-custom-badge"><i class="fa fa-sparkles"></i> {% trans "Custom Wave:" %}</span>
-                <input type="text" class="form-control input-sm custom-wave-label" maxlength="50" value="{{ cw.label }}" placeholder="{% trans 'e.g. Keynote Spotlight' %}" style="width: 150px; display: inline-block; height: 26px; padding: 2px 6px;">
+                <input type="text" class="form-control input-sm custom-wave-label sm-wave-label-input" maxlength="50" value="{{ cw.label }}" placeholder="{% trans 'e.g. Keynote Spotlight' %}">
               </div>
               <div class="wave-offset-wrap">
                 <span class="wave-offset-label">{% trans "Days before session:" %}</span>
-                <input type="number" class="form-control input-sm custom-wave-offset" value="{{ cw.offset }}" style="width: 70px; height: 28px; text-align: center;">
+                <input type="number" class="form-control input-sm custom-wave-offset sm-wave-offset-input" value="{{ cw.offset }}">
                 <button type="button" class="btn btn-danger btn-xs btn-remove-wave" title="{% trans 'Remove this wave' %}">
                   <i class="fa fa-trash"></i>
                 </button>
@@ -395,7 +395,7 @@
           </div>
           {% endfor %}
         </div>
-        <div class="custom-waves-actions" style="margin-bottom: 12px;">
+        <div class="custom-waves-actions">
           <button type="button" class="btn btn-default btn-sm btn-add-custom-wave" data-type="speaker" data-unit="{% trans 'Days before session:' %}">
             <i class="fa fa-plus text-success"></i> {% trans "Add Custom Wave" %}
           </button>
@@ -595,11 +595,11 @@
               <div class="wave-toggle-wrap">
                 <input type="checkbox" class="custom-wave-enable" {% if cw.enabled %}checked{% endif %}>
                 <span class="wave-badge wave-custom-badge"><i class="fa fa-sparkles"></i> {% trans "Custom Wave:" %}</span>
-                <input type="text" class="form-control input-sm custom-wave-label" maxlength="50" value="{{ cw.label }}" placeholder="{% trans 'e.g. 5 Min Warning' %}" style="width: 150px; display: inline-block; height: 26px; padding: 2px 6px;">
+                <input type="text" class="form-control input-sm custom-wave-label sm-wave-label-input" maxlength="50" value="{{ cw.label }}" placeholder="{% trans 'e.g. 5 Min Warning' %}">
               </div>
               <div class="wave-offset-wrap">
                 <span class="wave-offset-label">{% trans "Minutes before session:" %}</span>
-                <input type="number" class="form-control input-sm custom-wave-offset" value="{{ cw.offset }}" style="width: 70px; height: 28px; text-align: center;">
+                <input type="number" class="form-control input-sm custom-wave-offset sm-wave-offset-input" value="{{ cw.offset }}">
                 <button type="button" class="btn btn-danger btn-xs btn-remove-wave" title="{% trans 'Remove this wave' %}">
                   <i class="fa fa-trash"></i>
                 </button>
@@ -614,7 +614,7 @@
           </div>
           {% endfor %}
         </div>
-        <div class="custom-waves-actions" style="margin-bottom: 12px;">
+        <div class="custom-waves-actions">
           <button type="button" class="btn btn-default btn-sm btn-add-custom-wave" data-type="session" data-unit="{% trans 'Minutes before session:' %}">
             <i class="fa fa-plus text-success"></i> {% trans "Add Custom Wave" %}
           </button>
@@ -811,11 +811,11 @@
               <div class="wave-toggle-wrap">
                 <input type="checkbox" class="custom-wave-enable" {% if cw.enabled %}checked{% endif %}>
                 <span class="wave-badge wave-custom-badge"><i class="fa fa-sparkles"></i> {% trans "Custom Wave:" %}</span>
-                <input type="text" class="form-control input-sm custom-wave-label" maxlength="50" value="{{ cw.label }}" placeholder="{% trans 'e.g. Early Bird' %}" style="width: 150px; display: inline-block; height: 26px; padding: 2px 6px;">
+                <input type="text" class="form-control input-sm custom-wave-label sm-wave-label-input" maxlength="50" value="{{ cw.label }}" placeholder="{% trans 'e.g. Early Bird' %}">
               </div>
               <div class="wave-offset-wrap">
                 <span class="wave-offset-label">{% trans "Days before event:" %}</span>
-                <input type="number" class="form-control input-sm custom-wave-offset" value="{{ cw.offset }}" style="width: 70px; height: 28px; text-align: center;">
+                <input type="number" class="form-control input-sm custom-wave-offset sm-wave-offset-input" value="{{ cw.offset }}">
                 <button type="button" class="btn btn-danger btn-xs btn-remove-wave" title="{% trans 'Remove this wave' %}">
                   <i class="fa fa-trash"></i>
                 </button>
@@ -830,7 +830,7 @@
           </div>
           {% endfor %}
         </div>
-        <div class="custom-waves-actions" style="margin-bottom: 12px;">
+        <div class="custom-waves-actions">
           <button type="button" class="btn btn-default btn-sm btn-add-custom-wave" data-type="ticket" data-unit="{% trans 'Days before event:' %}">
             <i class="fa fa-plus text-success"></i> {% trans "Add Custom Wave" %}
           </button>
@@ -1001,11 +1001,11 @@
               <div class="wave-toggle-wrap">
                 <input type="checkbox" class="custom-wave-enable" {% if cw.enabled %}checked{% endif %}>
                 <span class="wave-badge wave-custom-badge"><i class="fa fa-sparkles"></i> {% trans "Custom Wave:" %}</span>
-                <input type="text" class="form-control input-sm custom-wave-label" maxlength="50" value="{{ cw.label }}" placeholder="{% trans 'e.g. Schedule Sneak Peek' %}" style="width: 150px; display: inline-block; height: 26px; padding: 2px 6px;">
+                <input type="text" class="form-control input-sm custom-wave-label sm-wave-label-input" maxlength="50" value="{{ cw.label }}" placeholder="{% trans 'e.g. Schedule Sneak Peek' %}">
               </div>
               <div class="wave-offset-wrap">
                 <span class="wave-offset-label">{% trans "Days before event:" %}</span>
-                <input type="number" class="form-control input-sm custom-wave-offset" value="{{ cw.offset }}" style="width: 70px; height: 28px; text-align: center;">
+                <input type="number" class="form-control input-sm custom-wave-offset sm-wave-offset-input" value="{{ cw.offset }}">
                 <button type="button" class="btn btn-danger btn-xs btn-remove-wave" title="{% trans 'Remove this wave' %}">
                   <i class="fa fa-trash"></i>
                 </button>
@@ -1020,7 +1020,7 @@
           </div>
           {% endfor %}
         </div>
-        <div class="custom-waves-actions" style="margin-bottom: 12px;">
+        <div class="custom-waves-actions">
           <button type="button" class="btn btn-default btn-sm btn-add-custom-wave" data-type="schedule" data-unit="{% trans 'Days before event:' %}">
             <i class="fa fa-plus text-success"></i> {% trans "Add Custom Wave" %}
           </button>
@@ -1135,7 +1135,7 @@
         </h4>
       </div>
       <div class="modal-body">
-        <p class="text-muted" style="margin-bottom: 20px;">
+        <p class="text-muted sm-intro-text">
           {% trans "Welcome to Eventyay Social Media! Follow this simple 4-step journey to automate and schedule posts for your event." %}
         </p>
 

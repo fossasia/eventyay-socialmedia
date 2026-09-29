@@ -29,7 +29,7 @@
       <p class="text-muted">
         {% trans "Posts have not been generated for this event yet. You can review or customize post templates before generating posts." %}
       </p>
-      <div style="margin-top: 15px;">
+      <div class="sm-empty-action">
         <a href="{{ templates_url }}" class="btn btn-primary">
           <i class="fa fa-file-text-o"></i> {% trans "Go to Templates" %}
         </a>
@@ -135,8 +135,8 @@
         </tr>
         {% empty %}
         <tr>
-          <td colspan="7" class="text-center text-muted" style="padding: 40px;">
-            <i class="fa fa-inbox fa-2x" style="display:block;margin-bottom:8px;opacity:0.4;"></i>
+          <td colspan="7" class="text-center text-muted sm-empty-cell">
+            <i class="fa fa-inbox fa-2x sm-empty-icon"></i>
             {% trans "No posts found for this filter." %}
           </td>
         </tr>
@@ -147,7 +147,7 @@
 
   <!-- Pagination -->
   {% if posts.has_other_pages %}
-  <div style="text-align:center; margin-top: 20px;">
+  <div class="sm-pagination">
     <ul class="pagination">
       {% if posts.has_previous %}
         <li><a href="?page={{ posts.previous_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}">&laquo;</a></li>

@@ -15,7 +15,7 @@
 
   {# Form errors shown at the top so they're always visible — not buried inside the accordion #}
   {% if form.errors %}
-  <div id="sm-form-errors" class="alert alert-danger" style="margin-bottom:16px;">
+  <div id="sm-form-errors" class="alert alert-danger sm-form-errors">
     <strong><i class="fa fa-exclamation-triangle"></i> {% trans "Please fix the errors below before saving." %}</strong>
     {% bootstrap_form_errors form %}
   </div>
@@ -78,7 +78,7 @@
         <option value="-30">{% trans "1 month before (30 days)" %}</option>
         <option value="custom">{% trans "Custom..." %}</option>
       </select>
-      <div id="bulk-schedule-custom-inputs" class="bulk-schedule-custom-inputs hidden">
+      <div id="bulk-schedule-custom-inputs" class="bulk-schedule-custom-inputs sm-hidden">
         <input type="date" id="bulk-schedule-custom-date" class="form-control input-sm">
         <input type="time" id="bulk-schedule-custom-time" class="form-control input-sm" value="09:00">
       </div>
@@ -461,27 +461,11 @@
     "exportUrl": "{{ export_url }}",
     "updateUrl": "{{ update_url }}",
     "publishNowUrl": "{% url 'plugins:socialmedia:publish_now' organizer=event.organizer.slug event=event.slug %}",
+    "hasFormErrors": {% if form.errors %}true{% else %}false{% endif %},
     "csrfToken": "{{ csrf_token }}",
     "transSelectAtLeastOne": "{% trans 'Please select at least one post to export.' %}",
     "transClickToEdit": "{% trans 'Click to edit · Ctrl+Enter to save' %}"
   }
 </script>
 <script src="{% static 'socialmedia/js/settings.js' %}"></script>
-{% if form.errors %}
-<script>
-  // Auto-expand the Advanced Settings accordion and scroll to the error banner.
-  document.addEventListener("DOMContentLoaded", function () {
-    var advBody = document.getElementById("adv-body");
-    var advToggle = document.getElementById("adv-toggle");
-    var errBanner = document.getElementById("sm-form-errors");
-    if (advBody) {
-      advBody.style.display = "block";
-      if (advToggle) advToggle.classList.add("open");
-    }
-    if (errBanner) {
-      errBanner.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  });
-</script>
-{% endif %}
 {% endblock %}
