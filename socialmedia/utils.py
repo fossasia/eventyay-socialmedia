@@ -7,6 +7,8 @@ from urllib.parse import urlparse
 
 import requests
 
+from socialmedia.operational_log import logged_request
+
 from .providers.base import PublishingError
 
 logger = logging.getLogger(__name__)
@@ -16,6 +18,7 @@ def _is_debug() -> bool:
     """Return True if Django DEBUG mode is active."""
     try:
         from django.conf import settings
+
         return bool(getattr(settings, "DEBUG", False))
     except Exception:
         return False
@@ -45,13 +48,18 @@ def _try_local_media_fallback(url: str) -> tuple[bytes, str] | None:
     if not path.startswith(media_url):
         return None
 
-    rel = path[len(media_url):]  # e.g. avatars/foo.jpg
+    rel = path[len(media_url) :]  # e.g. avatars/foo.jpg
     candidate = os.path.join(media_root, rel)
     real_candidate = os.path.realpath(candidate)
     real_root = os.path.realpath(media_root)
 
-    if not real_candidate.startswith(real_root + os.sep) and real_candidate != real_root:
-        logger.warning("_try_local_media_fallback: %r escapes MEDIA_ROOT, skipping.", url)
+    if (
+        not real_candidate.startswith(real_root + os.sep)
+        and real_candidate != real_root
+    ):
+        logger.warning(
+            "_try_local_media_fallback: %r escapes MEDIA_ROOT, skipping.", url
+        )
         return None
 
     if not os.path.isfile(real_candidate):
@@ -63,7 +71,9 @@ def _try_local_media_fallback(url: str) -> tuple[bytes, str] | None:
         with open(real_candidate, "rb") as f:
             content = f.read()
     except OSError as exc:
-        logger.debug("_try_local_media_fallback: cannot read %r: %s", real_candidate, exc)
+        logger.debug(
+            "_try_local_media_fallback: cannot read %r: %s", real_candidate, exc
+        )
         return None
 
     logger.debug(
@@ -171,5 +181,4 @@ def safe_fetch_url(url: str, timeout: int = 20) -> requests.Response:
     hostname = urlparse(url).hostname
 
     with DNSResolverContext(hostname, safe_ip):
-        return requests.get(url, timeout=timeout)
-
+        return logged_request("socialmedia", "GET", url, timeout=timeout)

@@ -217,7 +217,9 @@ def test_publish_scheduled_posts_auto_publishes_unpinned_posts_when_enabled(
         return_value={"post_id": "123", "url": "https://t.me/123"},
     ) as mock_publish:
         publish_scheduled_posts(sender=None)
-        mock_publish.assert_called_once_with(text="Unpinned auto published post", media=None)
+        mock_publish.assert_called_once_with(
+            text="Unpinned auto published post", media=None
+        )
 
     with scope(organizer=organizer, event=event):
         post.refresh_from_db()

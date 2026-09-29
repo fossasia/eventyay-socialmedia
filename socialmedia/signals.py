@@ -167,7 +167,7 @@ def claim_post_for_publishing(post_pk: int, provider_name: str):
         )
         if not locked_post:
             logger.info(
-                "Post %s could not be locked for publishing (already claimed, running, or not in SCHEDULED/FAILED state).",
+                "Post %s could not be locked for publishing (already claimed, running, or not in SCHEDULED/FAILED state).",  # noqa: E501
                 post_pk,
             )
             return None, None
@@ -185,7 +185,7 @@ def claim_post_for_publishing(post_pk: int, provider_name: str):
             )
             locked_post.save(update_fields=["status", "error_message", "updated_at"])
             logger.warning(
-                "Post %s marked as FAILED: No active %s account found for organizer '%s'.",
+                "Post %s marked as FAILED: No active %s account found for organizer '%s'.",  # noqa: E501
                 post_pk,
                 provider_name,
                 locked_post.event.organizer.slug,
@@ -234,7 +234,7 @@ def publish_scheduled_posts(sender, **kwargs):
         )
         if not auto_publish and not post.is_pinned:
             logger.info(
-                "Skipping post %s (event '%s'): socialmedia_auto_publish is False and post is unpinned.",
+                "Skipping post %s (event '%s'): socialmedia_auto_publish is False and post is unpinned.",  # noqa: E501
                 post.pk,
                 post.event.slug,
             )
@@ -243,7 +243,7 @@ def publish_scheduled_posts(sender, **kwargs):
         entity_id = post.entity_id or ""
         if any(entity_id.endswith(f"_{prov}") for prov in LEGACY_SCHEDULER_PROVIDERS):
             logger.debug(
-                "Skipping post %s (entity '%s'): belongs to legacy external scheduler provider.",
+                "Skipping post %s (entity '%s'): belongs to legacy external scheduler provider.",  # noqa: E501
                 post.pk,
                 entity_id,
             )
@@ -270,7 +270,7 @@ def publish_scheduled_posts(sender, **kwargs):
 
         if not provider_names:
             logger.warning(
-                "Post %s (event '%s', scheduled for %s) has no active direct providers configured.",
+                "Post %s (event '%s', scheduled for %s) has no active direct providers configured.",  # noqa: E501
                 post.pk,
                 post.event.slug,
                 post.scheduled_at,
@@ -282,7 +282,7 @@ def publish_scheduled_posts(sender, **kwargs):
                 settings, "CELERY_ALWAYS_EAGER", False
             )
             logger.info(
-                "Dispatching publish_single_post for post %s to provider %s (eager=%s).",
+                "Dispatching publish_single_post for post %s to provider %s (eager=%s).",  # noqa: E501
                 post.pk,
                 provider_name,
                 is_eager,

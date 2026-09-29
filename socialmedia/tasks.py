@@ -3,6 +3,7 @@ import logging
 from eventyay.celery_app import app
 
 from .models import SocialMediaPostStatus
+from .operational_log import OUTCOME_FAILURE, OUTCOME_SUCCESS, log_operation
 from .providers.registry import get_provider
 from .signals import claim_post_for_publishing
 
@@ -43,6 +44,9 @@ def publish_single_post(post_pk: int, provider_name: str):
         claimed_post.status = SocialMediaPostStatus.PUBLISHED
         claimed_post.error_message = ""
         claimed_post.save(update_fields=["status", "error_message", "updated_at"])
+        log_operation(
+            "social.post", OUTCOME_SUCCESS, backend=provider_name, object_id=post_pk
+        )
         logger.info(
             "Successfully published post %s to %s (status -> PUBLISHED).",
             post_pk,
@@ -55,6 +59,13 @@ def publish_single_post(post_pk: int, provider_name: str):
             provider_name,
             e,
             exc_info=True,
+        )
+        log_operation(
+            "social.post",
+            OUTCOME_FAILURE,
+            backend=provider_name,
+            object_id=post_pk,
+            error_code="publish_failed",
         )
         claimed_post.status = SocialMediaPostStatus.FAILED
         claimed_post.error_message = str(e)

@@ -5,7 +5,14 @@ from typing import Any
 
 import requests
 
-from .base import BaseSocialProvider, PublishingError, _safe_fetch_url, _try_local_media_fallback
+from socialmedia.operational_log import logged_request
+
+from .base import (
+    BaseSocialProvider,
+    PublishingError,
+    _safe_fetch_url,
+    _try_local_media_fallback,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +60,9 @@ class LinkedInProvider(BaseSocialProvider):
         """
         headers = self._get_headers()
         try:
-            resp = requests.get(self.ME_API_URL, headers=headers, timeout=15)
+            resp = logged_request(
+                "linkedin", "GET", self.ME_API_URL, headers=headers, timeout=15
+            )
             if resp.status_code == 200:
                 user_id = resp.json().get("id")
                 if user_id:
@@ -67,7 +76,9 @@ class LinkedInProvider(BaseSocialProvider):
             )
         except Exception:
             logger.debug(
-                "_resolve_person_urn: request failed for member_id=%s", member_id, exc_info=True
+                "_resolve_person_urn: request failed for member_id=%s",
+                member_id,
+                exc_info=True,
             )
         return None
 
@@ -97,7 +108,9 @@ class LinkedInProvider(BaseSocialProvider):
         headers = self._get_headers()
         # Try /v2/me first (returns numeric Person ID for ugcPosts API)
         try:
-            resp = requests.get(self.ME_API_URL, headers=headers, timeout=15)
+            resp = logged_request(
+                "linkedin", "GET", self.ME_API_URL, headers=headers, timeout=15
+            )
             if resp.status_code == 200:
                 user_id = resp.json().get("id")
                 if user_id:
@@ -107,7 +120,9 @@ class LinkedInProvider(BaseSocialProvider):
 
         # Try /v2/userinfo (OpenID Connect)
         try:
-            resp = requests.get(self.USERINFO_API_URL, headers=headers, timeout=15)
+            resp = logged_request(
+                "linkedin", "GET", self.USERINFO_API_URL, headers=headers, timeout=15
+            )
             if resp.status_code == 200:
                 sub = resp.json().get("sub")
                 if sub:
@@ -136,7 +151,9 @@ class LinkedInProvider(BaseSocialProvider):
         last_error = ""
         for url in profile_endpoints:
             try:
-                resp = requests.get(url, headers=headers, timeout=15)
+                resp = logged_request(
+                    "linkedin", "GET", url, headers=headers, timeout=15
+                )
                 if resp.status_code == 200:
                     return True
                 last_error = f"HTTP {resp.status_code}: {resp.text[:200]}"
@@ -173,7 +190,10 @@ class LinkedInProvider(BaseSocialProvider):
         real_candidate = os.path.realpath(candidate)
         real_root = os.path.realpath(media_root)
 
-        if not real_candidate.startswith(real_root + os.sep) and real_candidate != real_root:
+        if (
+            not real_candidate.startswith(real_root + os.sep)
+            and real_candidate != real_root
+        ):
             raise PublishingError(
                 f"Access denied: {media_item!r} resolves outside MEDIA_ROOT."
             )
@@ -203,7 +223,9 @@ class LinkedInProvider(BaseSocialProvider):
         }
 
         try:
-            reg_resp = requests.post(
+            reg_resp = logged_request(
+                "linkedin",
+                "POST",
                 self.REGISTER_UPLOAD_API_URL,
                 json=register_payload,
                 headers=headers,
@@ -251,8 +273,13 @@ class LinkedInProvider(BaseSocialProvider):
                 "Authorization": headers["Authorization"],
                 "Content-Type": content_type,
             }
-            up_resp = requests.put(
-                upload_url, data=content, headers=upload_headers, timeout=30
+            up_resp = logged_request(
+                "linkedin",
+                "PUT",
+                upload_url,
+                data=content,
+                headers=upload_headers,
+                timeout=30,
             )
             if up_resp.status_code in (200, 201):
                 return asset_urn
@@ -287,10 +314,10 @@ class LinkedInProvider(BaseSocialProvider):
                         asset_urn = self._upload_media(item, author_urn)
                         asset_urns.append(asset_urn)
                     except PublishingError:
-                        # Re-raise credential/scope errors — organizer needs to fix these.
+                        # Re-raise credential/scope errors — organizer needs to fix these.  # noqa: E501
                         raise
                     except Exception:
-                        # Transient failure (network, etc.): fall back to URL in post text.
+                        # Transient failure (network, etc.): fall back to URL in post text.  # noqa: E501
                         if item.startswith(("http://", "https://")):
                             fallback_urls.append(item)
 
@@ -338,7 +365,9 @@ class LinkedInProvider(BaseSocialProvider):
         rest_err_msg = None
         try:
             # 1. Try Versioned REST Posts API
-            resp = requests.post(
+            resp = logged_request(
+                "linkedin",
+                "POST",
                 "https://api.linkedin.com/rest/posts",
                 json=rest_payload,
                 headers=rest_headers,
@@ -348,7 +377,9 @@ class LinkedInProvider(BaseSocialProvider):
                 # Fallback to previous minor version
                 fallback_headers = dict(rest_headers)
                 fallback_headers["LinkedIn-Version"] = "202503"
-                resp = requests.post(
+                resp = logged_request(
+                    "linkedin",
+                    "POST",
                     "https://api.linkedin.com/rest/posts",
                     json=rest_payload,
                     headers=fallback_headers,
@@ -374,8 +405,13 @@ class LinkedInProvider(BaseSocialProvider):
                 rest_err_msg = resp.text
 
             # 2. Fallback to legacy ugcPosts API
-            resp = requests.post(
-                self.UGC_POSTS_API_URL, json=payload, headers=headers, timeout=20
+            resp = logged_request(
+                "linkedin",
+                "POST",
+                self.UGC_POSTS_API_URL,
+                json=payload,
+                headers=headers,
+                timeout=20,
             )
             if resp.status_code in (200, 201):
                 data = resp.json()
@@ -444,10 +480,10 @@ class LinkedInProvider(BaseSocialProvider):
                 "Page' to make a quick page first."
             ),
             (
-                "3. On the 'Products' tab, add these products to get the right permissions:\n"
+                "3. On the 'Products' tab, add these products to get the right permissions:\n"  # noqa: E501
                 "   • 'Share on LinkedIn' (grants w_member_social)\n"
-                "   • 'Sign In with LinkedIn using OpenID Connect' (grants openid and profile so Eventyay can auto-fetch your ID)\n"
-                "   • 'Advertising API' or 'Community Management API' (grants w_organization_social for posting to company pages)."
+                "   • 'Sign In with LinkedIn using OpenID Connect' (grants openid and profile so Eventyay can auto-fetch your ID)\n"  # noqa: E501
+                "   • 'Advertising API' or 'Community Management API' (grants w_organization_social for posting to company pages)."  # noqa: E501
             ),
             (
                 "4. On the 'Auth' tab, under 'Authorized redirect URLs', add: "
@@ -460,7 +496,7 @@ class LinkedInProvider(BaseSocialProvider):
                 "https://www.linkedin.com/oauth/v2/authorization?response_type=code"
                 "&client_id=YOUR_CLIENT_ID&redirect_uri=https://localhost"
                 "&scope=w_member_social%20openid%20profile\n"
-                "(Note: If posting to a Company Page, append %20w_organization_social to the scope)."
+                "(Note: If posting to a Company Page, append %20w_organization_social to the scope)."  # noqa: E501
             ),
             (
                 "7. Click 'Authorize app'. You will be redirected to "
@@ -469,8 +505,8 @@ class LinkedInProvider(BaseSocialProvider):
             ),
             (
                 "8. Your Author URN depends on what you want to post to:\n"
-                "   • Personal profile: LEAVE BLANK! (Eventyay will automatically detect your ID).\n"
-                "   • Company page: urn:li:organization:YOUR_PAGE_ID (To find your page ID, go to your Company Page URL on LinkedIn; the number in the URL is your page ID)."
+                "   • Personal profile: LEAVE BLANK! (Eventyay will automatically detect your ID).\n"  # noqa: E501
+                "   • Company page: urn:li:organization:YOUR_PAGE_ID (To find your page ID, go to your Company Page URL on LinkedIn; the number in the URL is your page ID)."  # noqa: E501
             ),
             (
                 "9. Enter the authorization code (from step 7), Client ID, Client "
@@ -478,6 +514,3 @@ class LinkedInProvider(BaseSocialProvider):
                 "The access token will be generated automatically."
             ),
         ]
-
-
-
