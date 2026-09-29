@@ -4,6 +4,7 @@ from eventyay.base.forms import SettingsForm
 
 from .export import DEFAULT_TEMPLATES, PLATFORMS
 from .models import SocialMediaAccount
+from .operational_log import logged_request
 from .telegram_utils import normalize_telegram_chat_id
 
 MAX_OFFSETS = 10
@@ -802,7 +803,9 @@ class LinkedInAccountForm(forms.ModelForm):
             import requests as http_requests
 
             try:
-                resp = http_requests.post(
+                resp = logged_request(
+                    "linkedin",
+                    "POST",
                     "https://www.linkedin.com/oauth/v2/accessToken",
                     data={
                         "grant_type": "authorization_code",
