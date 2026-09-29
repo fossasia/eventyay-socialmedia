@@ -7,6 +7,8 @@ from urllib.parse import urlparse
 
 import requests
 
+from socialmedia.operational_log import logged_request
+
 from .providers.base import PublishingError
 
 logger = logging.getLogger(__name__)
@@ -171,5 +173,5 @@ def safe_fetch_url(url: str, timeout: int = 20) -> requests.Response:
     hostname = urlparse(url).hostname
 
     with DNSResolverContext(hostname, safe_ip):
-        return requests.get(url, timeout=timeout)
+        return logged_request("socialmedia", "GET", url, timeout=timeout)
 

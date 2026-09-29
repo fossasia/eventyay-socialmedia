@@ -25,5 +25,8 @@ class SocialMediaPluginApp(PluginConfig):
         category = "FEATURE"
 
     def ready(self):
+        from .operational_log import log_plugin_loaded
+
+        log_plugin_loaded("socialmedia")
         from . import signals  # NOQA
         from . import tasks  # NOQA

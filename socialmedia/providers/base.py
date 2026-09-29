@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 import requests
 
 from socialmedia.models import SocialMediaAccount
+from socialmedia.operational_log import logged_request
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,7 @@ def _safe_fetch_url(url: str, timeout: int = 20) -> requests.Response:
             resp.headers["Content-Type"] = mime_type
             return resp
         # In DEBUG mode, still allow the request to proceed (no IP block).
-        resp = requests.get(url, timeout=timeout, stream=True)
+        resp = logged_request("socialmedia", "GET", url, timeout=timeout, stream=True)
         resp.raise_for_status()
         resp._content = resp.content
         return resp
@@ -82,7 +83,7 @@ def _safe_fetch_url(url: str, timeout: int = 20) -> requests.Response:
                     f"blocked network {network}."
                 )
 
-    resp = requests.get(url, timeout=timeout, stream=True)
+    resp = logged_request("socialmedia", "GET", url, timeout=timeout, stream=True)
     resp.raise_for_status()
 
     # Read up to _MAX_MEDIA_BYTES; reject oversized responses.
