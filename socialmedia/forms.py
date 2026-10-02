@@ -1,4 +1,5 @@
 from django import forms
+from django.core.validators import URLValidator
 from django.utils.translation import gettext_lazy as _
 from eventyay.base.forms import SettingsForm
 
@@ -14,7 +15,7 @@ MAX_OFFSET_VALUE_TICKET = 365
 MAX_OFFSET_VALUE_SCHEDULE = 90
 
 # Display order for platforms in the UI
-PLATFORM_ORDER = ["twitter", "linkedin", "telegram", "mastodon"]
+PLATFORM_ORDER = ["twitter", "linkedin", "telegram", "mastodon", "bluesky"]
 
 # Character limits per platform (None means no enforced limit)
 PLATFORM_CHAR_LIMITS = {
@@ -22,6 +23,7 @@ PLATFORM_CHAR_LIMITS = {
     "mastodon": 500,
     "telegram": 4096,
     "linkedin": 3000,
+    "bluesky": 300,
 }
 
 # Extra help-text hints per platform
@@ -30,6 +32,7 @@ _PLATFORM_HINTS = {
     "mastodon": "≤500 chars.",
     "telegram": "Markdown supported (≤4096 chars).",
     "linkedin": "Professional tone (≤3000 chars).",
+    "bluesky": "≤300 chars.",
 }
 
 # Available placeholder tokens per post type
@@ -177,6 +180,15 @@ class SocialMediaSettingsForm(SettingsForm):
     socialmedia_mastodon_enabled = forms.BooleanField(
         label=_("Enable Mastodon"),
         help_text=_("Generate separate draft posts for Mastodon (≤500 chars)."),
+        required=False,
+        initial=False,
+    )
+    socialmedia_bluesky_enabled = forms.BooleanField(
+        label=_("Enable Bluesky"),
+        help_text=_(
+            "Generate separate draft posts for Bluesky "
+            "(≤300 chars, AT Protocol rich text)."
+        ),
         required=False,
         initial=False,
     )
@@ -368,12 +380,21 @@ class SocialMediaTemplatesForm(SettingsForm):
     )
 
     # Custom Waves JSON Storage
-    socialmedia_cfp_custom_waves = forms.CharField(widget=forms.HiddenInput(), required=False)
-    socialmedia_speaker_custom_waves = forms.CharField(widget=forms.HiddenInput(), required=False)
-    socialmedia_session_custom_waves = forms.CharField(widget=forms.HiddenInput(), required=False)
-    socialmedia_ticket_custom_waves = forms.CharField(widget=forms.HiddenInput(), required=False)
-    socialmedia_schedule_custom_waves = forms.CharField(widget=forms.HiddenInput(), required=False)
-
+    socialmedia_cfp_custom_waves = forms.CharField(
+        widget=forms.HiddenInput(), required=False
+    )
+    socialmedia_speaker_custom_waves = forms.CharField(
+        widget=forms.HiddenInput(), required=False
+    )
+    socialmedia_session_custom_waves = forms.CharField(
+        widget=forms.HiddenInput(), required=False
+    )
+    socialmedia_ticket_custom_waves = forms.CharField(
+        widget=forms.HiddenInput(), required=False
+    )
+    socialmedia_schedule_custom_waves = forms.CharField(
+        widget=forms.HiddenInput(), required=False
+    )
 
     @property
     def default_template_preview(self):
@@ -440,7 +461,10 @@ class SocialMediaTemplatesForm(SettingsForm):
                     label=f"{type_label} ({wave_label}) template",
                     widget=forms.Textarea(attrs={"rows": 2}),
                     required=False,
-                    help_text=_("Leave blank to use system default copy for this wave. Available: %(tokens)s") % {"tokens": tokens},
+                    help_text=_(
+                        "Leave blank to use system default copy for this wave. Available: %(tokens)s"
+                    )
+                    % {"tokens": tokens},
                 )
 
     def _clean_custom_waves_json(self, field_name, max_offset):
@@ -452,45 +476,68 @@ class SocialMediaTemplatesForm(SettingsForm):
         else:
             try:
                 import json
+
                 parsed = json.loads(val)
             except Exception as e:
-                raise forms.ValidationError(_("Invalid JSON format for custom waves.")) from e
+                raise forms.ValidationError(
+                    _("Invalid JSON format for custom waves.")
+                ) from e
         if not isinstance(parsed, list):
-            raise forms.ValidationError(_("Custom waves must be a list of wave objects."))
+            raise forms.ValidationError(
+                _("Custom waves must be a list of wave objects.")
+            )
         if len(parsed) > 20:
             raise forms.ValidationError(_("Too many custom waves (maximum 20)."))
         for cw in parsed:
             if not isinstance(cw, dict):
-                raise forms.ValidationError(_("Each custom wave must be a JSON object."))
+                raise forms.ValidationError(
+                    _("Each custom wave must be a JSON object.")
+                )
             off = cw.get("offset")
             if off is not None:
                 try:
                     off_int = int(off)
                     if off_int < 0 or off_int > max_offset:
                         raise forms.ValidationError(
-                            _("Custom wave offset must be between 0 and %(max)s.") % {"max": max_offset}
+                            _("Custom wave offset must be between 0 and %(max)s.")
+                            % {"max": max_offset}
                         )
                 except (ValueError, TypeError) as e:
-                    raise forms.ValidationError(_("Custom wave offset must be an integer.")) from e
+                    raise forms.ValidationError(
+                        _("Custom wave offset must be an integer.")
+                    ) from e
             if "label" in cw and len(str(cw["label"])) > 50:
-                raise forms.ValidationError(_("Custom wave label cannot exceed 50 characters."))
+                raise forms.ValidationError(
+                    _("Custom wave label cannot exceed 50 characters.")
+                )
         import json
+
         return json.dumps(parsed)
 
     def clean_socialmedia_cfp_custom_waves(self):
-        return self._clean_custom_waves_json("socialmedia_cfp_custom_waves", MAX_OFFSET_VALUE_CFP)
+        return self._clean_custom_waves_json(
+            "socialmedia_cfp_custom_waves", MAX_OFFSET_VALUE_CFP
+        )
 
     def clean_socialmedia_speaker_custom_waves(self):
-        return self._clean_custom_waves_json("socialmedia_speaker_custom_waves", MAX_OFFSET_VALUE_SPEAKER)
+        return self._clean_custom_waves_json(
+            "socialmedia_speaker_custom_waves", MAX_OFFSET_VALUE_SPEAKER
+        )
 
     def clean_socialmedia_session_custom_waves(self):
-        return self._clean_custom_waves_json("socialmedia_session_custom_waves", MAX_OFFSET_VALUE_SESSION)
+        return self._clean_custom_waves_json(
+            "socialmedia_session_custom_waves", MAX_OFFSET_VALUE_SESSION
+        )
 
     def clean_socialmedia_ticket_custom_waves(self):
-        return self._clean_custom_waves_json("socialmedia_ticket_custom_waves", MAX_OFFSET_VALUE_TICKET)
+        return self._clean_custom_waves_json(
+            "socialmedia_ticket_custom_waves", MAX_OFFSET_VALUE_TICKET
+        )
 
     def clean_socialmedia_schedule_custom_waves(self):
-        return self._clean_custom_waves_json("socialmedia_schedule_custom_waves", MAX_OFFSET_VALUE_SCHEDULE)
+        return self._clean_custom_waves_json(
+            "socialmedia_schedule_custom_waves", MAX_OFFSET_VALUE_SCHEDULE
+        )
 
     def _clean_platform_template(self, field_name, platform):
         value = self.cleaned_data.get(field_name, "")
@@ -525,7 +572,6 @@ def _add_platform_clean_methods():
 
 
 _add_platform_clean_methods()
-
 
 
 class TelegramAccountForm(forms.ModelForm):
@@ -816,11 +862,11 @@ class LinkedInAccountForm(forms.ModelForm):
                 if resp.status_code == 200:
                     try:
                         token_data = resp.json()
-                    except Exception:
+                    except Exception as err:
                         raise forms.ValidationError(
                             _("LinkedIn token exchange failed: %(error)s"),
                             params={"error": resp.text[:200]},
-                        )
+                        ) from err
                     cleaned_data["access_token"] = token_data.get("access_token")
                 else:
                     try:
@@ -867,9 +913,95 @@ class LinkedInAccountForm(forms.ModelForm):
         return instance
 
 
+class BlueskyAccountForm(forms.ModelForm):
+    handle = forms.CharField(
+        label=_("Bluesky Handle"),
+        help_text=_("e.g. user.bsky.social or your custom domain handle"),
+        required=True,
+    )
+    app_password = forms.CharField(
+        label=_("App Password"),
+        widget=forms.PasswordInput(render_value=True),
+        help_text=_(
+            "Create an App Password in Bluesky Settings → Advanced → App passwords. "
+            "Do not use your main account password."
+        ),
+        required=True,
+    )
+    pds_url = forms.URLField(
+        label=_("PDS / Server URL"),
+        initial="https://bsky.social",
+        validators=[URLValidator(schemes=["https"])],
+        help_text=_(
+            "Personal Data Server host. Must use HTTPS. "
+            "Default is https://bsky.social for standard Bluesky accounts."
+        ),
+        required=False,
+    )
+
+    class Meta:
+        model = SocialMediaAccount
+        fields = ["platform_username", "is_active"]
+        labels = {
+            "platform_username": _("Display Name / Account Note"),
+        }
+        help_texts = {
+            "platform_username": _(
+                "Optional display name for this account in Eventyay."
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["platform_username"].required = False
+        if self.instance and self.instance.pk:
+            creds = self.instance.credentials
+            if creds.get("handle"):
+                self.fields["handle"].initial = creds.get("handle")
+            if creds.get("pds_url"):
+                self.fields["pds_url"].initial = creds.get("pds_url")
+            if creds.get("app_password"):
+                self.fields["app_password"].initial = "••••••••"
+                self.fields["app_password"].required = False
+
+    def clean_handle(self):
+        handle = (self.cleaned_data.get("handle") or "").strip()
+        if handle.startswith("@"):
+            handle = handle[1:]
+        return handle
+
+    def clean_pds_url(self):
+        url = (self.cleaned_data.get("pds_url") or "").strip()
+        if not url:
+            return "https://bsky.social"
+        return url.rstrip("/")
+
+    def clean_app_password(self):
+        val = self.cleaned_data.get("app_password")
+        if (not val or val == "••••••••") and self.instance and self.instance.pk:
+            return self.instance.credentials.get("app_password")
+        return val.strip() if val else val
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.provider = "bluesky"
+        handle = self.cleaned_data.get("handle")
+        if not instance.platform_username:
+            instance.platform_username = f"@{handle}"
+        instance.credentials = {
+            "handle": handle,
+            "app_password": self.cleaned_data.get("app_password"),
+            "pds_url": self.cleaned_data.get("pds_url") or "https://bsky.social",
+        }
+        if commit:
+            instance.save()
+        return instance
+
+
 PROVIDER_FORMS = {
     "telegram": TelegramAccountForm,
     "mastodon": MastodonAccountForm,
     "twitter": TwitterAccountForm,
     "linkedin": LinkedInAccountForm,
+    "bluesky": BlueskyAccountForm,
 }

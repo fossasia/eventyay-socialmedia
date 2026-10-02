@@ -21,8 +21,14 @@
       <button type="button" class="btn btn-default" data-toggle="modal" data-target="#sm-workflow-guide-modal">
         <i class="fa fa-question-circle text-primary"></i> {% trans "How It Works" %}
       </button>
+      <a href="{{ accounts_url }}" class="btn btn-default">
+        <i class="fa fa-share-alt"></i> {% trans "Manage Social Accounts" %}
+      </a>
       <a href="{{ templates_url }}" class="btn btn-default">
-        <i class="fa fa-file-text-o"></i> {% trans "Post Templates" %} <i class="fa fa-arrow-right"></i>
+        <i class="fa fa-file-text-o"></i> {% trans "Post Templates" %}
+      </a>
+      <a href="{{ posts_url }}" class="btn btn-default">
+        <i class="fa fa-list"></i> {% trans "View Posts" %}
       </a>
     </div>
   </div>
@@ -33,7 +39,12 @@
 
     <!-- Platforms -->
     <div class="sm-section-card">
-      <div class="adv-group-title"><i class="fa fa-share-alt"></i> {% trans "Platforms" %}</div>
+      <div class="adv-group-title" style="display:flex; justify-content:space-between; align-items:center;">
+        <span><i class="fa fa-share-alt"></i> {% trans "Platforms" %}</span>
+        <a href="{{ accounts_url }}" class="btn btn-xs btn-default">
+          <i class="fa fa-plug"></i> {% trans "Connect / Manage Accounts" %} <i class="fa fa-external-link"></i>
+        </a>
+      </div>
       <p class="adv-group-desc">
         {% trans "Enable the platforms you post to. Each enabled platform generates its own draft row in the preview table with a platform-specific default template. Leave all disabled to generate a single generic draft per content item." %}
       </p>
@@ -80,6 +91,17 @@
           </div>
           <div class="platform-toggle-input">
             {% bootstrap_field form.socialmedia_mastodon_enabled layout="inline" %}
+          </div>
+        </div>
+
+        <!-- Bluesky -->
+        <div class="platform-toggle-card">
+          <div class="platform-toggle-header">
+            <span class="plat-badge plat-bluesky"><i class="fa fa-cloud"></i> Bluesky</span>
+            <span class="plat-cap-hint">{% trans "≤300 chars" %}</span>
+          </div>
+          <div class="platform-toggle-input">
+            {% bootstrap_field form.socialmedia_bluesky_enabled layout="inline" %}
           </div>
         </div>
       </div>

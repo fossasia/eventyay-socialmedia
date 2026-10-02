@@ -137,6 +137,7 @@ Organizers can connect their social media accounts at the organizer level and pu
 - **Mastodon**: Direct status publishing to any Mastodon/Fediverse instance.
 - **Twitter / X**: Direct tweet publishing via Twitter API v2.
 - **LinkedIn**: Direct post publishing to personal profiles and organization pages.
+- **Bluesky**: Direct post publishing using the AT Protocol (`atproto`) with rich text facets and media upload.
 
 ### 2. External Scheduler CSV Exports
 Organizers who prefer using external scheduling suites retain 100% interoperability via Eventyay's built-in CSV export generator. Built-in export presets include:

@@ -428,9 +428,17 @@ def test_wave_level_template_and_offset_override(
     with scope(organizer=organizer, event=event):
         event = event.__class__.objects.get(pk=event.pk)
         event.settings.flush()
-        assert event.settings.get("socialmedia_cfp_announcement_template") == "Early CFP Announcement: {cfp_link}"
-        assert event.settings.get("socialmedia_cfp_reminder_template") == "Custom Reminder: {cfp_deadline}"
-        assert event.settings.get("socialmedia_cfp_announcement_offset", as_type=int) == 45
+        assert (
+            event.settings.get("socialmedia_cfp_announcement_template")
+            == "Early CFP Announcement: {cfp_link}"
+        )
+        assert (
+            event.settings.get("socialmedia_cfp_reminder_template")
+            == "Custom Reminder: {cfp_deadline}"
+        )
+        assert (
+            event.settings.get("socialmedia_cfp_announcement_offset", as_type=int) == 45
+        )
         assert event.settings.get("socialmedia_cfp_reminder_offset", as_type=int) == 10
 
         # Enable CFP and build posts
@@ -498,6 +506,7 @@ def test_add_custom_wave_and_generation(
 ):
     """Test adding custom organizer-defined waves via JSON storage and generating posts."""
     import json
+
     from socialmedia.export import build_posts
 
     settings.SITE_URL = "https://testserver"
@@ -638,8 +647,12 @@ def test_settings_form_save_does_not_overwrite_templates(
     settings.SITE_URL = "https://testserver"
 
     with scope(organizer=organizer, event=event):
-        event.settings.set("socialmedia_twitter_cfp_template", "Custom Twitter CFP: {cfp_link}")
-        event.settings.set("socialmedia_cfp_template", "Custom Universal CFP: {event_name}")
+        event.settings.set(
+            "socialmedia_twitter_cfp_template", "Custom Twitter CFP: {cfp_link}"
+        )
+        event.settings.set(
+            "socialmedia_cfp_template", "Custom Universal CFP: {event_name}"
+        )
 
     settings_url = reverse(
         "plugins:socialmedia:plugin_settings",
@@ -657,8 +670,14 @@ def test_settings_form_save_does_not_overwrite_templates(
         event = event.__class__.objects.get(pk=event.pk)
         event.settings.flush()
         # Verify templates are still intact and not reset to ""
-        assert event.settings.get("socialmedia_twitter_cfp_template") == "Custom Twitter CFP: {cfp_link}"
-        assert event.settings.get("socialmedia_cfp_template") == "Custom Universal CFP: {event_name}"
+        assert (
+            event.settings.get("socialmedia_twitter_cfp_template")
+            == "Custom Twitter CFP: {cfp_link}"
+        )
+        assert (
+            event.settings.get("socialmedia_cfp_template")
+            == "Custom Universal CFP: {event_name}"
+        )
         assert event.settings.get("socialmedia_default_hashtags") == "#testevent"
 
 
@@ -685,7 +704,9 @@ def test_custom_waves_form_validation(
     assert "socialmedia_cfp_custom_waves" in response.context["form"].errors
 
     # 2. Offset out of range
-    invalid_waves = [{"id": "w1", "label": "Invalid Offset", "offset": 9999, "enabled": True}]
+    invalid_waves = [
+        {"id": "w1", "label": "Invalid Offset", "offset": 9999, "enabled": True}
+    ]
     payload = {
         "socialmedia_cfp_custom_waves": json.dumps(invalid_waves),
     }
@@ -715,7 +736,3 @@ def test_linkedin_and_telegram_char_limit_validation(
     assert response.status_code == 200
     assert not response.context["form"].is_valid()
     assert "socialmedia_linkedin_cfp_template" in response.context["form"].errors
-
-
-
-

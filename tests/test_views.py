@@ -185,6 +185,7 @@ def test_update_post_reschedule_draft_to_future_becomes_scheduled(
     settings.SITE_URL = "https://testserver"
     import pytz
     from django.utils import timezone
+
     from socialmedia.models import SocialMediaPost, SocialMediaPostStatus
 
     event_tz = pytz.timezone(getattr(event, "timezone", None) or "UTC")
@@ -230,6 +231,7 @@ def test_update_post_published_reschedule_rejected(
     settings.SITE_URL = "https://testserver"
     import pytz
     from django.utils import timezone
+
     from socialmedia.models import SocialMediaPost, SocialMediaPostStatus
 
     event_tz = pytz.timezone(getattr(event, "timezone", None) or "UTC")
@@ -273,6 +275,7 @@ def test_update_post_published_status_change_rejected(
 ):
     settings.SITE_URL = "https://testserver"
     from django.utils import timezone
+
     from socialmedia.models import SocialMediaPost, SocialMediaPostStatus
 
     with scope(organizer=organizer, event=event):
@@ -846,9 +849,6 @@ def test_post_error_message_persistence(organizer, event):
         )
         post.refresh_from_db()
         assert post.error_message == "API Connection Timeout"
-
-
-
 
 
 @pytest.mark.django_db

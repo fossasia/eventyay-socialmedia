@@ -516,6 +516,7 @@
 .plat-linkedin { background: #e0e7ff; color: #3730a3; }
 .plat-telegram { background: #e0f2fe; color: #0369a1; }
 .plat-mastodon { background: #fae8ff; color: #86198f; }
+.plat-bluesky { background: #e6f4ff; color: #0085ff; }
 
 .plat-account-handle {
   font-size: 11px;

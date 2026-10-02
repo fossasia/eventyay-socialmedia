@@ -34,13 +34,15 @@
     mastodon: { label: "Mastodon", iconClass: "fa fa-globe", colorClass: "plat-mastodon" },
     telegram: { label: "Telegram", iconClass: "fa fa-paper-plane", colorClass: "plat-telegram" },
     linkedin: { label: "LinkedIn", iconClass: "fa fa-linkedin", colorClass: "plat-linkedin" },
+    bluesky: { label: "Bluesky", iconClass: "fa fa-cloud", colorClass: "plat-bluesky" },
   };
 
   const PLATFORM_LIMITS = {
     twitter: 280,
     mastodon: 500,
     telegram: 4096,
-    linkedin: 3000
+    linkedin: 3000,
+    bluesky: 300,
   };
 
 
@@ -838,6 +840,7 @@
           const net = (link.network || "globe").toLowerCase();
           if (net === "twitter" || net === "x") icon.className = "fa fa-twitter";
           else if (net === "linkedin") icon.className = "fa fa-linkedin";
+          else if (net === "bluesky" || net === "bsky") icon.className = "fa fa-cloud";
           else if (net === "github") icon.className = "fa fa-github";
           else if (net === "telegram") icon.className = "fa fa-telegram";
           else if (net === "instagram") icon.className = "fa fa-instagram";
@@ -1042,6 +1045,7 @@
           const net = (link.network || "globe").toLowerCase();
           if (net === "twitter" || net === "x") icon.className = "fa fa-twitter";
           else if (net === "linkedin") icon.className = "fa fa-linkedin";
+          else if (net === "bluesky" || net === "bsky") icon.className = "fa fa-cloud";
           else if (net === "github") icon.className = "fa fa-github";
           else if (net === "telegram") icon.className = "fa fa-telegram";
           else if (net === "instagram") icon.className = "fa fa-instagram";
@@ -2167,7 +2171,7 @@
     });
 
     // Platform toggle: show/hide per-platform template fields
-    const platformKeys = ["twitter", "mastodon", "telegram", "linkedin"];
+    const platformKeys = ["twitter", "mastodon", "telegram", "linkedin", "bluesky"];
     platformKeys.forEach(platform => {
       const checkbox = document.getElementById(`id_socialmedia_${platform}_enabled`);
       const tplBlock = document.getElementById(`plat-tpls-${platform}`);
@@ -2309,7 +2313,7 @@
     document.querySelectorAll(".reset-default-btn").forEach(btn => {
       btn.addEventListener("click", function () {
         const type = this.dataset.type;
-        const panel = document.getElementById(`custom-tpls-${type}`);
+        const panel = document.getElementById(`custom-plat-${type}`) || document.getElementById(`custom-tpls-${type}`);
         if (panel) {
           panel.querySelectorAll("textarea").forEach(ta => {
             ta.value = "";
@@ -2329,8 +2333,21 @@
       const input = document.getElementById(targetId);
       if (!input || isNaN(limit)) return;
 
+      const isGraphemeCount = targetId.includes("bluesky");
+      const countLength = (val) => {
+        if (!val) return 0;
+        if (isGraphemeCount) {
+          if (typeof Intl !== "undefined" && Intl.Segmenter) {
+            return Array.from(new Intl.Segmenter().segment(val)).length;
+          }
+          return Array.from(val).length;
+        }
+        return val.length;
+      };
+
       const updateBar = () => {
-        const len = input.value.length;
+        const val = input.value || "";
+        const len = countLength(val);
         bar.textContent = `${len} / ${limit} chars`;
         if (len > limit) {
           bar.classList.add("has-error");
