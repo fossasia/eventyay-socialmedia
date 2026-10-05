@@ -60,6 +60,12 @@
     }
   };
 
+  // Every wave of a post (announcement, reminder, ...) has the same `id`, so the
+  // page tells posts apart by type, id and offset, like the server does.
+  function postKey(post) {
+    return `${post.type}:${post.id}:${post.offset_days || 0}`;
+  }
+
   // ---- State Store module ----
   const PostState = (function () {
     let posts = [];
@@ -69,9 +75,10 @@
     return {
       init(incomingPosts) {
         posts = incomingPosts;
+        posts.forEach(p => { p.key = postKey(p); });
       },
-      get(id) {
-        return posts.find(p => p.id == id) || null;
+      get(key) {
+        return posts.find(p => p.key === key) || null;
       },
       getAll() {
         return posts;
@@ -263,8 +270,8 @@
       }
 
       // If a save is already in-flight for this post:
-      if (this._inFlightSaves[post.id]) {
-        const inFlight = this._inFlightPayloads[post.id];
+      if (this._inFlightSaves[post.key]) {
+        const inFlight = this._inFlightPayloads[post.key];
         // If in-flight request is already persisting these exact values, don't queue a duplicate
         if (
           inFlight &&
@@ -272,18 +279,18 @@
           inFlight.post_time === currentPayload.post_time &&
           inFlight.post_text === currentPayload.post_text
         ) {
-          return this._inFlightSaves[post.id];
+          return this._inFlightSaves[post.key];
         }
 
-        this._pendingSaves[post.id] = { button, showToast };
-        return this._inFlightSaves[post.id];
+        this._pendingSaves[post.key] = { button, showToast };
+        return this._inFlightSaves[post.key];
       }
 
       if (button) {
         button.disabled = true;
         UI.setWithIcon(button, "Saving…", "fa fa-spinner fa-spin");
       }
-      const row = document.querySelector(`tr[data-post-id="${post.id}"]`);
+      const row = document.querySelector(`tr[data-post-id="${post.key}"]`);
       const savingStatus = row ? row.querySelector(".sched-saving-status") : null;
       if (savingStatus) {
         savingStatus.className = "sched-saving-status status-saving";
@@ -295,7 +302,7 @@
         (post.post_date !== post.original_post_date) ||
         (post.post_time !== post.original_post_time);
 
-      this._inFlightPayloads[post.id] = currentPayload;
+      this._inFlightPayloads[post.key] = currentPayload;
 
       const savePromise = fetch(Config.UPDATE_URL, {
         method: "POST",
@@ -335,11 +342,11 @@
           }
 
           // Refresh row state and counts so status badge updates immediately
-          UI.updateRow(post.id);
+          UI.updateRow(post.key);
           UI.updateCounts();
 
           // Flash saved indicator on the updated row
-          const updatedRow = document.querySelector(`tr[data-post-id="${post.id}"]`);
+          const updatedRow = document.querySelector(`tr[data-post-id="${post.key}"]`);
           const updatedStatus = updatedRow ? updatedRow.querySelector(".sched-saving-status") : null;
           if (updatedStatus) {
             updatedStatus.className = "sched-saving-status status-saved";
@@ -371,11 +378,11 @@
           }
         })
         .finally(() => {
-          delete this._inFlightSaves[post.id];
-          delete this._inFlightPayloads[post.id];
-          if (this._pendingSaves[post.id]) {
-            const next = this._pendingSaves[post.id];
-            delete this._pendingSaves[post.id];
+          delete this._inFlightSaves[post.key];
+          delete this._inFlightPayloads[post.key];
+          if (this._pendingSaves[post.key]) {
+            const next = this._pendingSaves[post.key];
+            delete this._pendingSaves[post.key];
             if (
               !post.is_saved ||
               post.post_date !== post.last_saved_date ||
@@ -387,7 +394,7 @@
           }
         });
 
-      this._inFlightSaves[post.id] = savePromise;
+      this._inFlightSaves[post.key] = savePromise;
       return savePromise;
     },
 
@@ -553,7 +560,7 @@
       const isPast = p.post_date < todayStr;
 
       const tr = document.createElement("tr");
-      tr.dataset.postId = p.id;
+      tr.dataset.postId = p.key;
       tr.dataset.type = p.type;
       tr.className = p.enabled ? "" : "row-disabled";
 
@@ -561,7 +568,7 @@
       const chk = document.createElement("input");
       chk.type = "checkbox";
       chk.className = "row-chk";
-      chk.dataset.postId = p.id;
+      chk.dataset.postId = p.key;
       chk.checked = p.enabled;
       tdChk.appendChild(chk);
       tr.appendChild(tdChk);
@@ -696,13 +703,13 @@
       const dateIn = document.createElement("input");
       dateIn.type = "date";
       dateIn.className = `form-control input-sm sm-date-input${isDateModified ? ' is-modified' : ''}`;
-      dateIn.dataset.postId = p.id;
+      dateIn.dataset.postId = p.key;
       dateIn.value = p.post_date;
 
       const timeIn = document.createElement("input");
       timeIn.type = "time";
       timeIn.className = `form-control input-sm sm-time-input${isTimeModified ? ' is-modified' : ''}`;
-      timeIn.dataset.postId = p.id;
+      timeIn.dataset.postId = p.key;
       timeIn.value = p.post_time;
 
       if (isPublished) {
@@ -744,7 +751,7 @@
           if (isUnsaved) {
             const saveTime = document.createElement("button");
             saveTime.className = "btn-save-time";
-            saveTime.dataset.postId = p.id;
+            saveTime.dataset.postId = p.key;
             saveTime.type = "button";
             saveTime.title = "Save schedule time to database";
             this.setWithIcon(saveTime, "Save", "fa fa-check");
@@ -754,7 +761,7 @@
           if (isDateModified || isTimeModified) {
             const revTime = document.createElement("button");
             revTime.className = "btn-revert-time";
-            revTime.dataset.postId = p.id;
+            revTime.dataset.postId = p.key;
             revTime.type = "button";
             revTime.title = "Revert to default timing";
             this.setWithIcon(revTime, "Revert", "fa fa-undo");
@@ -777,7 +784,7 @@
 
       const viewSpan = document.createElement("span");
       viewSpan.className = `post-text-view${isTextModified ? ' is-modified' : ''}`;
-      viewSpan.dataset.postId = p.id;
+      viewSpan.dataset.postId = p.key;
       viewSpan.tabIndex = 0;
       viewSpan.title = "Click to edit text";
       viewSpan.textContent = p.post_text;
@@ -788,7 +795,7 @@
 
       const editArea = document.createElement("textarea");
       editArea.className = `post-text-edit${hasPlaceholder ? ' has-warning' : ''}${exceedsLimit ? ' has-error' : ''}`;
-      editArea.dataset.postId = p.id;
+      editArea.dataset.postId = p.key;
       editArea.value = p.post_text;
       editArea.rows = 3;
       tdContent.appendChild(editArea);
@@ -810,7 +817,7 @@
       if (isTextModified) {
         const revertBtn = document.createElement("button");
         revertBtn.className = "btn-revert-text";
-        revertBtn.dataset.postId = p.id;
+        revertBtn.dataset.postId = p.key;
         revertBtn.type = "button";
         this.setWithIcon(revertBtn, "Revert to default", "fa fa-undo");
         cWrap.appendChild(revertBtn);
@@ -863,7 +870,7 @@
       if (p.status === "excluded") {
         const restoreBtn = document.createElement("button");
         restoreBtn.className = "btn-action-tile btn-restore-post";
-        restoreBtn.dataset.postId = p.id;
+        restoreBtn.dataset.postId = p.key;
         restoreBtn.type = "button";
         restoreBtn.title = "Restore post to preview queue";
         restoreBtn.innerHTML = '<i class="fa fa-undo"></i><span class="action-label">Restore</span>';
@@ -871,7 +878,7 @@
       } else {
         const prevBtn = document.createElement("button");
         prevBtn.className = "btn-action-tile btn-preview-post";
-        prevBtn.dataset.postId = p.id;
+        prevBtn.dataset.postId = p.key;
         prevBtn.type = "button";
         prevBtn.title = "Preview post live card";
         prevBtn.innerHTML = '<i class="fa fa-eye"></i><span class="action-label">Preview</span>';
@@ -880,8 +887,7 @@
         if (p.status !== "published" && p.status !== "exported") {
           const pubBtn = document.createElement("button");
           pubBtn.className = "btn-action-tile btn-publish-now";
-          pubBtn.dataset.postId = p.id;
-          pubBtn.dataset.dbId = p.db_id || "";
+          pubBtn.dataset.postId = p.key;
           pubBtn.type = "button";
           pubBtn.title = p.status === "failed" ? "Retry publishing" : "Publish now";
           const pubIcon = document.createElement("i");
@@ -896,7 +902,7 @@
 
         const delBtn = document.createElement("button");
         delBtn.className = "btn-action-tile btn-delete-post";
-        delBtn.dataset.postId = p.id;
+        delBtn.dataset.postId = p.key;
         delBtn.type = "button";
         delBtn.title = "Discard post";
         delBtn.innerHTML = '<i class="fa fa-trash"></i><span class="action-label">Discard</span>';
@@ -1107,7 +1113,7 @@
           modalPubBtn.style.display = "inline-block";
           modalPubBtn.onclick = () => {
             hideModal();
-            AppController.publishPostNow(post.id, post.db_id, null);
+            AppController.publishPostNow(post, null);
           };
         } else {
           modalPubBtn.style.display = "none";
@@ -1420,11 +1426,11 @@
 
           const oldMap = {};
           PostState.getAll().forEach(p => {
-            if (p.id) oldMap[p.id] = p;
+            if (p.id) oldMap[postKey(p)] = p;
           });
 
           const posts = incoming.map(p => {
-            const old = oldMap[p.id];
+            const old = oldMap[postKey(p)];
             if (old) {
               return {
                 ...p,
@@ -1693,7 +1699,7 @@
         .catch(err => UI.showToast(`Export error: ${err.message}`, "warning"));
     },
 
-    publishPostNow(postId, dbId, button) {
+    publishPostNow(post, button) {
       if (button) {
         button.disabled = true;
         button.title = "Publishing...";
@@ -1703,10 +1709,10 @@
         }
       }
 
-      APIClient.publishPostNow(dbId, postId)
+      APIClient.publishPostNow(post.db_id, post.id)
         .then(res => {
           UI.showToast(res.message || "Post published successfully!", "success");
-          PostState.update(postId, {
+          PostState.update(post.key, {
             status: res.status || "published",
             error_message: ""
           });
@@ -1715,7 +1721,7 @@
         })
         .catch(err => {
           UI.showToast(`Publishing failed: ${err.message}`, "warning");
-          PostState.update(postId, {
+          PostState.update(post.key, {
             status: "failed",
             error_message: err.message
           });
@@ -1878,8 +1884,10 @@
             }
           } else if (e.target.closest(".btn-publish-now")) {
             const btn = e.target.closest(".btn-publish-now");
-            const dbId = btn.dataset.dbId;
-            this.publishPostNow(postId, dbId, btn);
+            const post = PostState.get(postId);
+            if (post) {
+              this.publishPostNow(post, btn);
+            }
           }
         });
 
