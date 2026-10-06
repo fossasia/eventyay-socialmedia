@@ -19,6 +19,30 @@
   text-decoration: underline;
 }
 
+.sm-form-errors {
+  margin-bottom: 16px;
+}
+
+.sm-intro-text {
+  margin-bottom: 20px;
+}
+
+.sm-hidden {
+  display: none;
+}
+
+.bulk-schedule-custom-inputs:not(.sm-hidden) {
+  display: inline-flex;
+}
+
+.adv-body {
+  display: none;
+}
+
+.adv-body.open {
+  display: block;
+}
+
 /* ---- Toolbar ---- */
 .sm-toolbar {
   display: flex;
@@ -81,6 +105,10 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.adv-group-title.sm-flex-between {
+  justify-content: space-between;
 }
 
 .sm-section-title i,
@@ -696,9 +724,9 @@
   transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.template-group.collapse,
-.sm-section-card.collapse {
-  display: block !important;
+.sm-page .template-group.collapse,
+.sm-page .sm-section-card.collapse {
+  display: block;
 }
 
 .template-group.collapsed .template-collapse-icon,
@@ -844,6 +872,23 @@
   color: #1e293b;
   border: 1px solid #cbd5e1;
   border-radius: 4px;
+}
+
+.sm-wave-label-input {
+  width: 150px;
+  display: inline-block;
+  height: 26px;
+  padding: 2px 6px;
+}
+
+.sm-wave-offset-input {
+  width: 70px;
+  height: 28px;
+  text-align: center;
+}
+
+.custom-waves-actions {
+  margin-bottom: 12px;
 }
 
 .btn-remove-wave {
@@ -1158,37 +1203,90 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
+.sm-empty-setup-state {
+  display: none;
+  padding: 40px 20px;
+  margin-top: 20px;
+}
+
+.sm-empty-content {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.sm-empty-icon {
+  display: block;
+  margin-bottom: 8px;
+  opacity: 0.4;
+}
+
+.sm-empty-setup-state .sm-empty-icon {
+  margin-bottom: 15px;
+  opacity: 1;
+}
+
+.sm-empty-description {
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.sm-empty-actions {
+  margin-top: 25px;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sm-empty-action {
+  margin-top: 15px;
+}
+
+.sm-empty-cell {
+  padding: 40px;
+}
+
+.sm-pagination {
+  text-align: center;
+  margin-top: 20px;
+}
+
+.validation-alert-container {
+  margin-bottom: 12px;
+}
+
 /* ---- Modals: Positioning & Navbar Offset Fix ---- */
-.modal {
-  z-index: 1050 !important;
+#sm-preview-modal,
+#sm-workflow-guide-modal {
+  z-index: 1050;
 }
 
 .modal-backdrop {
-  z-index: 1040 !important;
+  z-index: 1040;
 }
 
 #sm-preview-modal .modal-dialog {
-  max-width: 520px !important;
-  width: 92% !important;
-  margin: 75px auto 40px auto !important;
+  max-width: 520px;
+  width: 92%;
+  margin: 75px auto 40px auto;
 }
 
 #sm-workflow-guide-modal .modal-dialog {
-  max-width: 680px !important;
-  width: 92% !important;
-  margin: 75px auto 40px auto !important;
+  max-width: 680px;
+  width: 92%;
+  margin: 75px auto 40px auto;
 }
 
 @media (min-width: 768px) {
   #sm-preview-modal .modal-dialog {
-    max-width: 520px !important;
-    width: 520px !important;
-    margin: 85px auto 40px auto !important;
+    max-width: 520px;
+    width: 520px;
+    margin: 85px auto 40px auto;
   }
   #sm-workflow-guide-modal .modal-dialog {
-    max-width: 680px !important;
-    width: 680px !important;
-    margin: 85px auto 40px auto !important;
+    max-width: 680px;
+    width: 680px;
+    margin: 85px auto 40px auto;
   }
 }
 
@@ -1381,7 +1479,7 @@
   letter-spacing: 0.03em;
 }
 
-.sm-speaker-social-link {
+.sm-page .sm-speaker-social-link {
   font-size: 11px;
   padding: 2px 7px;
   border-radius: 4px;
@@ -1391,7 +1489,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  text-decoration: none !important;
+  text-decoration: none;
 }
 
 .sm-speaker-social-link:hover {
@@ -1482,8 +1580,8 @@
   border-color: #fde047;
 }
 
-.post-text-view.editing {
-  display: none !important;
+.sm-page .post-text-view.editing {
+  display: none;
 }
 
 .post-text-edit {
@@ -1500,8 +1598,8 @@
   background: #ffffff;
 }
 
-.post-text-edit.editing {
-  display: block !important;
+.sm-page .post-text-edit.editing {
+  display: block;
 }
 
 .post-text-edit.has-error {
@@ -1552,18 +1650,18 @@
   margin-top: 6px;
 }
 
-.speaker-social-pill {
+.sm-page .speaker-social-pill {
   font-size: 11px;
   font-weight: 500;
   padding: 2px 7px;
   border-radius: 12px;
   background: #f1f5f9;
   border: 1px solid #cbd5e1;
-  color: #334155 !important;
+  color: #334155;
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  text-decoration: none !important;
+  text-decoration: none;
   transition: all 0.15s ease;
   line-height: 1.3;
 }
@@ -1571,7 +1669,7 @@
 .speaker-social-pill:hover {
   background: #e2e8f0;
   border-color: #94a3b8;
-  color: #0f172a !important;
+  color: #0f172a;
 }
 
 /* Schedule inputs */
@@ -1646,13 +1744,13 @@
 }
 
 /* Post Schedule Editability & Status Styles (Issue #70) */
-.sm-date-input.input-locked,
-.sm-time-input.input-locked {
-  background-color: #f1f5f9 !important;
-  color: #94a3b8 !important;
-  border-color: #e2e8f0 !important;
-  cursor: not-allowed !important;
-  box-shadow: none !important;
+.sm-page .sm-date-input.input-locked,
+.sm-page .sm-time-input.input-locked {
+  background-color: #f1f5f9;
+  color: #94a3b8;
+  border-color: #e2e8f0;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 .sched-locked-badge {
@@ -1856,13 +1954,13 @@
 }
 
 /* ---- Action Tile Buttons (Vertical Stack) ---- */
-.actions-cell {
+.sm-table tbody td.actions-cell {
   width: 110px;
   min-width: 105px;
   max-width: 115px;
   text-align: center;
   vertical-align: middle;
-  padding: 10px 8px !important;
+  padding: 10px 8px;
 }
 
 .actions-buttons-stack {
@@ -1945,8 +2043,4 @@
   border-color: #16a34a;
   background: #dcfce7;
   color: #15803d;
-}
-
-.hidden {
-  display: none !important;
 }

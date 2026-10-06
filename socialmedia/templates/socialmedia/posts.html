@@ -33,14 +33,14 @@
   </div>
 
   <!-- Onboarding / Empty Setup State (Issue #65) -->
-  <div id="sm-empty-setup-state" class="well text-center sm-empty-onboarding" style="display: none; padding: 40px 20px; margin-top: 20px;">
-    <div style="max-width: 600px; margin: 0 auto;">
-      <i class="fa fa-magic fa-3x text-primary" style="margin-bottom: 15px;"></i>
+  <div id="sm-empty-setup-state" class="well text-center sm-empty-onboarding sm-empty-setup-state">
+    <div class="sm-empty-content">
+      <i class="fa fa-magic fa-3x text-primary sm-empty-icon"></i>
       <h2>{% trans "Ready to Generate Social Media Posts" %}</h2>
-      <p class="text-muted" style="font-size: 15px; line-height: 1.6;">
+      <p class="text-muted sm-empty-description">
         {% trans "Posts have not been generated for this event yet. You can review and customize your post copy in Templates, or generate posts directly using the system defaults." %}
       </p>
-      <div style="margin-top: 25px; display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;">
+      <div class="sm-empty-actions">
         <a href="{{ templates_url }}" class="btn btn-default btn-lg">
           <i class="fa fa-pencil"></i> {% trans "Customize Templates" %}
         </a>
@@ -116,7 +116,7 @@
             <option value="-30">{% trans "1 month before (30 days)" %}</option>
             <option value="custom">{% trans "Custom..." %}</option>
           </select>
-          <div id="bulk-schedule-custom-inputs" class="bulk-schedule-custom-inputs hidden">
+          <div id="bulk-schedule-custom-inputs" class="bulk-schedule-custom-inputs sm-hidden">
             <input type="date" id="bulk-schedule-custom-date" class="form-control input-sm">
             <input type="time" id="bulk-schedule-custom-time" class="form-control input-sm" value="09:00">
           </div>
@@ -166,7 +166,7 @@
       </div>
     </div>
 
-    <div id="validation-alert-container" style="display: none; margin-bottom: 12px;"></div>
+    <div id="validation-alert-container" class="validation-alert-container sm-hidden"></div>
 
     <!-- Post table -->
     <div class="sm-table-wrap">
