@@ -66,6 +66,11 @@
     return `${post.type}:${post.id}:${post.offset_days || 0}`;
   }
 
+  // The fields the server uses to find a wave that has no saved row (db_id) yet.
+  function postIdentity(post) {
+    return { id: post.id, post_type: post.type, offset_days: post.offset_days || 0 };
+  }
+
   // ---- State Store module ----
   const PostState = (function () {
     let posts = [];
@@ -312,9 +317,8 @@
           "X-Requested-With": "XMLHttpRequest",
         },
         body: JSON.stringify({
-          id: post.id,
+          ...postIdentity(post),
           db_id: post.db_id,
-          post_type: post.type,
           post_text: post.post_text,
           post_date: post.post_date,
           post_time: post.post_time,
@@ -408,9 +412,8 @@
           "X-Requested-With": "XMLHttpRequest",
         },
         body: JSON.stringify({
-          id: post.id,
+          ...postIdentity(post),
           db_id: post.db_id,
-          post_type: post.type,
           status: status
         }),
       })
@@ -426,7 +429,7 @@
         .catch(err => console.error("Failed to update post status:", err));
     },
 
-    publishPostNow(dbId, postId) {
+    publishPostNow(post) {
       if (!Config.PUBLISH_NOW_URL) return Promise.reject(new Error("Publish URL not configured"));
       return fetch(Config.PUBLISH_NOW_URL, {
         method: "POST",
@@ -435,7 +438,12 @@
           "X-CSRFToken": Config.CSRF_TOKEN,
           "X-Requested-With": "XMLHttpRequest",
         },
-        body: JSON.stringify({ db_id: dbId, post_id: postId })
+        body: JSON.stringify({
+          db_id: post.db_id,
+          post_id: post.id,
+          post_type: post.type,
+          offset_days: post.offset_days || 0
+        })
       }).then(async r => {
         const text = await r.text();
         let data = {};
@@ -1522,9 +1530,9 @@
       }
 
       const dbIds = selected.map(p => p.db_id).filter(Boolean);
-      const postIds = selected.map(p => p.id);
+      const unsaved = selected.filter(p => !p.db_id).map(postIdentity);
 
-      APIClient.bulkAction("discard", { db_ids: dbIds, post_ids: postIds })
+      APIClient.bulkAction("discard", { db_ids: dbIds, posts: unsaved })
         .then(res => {
           if (res.success) {
             const previousStates = selected.map(p => ({ post: p, oldStatus: p.status }));
@@ -1574,9 +1582,9 @@
       }
 
       const dbIds = failedPosts.map(p => p.db_id).filter(Boolean);
-      const postIds = failedPosts.map(p => p.id);
+      const unsaved = failedPosts.filter(p => !p.db_id).map(postIdentity);
 
-      APIClient.bulkAction("retry", { provider, db_ids: dbIds, post_ids: postIds })
+      APIClient.bulkAction("retry", { provider, db_ids: dbIds, posts: unsaved })
         .then(res => {
           if (res.success) {
             failedPosts.forEach(p => {
@@ -1709,7 +1717,7 @@
         }
       }
 
-      APIClient.publishPostNow(post.db_id, post.id)
+      APIClient.publishPostNow(post)
         .then(res => {
           UI.showToast(res.message || "Post published successfully!", "success");
           PostState.update(post.key, {

@@ -7,6 +7,7 @@ from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db import transaction
+from django.db.models import Q
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect
 from django.urls import reverse
@@ -69,6 +70,32 @@ def _check_permission(request):
         request=request,
     ):
         raise PermissionDenied()
+
+
+def _post_wave_filter(post_id, post_type=None, offset_days=None):
+    """Lookup filters for one post wave without a saved row id.
+
+    Every wave of a post (announcement, reminder, ...) shares the entity id, so
+    the type and offset are needed to tell them apart.
+    """
+    filters = {"entity_id": str(post_id)}
+    if post_type:
+        filters["post_type"] = post_type
+    if offset_days is not None:
+        filters["offset_days"] = int(offset_days)
+    return filters
+
+
+def _selected_posts_filter(db_ids, posts):
+    """Match exactly the selected waves, by row id or by their full identity."""
+    selection = Q(pk__in=db_ids) if db_ids else Q()
+    for post in posts:
+        selection |= Q(
+            **_post_wave_filter(
+                post["id"], post.get("post_type"), post.get("offset_days", 0)
+            )
+        )
+    return selection
 
 
 class SocialMediaSettingsView(DecoupleMixin, FormView):
@@ -678,12 +705,12 @@ def bulk_post_action(request, organizer, event):
     try:
         data = json.loads(request.body)
         action = data.get("action")
-        post_ids = data.get("post_ids", [])
         db_ids = data.get("db_ids", [])
+        posts = data.get("posts", [])
         provider = data.get("provider")
 
         if action == "discard":
-            if not db_ids and not post_ids:
+            if not db_ids and not posts:
                 return JsonResponse(
                     {
                         "success": False,
@@ -691,11 +718,9 @@ def bulk_post_action(request, organizer, event):
                     },
                     status=400,
                 )
-            qs = SocialMediaPost.objects.filter(event=request.event)
-            if db_ids:
-                qs = qs.filter(pk__in=db_ids)
-            elif post_ids:
-                qs = qs.filter(entity_id__in=[str(pid) for pid in post_ids])
+            qs = SocialMediaPost.objects.filter(event=request.event).filter(
+                _selected_posts_filter(db_ids, posts)
+            )
             if provider:
                 qs = qs.filter(entity_id__endswith=f"_{provider}")
 
@@ -719,10 +744,8 @@ def bulk_post_action(request, organizer, event):
                 event=request.event,
                 status=SocialMediaPostStatus.FAILED,
             )
-            if db_ids:
-                qs = qs.filter(pk__in=db_ids)
-            elif post_ids:
-                qs = qs.filter(entity_id__in=[str(pid) for pid in post_ids])
+            if db_ids or posts:
+                qs = qs.filter(_selected_posts_filter(db_ids, posts))
             if provider:
                 qs = qs.filter(entity_id__endswith=f"_{provider}")
 
@@ -773,6 +796,7 @@ def update_post(request, organizer, event):
         is_pinned = data.get("is_pinned")
 
         post_type = data.get("post_type")
+        offset_days = data.get("offset_days")
 
         with transaction.atomic():
             db_post = None
@@ -783,11 +807,11 @@ def update_post(request, organizer, event):
                     .first()
                 )
             if not db_post and post_id:
-                lookup_filters = {"entity_id": str(post_id), "event": request.event}
-                if post_type:
-                    lookup_filters["post_type"] = post_type
                 db_post = (
-                    SocialMediaPost.objects.filter(**lookup_filters)
+                    SocialMediaPost.objects.filter(
+                        event=request.event,
+                        **_post_wave_filter(post_id, post_type, offset_days),
+                    )
                     .select_for_update()
                     .first()
                 )
@@ -1154,6 +1178,8 @@ def publish_post_now(request, organizer, event):
         data = json.loads(request.body)
         db_id = data.get("db_id")
         post_id = data.get("post_id")
+        post_type = data.get("post_type")
+        offset_days = data.get("offset_days")
 
         db_post = None
         if db_id:
@@ -1162,7 +1188,8 @@ def publish_post_now(request, organizer, event):
             ).first()
         if not db_post and post_id:
             db_post = SocialMediaPost.objects.filter(
-                entity_id=str(post_id), event=request.event
+                event=request.event,
+                **_post_wave_filter(post_id, post_type, offset_days),
             ).first()
 
         if not db_post:
@@ -1173,7 +1200,8 @@ def publish_post_now(request, organizer, event):
                 ).first()
             if not db_post and post_id:
                 db_post = SocialMediaPost.objects.filter(
-                    entity_id=str(post_id), event=request.event
+                    event=request.event,
+                    **_post_wave_filter(post_id, post_type, offset_days),
                 ).first()
 
         if not db_post:
