@@ -62,10 +62,10 @@ The **Eventyay Social Media Plugin** integrates directly into the Eventyay contr
 - **Rich Media & Avatar Handling:** Automatically fetches speaker avatar photos or custom media attachments and uploads them directly to platform APIs.
 - **Speaker Social Handle Resolution:** Parses speaker social links (Twitter/X, LinkedIn) and interpolates platform-specific `@handles` into post copy.
 - **AT Protocol Richtext Facets:** Generates native byte-offset links and hashtags for Bluesky posts.
-- **SSRF & Path Traversal Guards:** Enforces private IP range blocking, a 10 MB payload cap, and `MEDIA_ROOT` path traversal protection across Twitter, LinkedIn, and Bluesky provider uploads, with DNS pinning in shared fetch utilities.
+- **SSRF & Path Traversal Guards:** In Twitter, LinkedIn, and Bluesky, blocks private IP ranges, caps payloads at 10 MB, and restricts local files to `MEDIA_ROOT`. In Mastodon, remote URLs are fetched with DNS pinning.
 - **Encrypted Credential Storage:** Organizers' API keys and access tokens are encrypted at rest using Fernet symmetric encryption derived from Django's `SECRET_KEY`.
 - **Granular Permissions:** Seamlessly integrates with Eventyay team role-based permissions (`can_change_event_settings`, `can_change_organizer_settings`, or `can_manage_social_media`).
-- **Publishing Audit Log:** Tracks delivery statuses (`draft`, `scheduled`, `published`, `failed`, `exported`, `excluded`), scheduled/update timestamps, and provider error messages (`str(e)`) for failed deliveries with manual retry capability.
+- **Publishing Audit Log:** Tracks non-draft delivery statuses (`scheduled`, `published`, `failed`, `exported`, `excluded`), scheduled and update timestamps, and provider error messages (`str(e)`) for failure inspection.
 
 ---
 
@@ -224,7 +224,7 @@ Configure Accounts  ──>  Adjust Settings  ──>  Customize Templates  ─�
 1. Navigate to **Social Media** → **Posts**.
 2. Click **Generate Posts**. The plugin queries live event data and synthesizes posts according to your wave offsets.
 3. Use the filter bar to search by status (`Draft`, `Scheduled`, `Published`, `Failed`, `Excluded`), content type, or platform.
-4. Click any post row to edit the copy, upload/replace media URLs, adjust scheduled time, or toggle **Pinned**.
+4. Click any post row to edit the post text, adjust the scheduled date and time, or toggle **Pinned** (media attachments can be previewed if attached during generation).
 
 ### Step 5: Publishing & Monitoring
 - **Automatic Publishing:** If `socialmedia_auto_publish` is active, Eventyay's Celery periodic worker checks for due posts every cycle, acquires a row lock (`select_for_update`), claims the post, and dispatches publishing asynchronously.
@@ -233,7 +233,7 @@ Configure Accounts  ──>  Adjust Settings  ──>  Customize Templates  ─�
   - **Schedule Preset / Custom:** Shift scheduled dates and times for selected posts in bulk.
   - **Discard Selected:** Move selected posts to `Excluded` status.
   - **Retry Failed:** Re-attempt delivery for failed posts (all or filtered by provider).
-- **Publishing Log:** Inspect **Social Media** → **Publishing Log** for an audit trail showing scheduled times, last update timestamps, post types, providers, delivery status, and API error messages (`str(e)`) for failed deliveries with a direct **Retry** button.
+- **Publishing Log:** Inspect **Social Media** → **Publishing Log** for an audit log showing scheduled times, last update timestamps, post types, providers, delivery status, and API error messages (`str(e)`) for non-draft posts. (To retry failed posts, use the individual or bulk retry controls on the **Posts** page).
 
 ---
 
@@ -263,10 +263,9 @@ Each content type supports multiple waves defined as comma-separated offsets:
 
 - **Credential Encryption at Rest:** Account tokens, consumer secrets, and app passwords are encrypted using Fernet symmetric encryption (`cryptography.fernet.Fernet`). The encryption key is deterministically derived from Django's `SECRET_KEY` via SHA-256 (`socialmedia/crypto.py`). Plaintext secrets are never stored in the database.
 - **Remote Media SSRF Validation:**
-  - In **Twitter / X**, **LinkedIn**, and **Bluesky**, remote media URLs are fetched through `_safe_fetch_url`, which resolves hostnames and strictly blocks private, loopback, link-local, multicast, or cloud metadata ranges (`127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.0.0/16`, `::1/128`, `fc00::/7`, `fe80::/10`). Responses are capped at a maximum of 10 MB.
-  - The shared utility `socialmedia/utils.py` provides `DNSResolverContext` for DNS pinning to prevent Time-of-Check to Time-of-Use (TOCTOU) DNS rebinding attacks.
-  - **Mastodon** uses `safe_fetch_url` with DNS pinning for remote media downloads.
-  - **Telegram** currently downloads media via direct `requests.get` with a 20-second timeout.
+  - In **Twitter / X**, **LinkedIn**, and **Bluesky**, remote media URLs are fetched through `socialmedia.providers.base._safe_fetch_url`, which resolves hostnames, blocks private/loopback/RFC1918/link-local/IMDS ranges (`127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.0.0/16`, `::1/128`, `fc00::/7`, `fe80::/10`), and caps responses at a maximum of 10 MB.
+  - In **Mastodon**, remote media is fetched via `socialmedia.utils.safe_fetch_url`, which employs `DNSResolverContext` for DNS pinning (preventing TOCTOU DNS rebinding) and checks against private, loopback, link-local, reserved, and multicast IP ranges.
+  - In **Telegram**, media is downloaded via direct `requests.get` with a 20-second timeout.
 - **Local File Path Traversal Defense:**
   - In **Twitter / X**, **LinkedIn**, and **Bluesky**, local media reads are strictly confined to `settings.MEDIA_ROOT` via `os.path.realpath` prefix checks (`_safe_open_local`).
   - In **Mastodon** and **Telegram**, local paths are read or passed to client libraries directly.
@@ -470,7 +469,7 @@ pre-commit run --all-files
 6. **Generic Posts with Multiple Accounts:**
    - If posts are generated without platform tagging (when no platform is explicitly enabled in event settings) and multiple direct provider accounts are connected, only the first provider to claim the post will publish it (due to status transitioning to `EXPORTED`). Enable target platforms in Settings so platform-specific posts are generated.
 7. **Worker Interruption / Stuck Claims:**
-   - If a background worker terminates while a claimed post is in `EXPORTED` status, the scheduled task will not re-select it automatically; organizers can retry the post manually from the Posts table or Publishing Log.
+   - If a background worker terminates while a claimed post is in `EXPORTED` status, the scheduled task will not re-select it automatically; organizers can retry the post manually from the Posts table.
 8. **Network Timeouts & Idempotency:**
    - If a remote platform receives and publishes a post but the network connection times out before returning HTTP 200, the task marks the post as `FAILED`. Manually retrying such a post can result in a duplicate post on the platform.
 
