@@ -62,10 +62,10 @@ The **Eventyay Social Media Plugin** integrates directly into the Eventyay contr
 - **Rich Media & Avatar Handling:** Automatically fetches speaker avatar photos or custom media attachments and uploads them directly to platform APIs.
 - **Speaker Social Handle Resolution:** Parses speaker social links (Twitter/X, LinkedIn) and interpolates platform-specific `@handles` into post copy.
 - **AT Protocol Richtext Facets:** Generates native byte-offset links and hashtags for Bluesky posts.
-- **SSRF & DNS-Rebinding Protection:** Validates all remote media URLs, blocks private/local IP ranges, caps payload size at 10 MB, and uses DNS pinning.
+- **SSRF & Path Traversal Guards:** Enforces private IP range blocking, a 10 MB payload cap, and `MEDIA_ROOT` path traversal protection across Twitter, LinkedIn, and Bluesky provider uploads, with DNS pinning in shared fetch utilities.
 - **Encrypted Credential Storage:** Organizers' API keys and access tokens are encrypted at rest using Fernet symmetric encryption derived from Django's `SECRET_KEY`.
 - **Granular Permissions:** Seamlessly integrates with Eventyay team role-based permissions (`can_change_event_settings`, `can_change_organizer_settings`, or `can_manage_social_media`).
-- **Comprehensive Publishing Audit Log:** Tracks delivery statuses (`draft`, `scheduled`, `published`, `failed`, `exported`, `excluded`), timestamps, remote post IDs/URLs, and API error traces with manual retry capability.
+- **Publishing Audit Log:** Tracks delivery statuses (`draft`, `scheduled`, `published`, `failed`, `exported`, `excluded`), scheduled/update timestamps, and provider error messages (`str(e)`) for failed deliveries with manual retry capability.
 
 ---
 
@@ -160,14 +160,18 @@ All direct native providers support credential validation, test messaging, text 
 
 | Platform | Authentication / Credentials | Media Handling | Max Length | Details |
 |---|---|---|---|---|
-| **Telegram** | Bot API Token (`bot_token`), Target Chat ID (`platform_username` e.g. `@channel` or `-100...`) | `sendPhoto` with caption (JPEG/PNG). URL download or local disk fallback. | 4,096 chars | Markdown formatting supported with automatic plain-text retry if formatting fails. |
-| **Mastodon** | Instance Base URL (`api_base_url`), Access Token (`access_token`, scopes: `write:statuses`, `read:accounts`) | Multi-format media upload via `media_post` (JPEG, PNG, GIF, WebP). | 500 chars | Status published via `Mastodon.py` client; works with any standard Fediverse instance. |
-| **Twitter / X** | 4-legged OAuth 1.0a: API Key, API Secret, Access Token, Access Token Secret | v1.1 Media Upload API (`upload.twitter.com/1.1`) requires OAuth1 user context. | 280 chars | Published via Twitter API v2 (`/2/tweets`). If media upload encounters transient network errors, URL falls back into tweet text. |
-| **LinkedIn** | OAuth 2.0 Access Token (`access_token`, scopes: `w_member_social`, `openid`, `profile`). Author URN (person or organization). | Two-step asset upload (`/v2/assets?action=registerUpload` followed by binary PUT). | 3,000 chars | Targets versioned REST Posts API (`/rest/posts` with `LinkedIn-Version: 202504`), falling back to legacy `ugcPosts`. Personal author URNs are auto-detected via `/v2/me` or `/v2/userinfo`. |
-| **Bluesky** | AT Protocol identifier (`handle`), App Password (`app_password`), PDS host URL (default `https://bsky.social`) | Blob upload via `com.atproto.repo.uploadBlob` embedded as `app.bsky.embed.images` (up to 4 images). | 300 graphemes (3,000 bytes) | Generates AT Protocol rich text facets (`app.bsky.richtext.facet`) with exact UTF-8 byte offsets for links and tags. |
+| **Telegram** | Bot API Token (`bot_token`), Target Chat ID (`platform_username` e.g. `@channel` or `-100...`) | `sendPhoto` with caption (JPEG/PNG). URL download via `requests.get` or local disk fallback. | 4,096 chars (text) / 1,024 chars (caption) | Plain-text messages support up to 4,096 characters via `sendMessage`. Posts with photo attachments use `sendPhoto`, where captions are capped by Telegram at **1,024 characters**. Markdown formatting supported with automatic plain-text retry on parse errors. |
+| **Mastodon** | Instance Base URL (`api_base_url`), Access Token (`access_token`, scopes: `write:statuses`, `read:accounts`) | Multi-format media upload via `media_post` (JPEG, PNG, GIF, WebP). Remote URLs fetched via `safe_fetch_url`. | 500 chars | Status published via `Mastodon.py` client; works with any standard Fediverse instance. |
+| **Twitter / X** | 4-legged OAuth 1.0a: API Key, API Secret, Access Token, Access Token Secret | v1.1 Media Upload API (`upload.twitter.com/1.1`) requires OAuth1 user context. Remote URLs use guarded fetch. | 280 chars | Published via Twitter API v2 (`/2/tweets`). Media upload errors raise a `PublishingError` rather than silently posting without media. |
+| **LinkedIn** | OAuth 2.0 Access Token (`access_token`, scopes: `w_member_social`, `openid`, `profile`). Author URN (person or organization). | Two-step asset upload (`/v2/assets?action=registerUpload` followed by binary PUT). Remote URLs use guarded fetch. | 3,000 chars | Targets versioned REST Posts API (`/rest/posts` with `LinkedIn-Version: 202504`), falling back to legacy `ugcPosts`. Personal author URNs are auto-detected via `/v2/me` or `/v2/userinfo`. |
+| **Bluesky** | AT Protocol identifier (`handle`), App Password (`app_password`), PDS host URL (default `https://bsky.social`) | Blob upload via `com.atproto.repo.uploadBlob` embedded as `app.bsky.embed.images` (up to 4 images). Remote URLs use guarded fetch. | 300 graphemes (3,000 bytes) | Generates AT Protocol rich text facets (`app.bsky.richtext.facet`) with exact UTF-8 byte offsets for links and tags. |
 
 > [!WARNING]
-> Testing credentials via **Test Connection** for Twitter / X, LinkedIn, and Bluesky publishes a real, public test post on that platform. Ensure you test using appropriate test or staging accounts.
+> Triggering **Test Connection** sends a live message or post for all direct providers:
+> - **Twitter / X**, **LinkedIn**, and **Bluesky** publish a real, public test post.
+> - **Mastodon** publishes a real test status post.
+> - **Telegram** sends a real message to the configured target chat or channel.
+> Always verify credentials using dedicated test accounts or private channels.
 
 ### 2. External Scheduler CSV Exports
 
@@ -204,25 +208,32 @@ Configure Accounts  ──>  Adjust Settings  ──>  Customize Templates  ─�
    - **Content Types:** Enable CFP, Speaker, Session, Ticket, or Schedule announcements.
    - **Timing Waves & Offsets:** Configure how many days (or minutes) before the milestone each wave should trigger.
    - **Auto-Publish:** When enabled, the background worker automatically publishes scheduled posts when due. If disabled, posts remain scheduled until manually approved or pinned.
-   - **Default Hashtags & Event Link:** Set default event hashtags and optional URL overrides.
+   - **Default Hashtags & Ticket Link:** Set default event hashtags and optional URL overrides.
 
 ### Step 3: Customize Templates
 1. Navigate to **Social Media** → **Templates**.
 2. Review default templates for each milestone wave.
 3. You can set global templates or override copy per platform (e.g., shorter copy for Twitter/Bluesky, richer copy with markdown for Telegram).
-4. Forms validate character limits in real time based on platform rules.
+4. Forms validate character limits in real time for static template text (excluding `{tokens}`). Keep template text compact so that long speaker names or talk titles fit comfortably within platform limits.
 
 ### Step 4: Generate and Review Posts
+
+> [!IMPORTANT]
+> When posts are generated, posts scheduled for future dates are created directly with the `SCHEDULED` status. Because `socialmedia_auto_publish` is enabled by default, these posts will automatically be dispatched by background workers when their scheduled time arrives without requiring manual approval. If you want to review posts before they can publish, disable auto-publish in Settings or move posts to `Draft` / `Excluded`.
+
 1. Navigate to **Social Media** → **Posts**.
-2. Click **Generate Posts**. The plugin queries live event data and synthesizes draft posts according to your wave offsets.
+2. Click **Generate Posts**. The plugin queries live event data and synthesizes posts according to your wave offsets.
 3. Use the filter bar to search by status (`Draft`, `Scheduled`, `Published`, `Failed`, `Excluded`), content type, or platform.
 4. Click any post row to edit the copy, upload/replace media URLs, adjust scheduled time, or toggle **Pinned**.
 
 ### Step 5: Publishing & Monitoring
 - **Automatic Publishing:** If `socialmedia_auto_publish` is active, Eventyay's Celery periodic worker checks for due posts every cycle, acquires a row lock (`select_for_update`), claims the post, and dispatches publishing asynchronously.
-- **Manual Publishing:** Click **Publish Now** on any post to publish immediately, bypassing the scheduler.
-- **Bulk Actions:** Select multiple posts to perform batch operations: Publish Now, Reschedule, Change Status, or Delete.
-- **Publishing Log:** Inspect **Social Media** → **Publishing Log** for a full audit trail showing delivery time, remote post URLs, and detailed provider error stack traces if an API call fails.
+- **Manual Publishing:** Click **Publish Now** on any post row to publish immediately, bypassing the scheduler.
+- **Bulk Actions:** Select multiple posts in the table to perform batch operations:
+  - **Schedule Preset / Custom:** Shift scheduled dates and times for selected posts in bulk.
+  - **Discard Selected:** Move selected posts to `Excluded` status.
+  - **Retry Failed:** Re-attempt delivery for failed posts (all or filtered by provider).
+- **Publishing Log:** Inspect **Social Media** → **Publishing Log** for an audit trail showing scheduled times, last update timestamps, post types, providers, delivery status, and API error messages (`str(e)`) for failed deliveries with a direct **Retry** button.
 
 ---
 
@@ -251,12 +262,14 @@ Each content type supports multiple waves defined as comma-separated offsets:
 ## Security & Privacy Architecture
 
 - **Credential Encryption at Rest:** Account tokens, consumer secrets, and app passwords are encrypted using Fernet symmetric encryption (`cryptography.fernet.Fernet`). The encryption key is deterministically derived from Django's `SECRET_KEY` via SHA-256 (`socialmedia/crypto.py`). Plaintext secrets are never stored in the database.
-- **SSRF Defense & Network Validation:** When remote media attachments or avatars are fetched for upload to platform APIs, the plugin validates the URL host (`socialmedia/utils.py`):
-  - Enforces `http` or `https` schemes.
-  - Resolves hostnames and rejects any IP falling inside private, loopback, link-local, multicast, or cloud metadata ranges (`127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.0.0/16`, `::1/128`, `fc00::/7`, `fe80::/10`).
-  - Employs **DNS Pinning** (`DNSResolverContext`) to prevent Time-of-Check to Time-of-Use (TOCTOU) DNS rebinding attacks.
-  - Enforces a strict 10 MB maximum payload limit on remote media.
-- **Path Traversal Guards:** Local media reads are strictly confined to `settings.MEDIA_ROOT` via `os.path.realpath` prefix verification.
+- **Remote Media SSRF Validation:**
+  - In **Twitter / X**, **LinkedIn**, and **Bluesky**, remote media URLs are fetched through `_safe_fetch_url`, which resolves hostnames and strictly blocks private, loopback, link-local, multicast, or cloud metadata ranges (`127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.0.0/16`, `::1/128`, `fc00::/7`, `fe80::/10`). Responses are capped at a maximum of 10 MB.
+  - The shared utility `socialmedia/utils.py` provides `DNSResolverContext` for DNS pinning to prevent Time-of-Check to Time-of-Use (TOCTOU) DNS rebinding attacks.
+  - **Mastodon** uses `safe_fetch_url` with DNS pinning for remote media downloads.
+  - **Telegram** currently downloads media via direct `requests.get` with a 20-second timeout.
+- **Local File Path Traversal Defense:**
+  - In **Twitter / X**, **LinkedIn**, and **Bluesky**, local media reads are strictly confined to `settings.MEDIA_ROOT` via `os.path.realpath` prefix checks (`_safe_open_local`).
+  - In **Mastodon** and **Telegram**, local paths are read or passed to client libraries directly.
 - **Race Condition Prevention:** Automated publishing claims rows atomically using `SocialMediaPost.objects.select_for_update(skip_locked=True)` in a database transaction, transitioning status to `EXPORTED` before releasing the lock for asynchronous Celery execution.
 - **Permission Scoping:** All event views require authenticated organizers with `can_change_event_settings` or `can_manage_social_media`. Account administration requires organizer permissions (`can_change_organizer_settings` or `can_manage_social_media`).
 
@@ -334,10 +347,10 @@ These settings are managed automatically via the **Social Media** → **Settings
 |---|---|---|---|
 | `socialmedia_auto_publish` | bool | `True` | Automatically publish scheduled posts when due. |
 | `socialmedia_default_hashtags` | str | `""` | Appended to generated posts via `{hashtags}`. |
-| `socialmedia_event_link` | str | `""` | Optional manual override for `{event_link}`. |
+| `socialmedia_event_link` | str | `""` | Optional manual override for ticket links and fallback URLs. |
 | `socialmedia_<platform>_enabled` | bool | `False` | Enable specific platform (`twitter`, `linkedin`, `telegram`, `mastodon`, `bluesky`). |
 | `socialmedia_<type>_enabled` | bool | `True` | Enable content types (`cfp`, `speaker`, `session`, `ticket`, `schedule`). |
-| `socialmedia_<type>_offsets` | str | *(varies)* | Comma-separated offsets for scheduling waves. |
+| `socialmedia_<type>_offset` | str | *(varies)* | Comma-separated offsets for scheduling waves (e.g., `socialmedia_cfp_offset`). Supported per-wave custom settings take precedence. |
 
 ---
 
@@ -442,15 +455,24 @@ pre-commit run --all-files
 ## Known Limitations & Operational Caveats
 
 1. **Test Message Side Effects:**
-   - On **Twitter / X**, **LinkedIn**, and **Bluesky**, triggering **Test Connection** publishes a live post to the platform to confirm write permissions. Ensure test connections are run on authorized test accounts.
+   - On **Twitter / X**, **LinkedIn**, and **Bluesky**, triggering **Test Connection** publishes a live post.
+   - On **Mastodon**, it publishes a live status post.
+   - On **Telegram**, it sends a live message to the target chat or channel.
+   Ensure connection tests are executed against designated test accounts or private channels.
 2. **Twitter / X Media Upload Requirements:**
-   - Twitter's v1.1 Media Upload endpoint strictly requires all four OAuth 1.0a credentials (API Key, API Secret, Access Token, Access Token Secret). Twitter Bearer tokens cannot be used to upload media attachments.
+   - Twitter's v1.1 Media Upload endpoint strictly requires all four OAuth 1.0a credentials (API Key, API Secret, Access Token, Access Token Secret). Twitter Bearer tokens cannot upload media attachments.
 3. **LinkedIn Token Expiration:**
    - LinkedIn OAuth 2.0 user access tokens generally expire after 60 days. When tokens expire, posts fail with HTTP 401/403 errors and must be re-authenticated in the organizer account settings.
 4. **Speaker Social Handle Dependency:**
    - The `{speaker_social_handle}` token relies on speakers providing their Twitter/X or LinkedIn profiles in their Eventyay speaker profile. If no matching link exists, the token resolves cleanly to an empty string.
 5. **Session Scheduling Dependency:**
-   - Session countdown posts require talks to be scheduled in the active Eventyay schedule release. Unscheduled talks fall back to the event start date or can be excluded.
+   - Session countdown posts are generated *only* for talks that have a confirmed scheduled start time (`talk_start`). Unscheduled talks do not generate session countdown posts; however, speaker announcement posts will fall back to the event start date (`event.date_from`).
+6. **Generic Posts with Multiple Accounts:**
+   - If posts are generated without platform tagging (when no platform is explicitly enabled in event settings) and multiple direct provider accounts are connected, only the first provider to claim the post will publish it (due to status transitioning to `EXPORTED`). Enable target platforms in Settings so platform-specific posts are generated.
+7. **Worker Interruption / Stuck Claims:**
+   - If a background worker terminates while a claimed post is in `EXPORTED` status, the scheduled task will not re-select it automatically; organizers can retry the post manually from the Posts table or Publishing Log.
+8. **Network Timeouts & Idempotency:**
+   - If a remote platform receives and publishes a post but the network connection times out before returning HTTP 200, the task marks the post as `FAILED`. Manually retrying such a post can result in a duplicate post on the platform.
 
 ---
 
