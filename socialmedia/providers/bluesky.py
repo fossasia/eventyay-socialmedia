@@ -22,7 +22,7 @@ MAX_POST_GRAPHEMES = 300
 MAX_POST_BYTES = 3000
 
 
-def _count_graphemes(text: str) -> int:
+def count_graphemes(text: str) -> int:
     """Count user-perceived characters (grapheme clusters) in text.
 
     Supports base characters combined with combining marks, skin tone
@@ -336,7 +336,7 @@ class BlueskyProvider(BaseSocialProvider):
                 "Post text or media is required for Bluesky publishing."
             )
 
-        grapheme_count = _count_graphemes(text)
+        grapheme_count = count_graphemes(text)
         byte_count = len(text.encode("utf-8"))
         if grapheme_count > MAX_POST_GRAPHEMES or byte_count > MAX_POST_BYTES:
             raise PublishingError(

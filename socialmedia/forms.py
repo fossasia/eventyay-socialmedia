@@ -6,6 +6,7 @@ from eventyay.base.forms import SettingsForm
 from .export import DEFAULT_TEMPLATES, PLATFORMS
 from .models import SocialMediaAccount
 from .providers.base import _validate_url_host
+from .providers.bluesky import MAX_POST_GRAPHEMES, count_graphemes
 from .telegram_utils import normalize_telegram_chat_id
 
 MAX_OFFSETS = 10
@@ -24,7 +25,7 @@ PLATFORM_CHAR_LIMITS = {
     "mastodon": 500,
     "telegram": 4096,
     "linkedin": 3000,
-    "bluesky": 300,
+    "bluesky": MAX_POST_GRAPHEMES,
 }
 
 # Extra help-text hints per platform
@@ -95,7 +96,7 @@ def _validate_offsets(value, max_value, unit_label="days"):
     return ", ".join(str(v) for v in sorted(cleaned, reverse=True))
 
 
-def _check_platform_char_limit(value, limit, platform_name):
+def _check_platform_char_limit(value, limit, platform_name, *, count=len):
     """Raise ValidationError if the template text (excluding {token} placeholders)
     already exceeds the platform character limit."""
     import re
@@ -103,7 +104,8 @@ def _check_platform_char_limit(value, limit, platform_name):
     if not value or not limit:
         return value
     stripped = re.sub(r"\{[^}]+\}", "", value)
-    if len(stripped) > limit:
+    length = count(stripped)
+    if length > limit:
         raise forms.ValidationError(
             _(
                 "The template text (excluding placeholders) is %(length)s characters, "
@@ -111,7 +113,7 @@ def _check_platform_char_limit(value, limit, platform_name):
                 "Shorten the template so interpolated posts fit within the limit."
             ),
             params={
-                "length": len(stripped),
+                "length": length,
                 "platform": platform_name,
                 "limit": limit,
             },
@@ -544,7 +546,8 @@ class SocialMediaTemplatesForm(SettingsForm):
         value = self.cleaned_data.get(field_name, "")
         limit = PLATFORM_CHAR_LIMITS.get(platform)
         platform_label = PLATFORMS.get(platform, platform)
-        return _check_platform_char_limit(value, limit, platform_label)
+        count = count_graphemes if platform == "bluesky" else len
+        return _check_platform_char_limit(value, limit, platform_label, count=count)
 
 
 def _add_platform_clean_methods():

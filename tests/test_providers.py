@@ -10,7 +10,7 @@ from socialmedia.providers.base import (
 )
 from socialmedia.providers.bluesky import (
     BlueskyProvider,
-    _count_graphemes,
+    count_graphemes,
     extract_atproto_facets,
 )
 from socialmedia.providers.linkedin import LinkedInProvider
@@ -669,10 +669,10 @@ def test_bluesky_publish_post_empty_text_and_no_embed(mock_post, mock_account):
 def test_bluesky_count_graphemes_zwj_sequence():
     # Family emoji sequence: Woman + ZWJ + Woman + ZWJ + Girl + ZWJ + Boy
     family = "👩‍👩‍👧‍👦"
-    assert _count_graphemes(family) == 1
-    assert _count_graphemes("👨‍⚕️") == 1
+    assert count_graphemes(family) == 1
+    assert count_graphemes("👨‍⚕️") == 1
     # 76 family emojis = 76 graphemes
-    assert _count_graphemes(family * 76) == 76
+    assert count_graphemes(family * 76) == 76
 
 
 @pytest.mark.parametrize(
@@ -680,7 +680,7 @@ def test_bluesky_count_graphemes_zwj_sequence():
     [("🇮🇳🇫🇷🇺", 3), ("🇮x🇳", 3), ("🇮\u0301🇳", 2)],
 )
 def test_bluesky_count_graphemes_groups_consecutive_regional_indicators(text, expected):
-    assert _count_graphemes(text) == expected
+    assert count_graphemes(text) == expected
 
 
 def test_bluesky_extract_atproto_facets_preserves_exclamation_in_url():
