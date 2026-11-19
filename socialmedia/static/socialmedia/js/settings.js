@@ -53,6 +53,12 @@
   const utf8Encoder = typeof TextEncoder === "function" ? new TextEncoder() : null;
   const BLUESKY_BYTE_LIMIT = 3000;
 
+  function countBasicGraphemes(text) {
+    // Without native segmentation, only count the clusters this fallback handles exactly.
+    if (/[^\x00-\x7F\u{1F1E6}-\u{1F1FF}]/u.test(text)) return null;
+    return text.match(/\r\n|[\u{1F1E6}-\u{1F1FF}]{1,2}|[\x00-\x7F]/gu)?.length || 0;
+  }
+
   function postTextMetrics(text, platform) {
     const limit = PLATFORM_LIMITS[platform];
     let count = text.length;
@@ -61,11 +67,15 @@
       text = text.trim();
       const bytes = utf8Encoder?.encode(text).length;
       const byteLabel = `${bytes} / ${BLUESKY_BYTE_LIMIT} bytes`;
-      if (!blueskySegmenter && bytes != null) {
-        // Report the known byte limit without guessing the grapheme count.
-        return { label: byteLabel, exceeds: bytes > BLUESKY_BYTE_LIMIT };
+      count = blueskySegmenter
+        ? Array.from(blueskySegmenter.segment(text)).length
+        : countBasicGraphemes(text);
+      if (count === null) {
+        return {
+          label: bytes == null ? "Character count unavailable" : byteLabel,
+          exceeds: bytes > BLUESKY_BYTE_LIMIT,
+        };
       }
-      count = Array.from(blueskySegmenter ? blueskySegmenter.segment(text) : text).length;
       if (bytes > BLUESKY_BYTE_LIMIT) byteWarning = ` · ${byteLabel}`;
     }
     return {
