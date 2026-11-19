@@ -35,11 +35,33 @@ _FORMAT_CONTROL_RANGES = (
 )
 
 
+_HANGUL_CONTINUATIONS = {
+    "L": ("L", "V", "LV", "LVT"),
+    "LV": ("V", "T"),
+    "V": ("V", "T"),
+    "LVT": ("T",),
+    "T": ("T",),
+}
+
+
+def _hangul_type(codepoint: int) -> str | None:
+    if 0x1100 <= codepoint <= 0x115F or 0xA960 <= codepoint <= 0xA97C:
+        return "L"
+    if 0x1160 <= codepoint <= 0x11A7 or 0xD7B0 <= codepoint <= 0xD7C6:
+        return "V"
+    if 0x11A8 <= codepoint <= 0x11FF or 0xD7CB <= codepoint <= 0xD7FB:
+        return "T"
+    if 0xAC00 <= codepoint <= 0xD7A3:
+        return "LV" if (codepoint - 0xAC00) % 28 == 0 else "LVT"
+    return None
+
+
 def count_graphemes(text: str) -> int:
     """Count user-perceived characters (grapheme clusters) in text.
 
     Supports base characters combined with combining marks, skin tone
-    modifiers, variation selectors, zero-width joiners, and flag pairs.
+    modifiers, variation selectors, zero-width joiners, flag pairs, and
+    conjoining Hangul syllables.
     """
     if not text:
         return 0
@@ -74,7 +96,13 @@ def count_graphemes(text: str) -> int:
             after_zwj = False
             continue
         unpaired_indicator = False
-        if after_zwj:
+        hangul = _hangul_type(codepoint) if codepoint >= 0x1100 else None
+        if hangul and index:
+            # GB6–GB8 only join immediately adjacent Hangul types.
+            previous_type = _hangul_type(ord(text[index - 1]))
+            if previous_type and hangul in _HANGUL_CONTINUATIONS[previous_type]:
+                continue
+        if after_zwj and not hangul:
             after_zwj = char == "\u200d"
             continue
         if in_cluster and (

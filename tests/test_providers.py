@@ -413,8 +413,9 @@ def test_bluesky_validate_credentials(mock_post, mock_account):
     [
         "Hello Bluesky from https://eventyay.com #eventyay",
         "a" * 268 + "🇮🇳 https://eventyay.com #eventyay",
+        "a" * 268 + "가 https://eventyay.com #eventyay",
     ],
-    ids=["plain-text", "flag-at-grapheme-limit"],
+    ids=["plain-text", "flag-at-grapheme-limit", "hangul-at-grapheme-limit"],
 )
 @patch("requests.post")
 def test_bluesky_publish_post_text_only(mock_post, mock_account, text):
@@ -688,6 +689,23 @@ def test_bluesky_count_graphemes_groups_consecutive_regional_indicators(text, ex
     [("a\u200bb", 3), ("a\u200d\u200bb", 3), ("🇮\u200b🇳", 3), ("a\r\nb", 3)],
 )
 def test_bluesky_count_graphemes_separates_controls(text, expected):
+    assert count_graphemes(text) == expected
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("\u1100\u1161" * 151, 151),
+        ("\u1100\u1102\u1161\u1175\u11a8\u11ab", 1),
+        ("\ua960\ud7b0\ud7cb", 1),
+        ("\u1100\uac00\u1161\u11a8", 1),
+        ("\u1100\uac01\u11a8", 1),
+        ("\uac01\u1161", 2),
+        ("\u1100\u0301\u1161", 2),
+        ("a\u200d\u1100\u1161", 2),
+    ],
+)
+def test_bluesky_count_graphemes_joins_hangul(text, expected):
     assert count_graphemes(text) == expected
 
 
