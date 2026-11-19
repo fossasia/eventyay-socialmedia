@@ -47,6 +47,33 @@
   };
 
 
+  const blueskySegmenter = typeof Intl !== "undefined" && Intl.Segmenter
+    ? new Intl.Segmenter(undefined, { granularity: "grapheme" })
+    : null;
+  const utf8Encoder = typeof TextEncoder === "function" ? new TextEncoder() : null;
+  const BLUESKY_BYTE_LIMIT = 3000;
+
+  function postTextMetrics(text, platform) {
+    const limit = PLATFORM_LIMITS[platform];
+    let count = text.length;
+    let byteWarning = "";
+    if (platform === "bluesky") {
+      text = text.trim();
+      const bytes = utf8Encoder?.encode(text).length;
+      const byteLabel = `${bytes} / ${BLUESKY_BYTE_LIMIT} bytes`;
+      if (!blueskySegmenter && bytes != null) {
+        // Report the known byte limit without guessing the grapheme count.
+        return { label: byteLabel, exceeds: bytes > BLUESKY_BYTE_LIMIT };
+      }
+      count = Array.from(blueskySegmenter ? blueskySegmenter.segment(text) : text).length;
+      if (bytes > BLUESKY_BYTE_LIMIT) byteWarning = ` · ${byteLabel}`;
+    }
+    return {
+      label: limit ? `${count} / ${limit} chars${byteWarning}` : `${count} chars`,
+      exceeds: (limit != null && count > limit) || byteWarning !== "",
+    };
+  }
+
   // ---- Helper functions ----
   const Helpers = {
     addDays(dateStr, days) {
@@ -175,8 +202,7 @@
           if (p.post_date < todayStr) pastCount++;
           if (p.post_text.includes("{") || p.post_text.includes("}")) placeholderCount++;
 
-          const limit = PLATFORM_LIMITS[p.platform] || null;
-          if (limit && p.post_text.length > limit) limitExceededCount++;
+          if (postTextMetrics(p.post_text, p.platform).exceeds) limitExceededCount++;
         });
 
         return { pastCount, placeholderCount, limitExceededCount };
@@ -799,8 +825,7 @@
       viewSpan.textContent = p.post_text;
       tdContent.appendChild(viewSpan);
 
-      const limit = PLATFORM_LIMITS[p.platform] || null;
-      const exceedsLimit = limit && p.post_text.length > limit;
+      const { label, exceeds: exceedsLimit } = postTextMetrics(p.post_text, p.platform);
 
       const editArea = document.createElement("textarea");
       editArea.className = `post-text-edit${hasPlaceholder ? ' has-warning' : ''}${exceedsLimit ? ' has-error' : ''}`;
@@ -814,13 +839,8 @@
       const charSpan = document.createElement("span");
       const numSpan = document.createElement("span");
       numSpan.className = `char-count${exceedsLimit ? ' has-warning' : ''}`;
-      if (limit) {
-        numSpan.textContent = `${p.post_text.length} / ${limit}`;
-      } else {
-        numSpan.textContent = p.post_text.length;
-      }
+      numSpan.textContent = label;
       charSpan.appendChild(numSpan);
-      charSpan.appendChild(document.createTextNode(" characters"));
       cWrap.appendChild(charSpan);
 
       if (isTextModified) {
@@ -990,7 +1010,6 @@
 
       const platformKey = post.platform || "generic";
       const meta = PLATFORM_META[platformKey] || { label: "Generic Post", iconClass: "fa fa-share-alt", colorClass: "plat-generic" };
-      const limit = PLATFORM_LIMITS[platformKey] || null;
 
       const previewBox = document.createElement("div");
       previewBox.className = "sm-card-preview";
@@ -1095,9 +1114,9 @@
       footer.appendChild(timeSpan);
 
       const charSpan = document.createElement("span");
-      const exceeds = limit && post.post_text.length > limit;
+      const { label, exceeds } = postTextMetrics(post.post_text, platformKey);
       charSpan.className = exceeds ? "char-count over-limit" : "char-count";
-      charSpan.textContent = limit ? `${post.post_text.length} / ${limit} chars` : `${post.post_text.length} chars`;
+      charSpan.textContent = label;
       footer.appendChild(charSpan);
 
       previewBox.appendChild(footer);
@@ -1242,7 +1261,7 @@
           parts.push(`${placeholderCount} post(s) with unresolved placeholders (e.g. {tag})`);
         }
         if (limitExceededCount > 0) {
-          parts.push(`${limitExceededCount} post(s) exceeding platform character limits`);
+          parts.push(`${limitExceededCount} post(s) exceeding platform text limits`);
         }
 
         alertDiv.appendChild(document.createTextNode(parts.join(", ") + ". Review highlighted rows before exporting."));
@@ -2019,19 +2038,10 @@
               const countSpan = row.querySelector(".char-count");
               if (countSpan) {
                 const post = PostState.get(postId);
-                const limit = PLATFORM_LIMITS[post.platform] || null;
-                if (limit) {
-                  countSpan.textContent = `${e.target.value.length} / ${limit}`;
-                  if (e.target.value.length > limit) {
-                    countSpan.classList.add("has-warning");
-                    e.target.classList.add("has-error");
-                  } else {
-                    countSpan.classList.remove("has-warning");
-                    e.target.classList.remove("has-error");
-                  }
-                } else {
-                  countSpan.textContent = e.target.value.length;
-                }
+                const { label, exceeds } = postTextMetrics(e.target.value, post.platform);
+                countSpan.textContent = label;
+                countSpan.classList.toggle("has-warning", exceeds);
+                e.target.classList.toggle("has-error", exceeds);
               }
             }
           }
