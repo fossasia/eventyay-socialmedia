@@ -408,8 +408,16 @@ def test_bluesky_validate_credentials(mock_post, mock_account):
     assert provider.validate_credentials() is False
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Hello Bluesky from https://eventyay.com #eventyay",
+        "a" * 268 + "🇮🇳 https://eventyay.com #eventyay",
+    ],
+    ids=["plain-text", "flag-at-grapheme-limit"],
+)
 @patch("requests.post")
-def test_bluesky_publish_post_text_only(mock_post, mock_account):
+def test_bluesky_publish_post_text_only(mock_post, mock_account, text):
     mock_account.provider = "bluesky"
     mock_account.platform_username = "@test.bsky.social"
     mock_account.credentials = {
@@ -438,7 +446,7 @@ def test_bluesky_publish_post_text_only(mock_post, mock_account):
 
     mock_post.side_effect = [res_session, res_record]
 
-    res = provider.publish_post("Hello Bluesky from https://eventyay.com #eventyay")
+    res = provider.publish_post(text)
     assert res["post_id"] == "3l7example"
     assert res["url"] == "https://bsky.app/profile/test.bsky.social/post/3l7example"
 
@@ -447,9 +455,7 @@ def test_bluesky_publish_post_text_only(mock_post, mock_account):
     payload = create_call.kwargs["json"]
     assert payload["repo"] == "did:plc:12345"
     assert payload["collection"] == "app.bsky.feed.post"
-    assert (
-        payload["record"]["text"] == "Hello Bluesky from https://eventyay.com #eventyay"
-    )
+    assert payload["record"]["text"] == text
     assert len(payload["record"]["facets"]) == 2
 
 
@@ -615,7 +621,12 @@ def test_bluesky_extract_atproto_facets_skips_overlapping_url_anchors():
     assert facets[1]["features"][0]["tag"] == "eventyay"
 
 
-def test_bluesky_publish_post_exceeds_limits(mock_account):
+@pytest.mark.parametrize(
+    "text",
+    ["a" * 301, "a" * 300 + "🇮🇳", "a" + "\u0301" * 1500],
+    ids=["ascii-limit", "flag-limit", "byte-limit"],
+)
+def test_bluesky_publish_post_exceeds_limits(mock_account, text):
     mock_account.provider = "bluesky"
     mock_account.credentials = {
         "handle": "test.bsky.social",
@@ -624,9 +635,8 @@ def test_bluesky_publish_post_exceeds_limits(mock_account):
     }
     provider = BlueskyProvider(mock_account)
 
-    long_text = "a" * 301
     with pytest.raises(PublishingError, match="Post exceeds Bluesky limits"):
-        provider.publish_post(long_text)
+        provider.publish_post(text)
 
 
 @patch("requests.post")
@@ -663,6 +673,14 @@ def test_bluesky_count_graphemes_zwj_sequence():
     assert _count_graphemes("👨‍⚕️") == 1
     # 76 family emojis = 76 graphemes
     assert _count_graphemes(family * 76) == 76
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [("🇮🇳🇫🇷🇺", 3), ("🇮x🇳", 3), ("🇮\u0301🇳", 2)],
+)
+def test_bluesky_count_graphemes_groups_consecutive_regional_indicators(text, expected):
+    assert _count_graphemes(text) == expected
 
 
 def test_bluesky_extract_atproto_facets_preserves_exclamation_in_url():

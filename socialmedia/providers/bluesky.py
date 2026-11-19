@@ -26,14 +26,26 @@ def _count_graphemes(text: str) -> int:
     """Count user-perceived characters (grapheme clusters) in text.
 
     Supports base characters combined with combining marks, skin tone
-    modifiers, variation selectors, and zero-width joiners.
+    modifiers, variation selectors, zero-width joiners, and flag pairs.
     """
     if not text:
         return 0
     count = 0
     in_cluster = False
     after_zwj = False
+    unpaired_indicator = False
     for char in text:
+        codepoint = ord(char)
+        if 0x1F1E6 <= codepoint <= 0x1F1FF:
+            # Unicode GB12/GB13 pair consecutive regional indicators from the
+            # start of each run. A lone indicator still counts on its own.
+            if not unpaired_indicator:
+                count += 1
+            unpaired_indicator = not unpaired_indicator
+            in_cluster = True
+            after_zwj = False
+            continue
+        unpaired_indicator = False
         cat = unicodedata.category(char)
         if after_zwj:
             after_zwj = char == "\u200d"
@@ -41,9 +53,9 @@ def _count_graphemes(text: str) -> int:
         if in_cluster and (
             unicodedata.combining(char) != 0
             or cat in ("Mn", "Mc", "Me", "Cf")
-            or 0x1F3FB <= ord(char) <= 0x1F3FF
-            or 0xFE00 <= ord(char) <= 0xFE0F
-            or 0xE0100 <= ord(char) <= 0xE01EF
+            or 0x1F3FB <= codepoint <= 0x1F3FF
+            or 0xFE00 <= codepoint <= 0xFE0F
+            or 0xE0100 <= codepoint <= 0xE01EF
         ):
             if char == "\u200d":
                 after_zwj = True
