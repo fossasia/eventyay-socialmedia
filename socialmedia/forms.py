@@ -6,7 +6,7 @@ from eventyay.base.forms import SettingsForm
 from .export import DEFAULT_TEMPLATES, PLATFORMS
 from .models import SocialMediaAccount
 from .providers.base import _validate_url_host
-from .providers.bluesky import MAX_POST_GRAPHEMES, count_graphemes
+from .providers.bluesky import MAX_POST_BYTES, MAX_POST_GRAPHEMES, count_graphemes
 from .telegram_utils import normalize_telegram_chat_id
 
 MAX_OFFSETS = 10
@@ -96,15 +96,16 @@ def _validate_offsets(value, max_value, unit_label="days"):
     return ", ".join(str(v) for v in sorted(cleaned, reverse=True))
 
 
-def _check_platform_char_limit(value, limit, platform_name, *, count=len):
+def _check_platform_char_limit(value, platform):
     """Raise ValidationError if the template text (excluding {token} placeholders)
     already exceeds the platform character limit."""
     import re
 
+    limit = PLATFORM_CHAR_LIMITS.get(platform)
     if not value or not limit:
         return value
     stripped = re.sub(r"\{[^}]+\}", "", value)
-    length = count(stripped)
+    length = count_graphemes(stripped) if platform == "bluesky" else len(stripped)
     if length > limit:
         raise forms.ValidationError(
             _(
@@ -114,9 +115,17 @@ def _check_platform_char_limit(value, limit, platform_name, *, count=len):
             ),
             params={
                 "length": length,
-                "platform": platform_name,
+                "platform": PLATFORMS.get(platform, platform),
                 "limit": limit,
             },
+        )
+    if platform == "bluesky" and len(stripped.encode("utf-8")) > MAX_POST_BYTES:
+        raise forms.ValidationError(
+            _(
+                "The template text (excluding placeholders) exceeds "
+                "the Bluesky limit of %(limit)s UTF-8 bytes."
+            ),
+            params={"limit": MAX_POST_BYTES},
         )
     return value
 
@@ -544,10 +553,7 @@ class SocialMediaTemplatesForm(SettingsForm):
 
     def _clean_platform_template(self, field_name, platform):
         value = self.cleaned_data.get(field_name, "")
-        limit = PLATFORM_CHAR_LIMITS.get(platform)
-        platform_label = PLATFORMS.get(platform, platform)
-        count = count_graphemes if platform == "bluesky" else len
-        return _check_platform_char_limit(value, limit, platform_label, count=count)
+        return _check_platform_char_limit(value, platform)
 
 
 def _add_platform_clean_methods():

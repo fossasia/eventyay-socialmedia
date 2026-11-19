@@ -683,6 +683,14 @@ def test_bluesky_count_graphemes_groups_consecutive_regional_indicators(text, ex
     assert count_graphemes(text) == expected
 
 
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [("a\u200bb", 3), ("a\u200d\u200bb", 3), ("🇮\u200b🇳", 3), ("a\r\nb", 3)],
+)
+def test_bluesky_count_graphemes_separates_controls(text, expected):
+    assert count_graphemes(text) == expected
+
+
 def test_bluesky_extract_atproto_facets_preserves_exclamation_in_url():
     text = "Visit https://example.test/docs#section! to read more."
     facets = extract_atproto_facets(text)

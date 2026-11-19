@@ -21,6 +21,19 @@ logger = logging.getLogger(__name__)
 MAX_POST_GRAPHEMES = 300
 MAX_POST_BYTES = 3000
 
+# Assigned format characters marked Control in Unicode GraphemeBreakProperty.
+_FORMAT_CONTROLS = frozenset({0x00AD, 0x061C, 0x180E, 0x200B, 0xFEFF, 0xE0001})
+_FORMAT_CONTROL_RANGES = (
+    (0x200E, 0x200F),
+    (0x202A, 0x202E),
+    (0x2060, 0x2064),
+    (0x2066, 0x206F),
+    (0xFFF9, 0xFFFB),
+    (0x13430, 0x1343F),
+    (0x1BCA0, 0x1BCA3),
+    (0x1D173, 0x1D17A),
+)
+
 
 def count_graphemes(text: str) -> int:
     """Count user-perceived characters (grapheme clusters) in text.
@@ -34,8 +47,23 @@ def count_graphemes(text: str) -> int:
     in_cluster = False
     after_zwj = False
     unpaired_indicator = False
-    for char in text:
+    for index, char in enumerate(text):
         codepoint = ord(char)
+        cat = unicodedata.category(char)
+        if cat in ("Cc", "Zl", "Zp") or (
+            cat == "Cf"
+            and (
+                codepoint in _FORMAT_CONTROLS
+                or any(
+                    start <= codepoint <= end for start, end in _FORMAT_CONTROL_RANGES
+                )
+            )
+        ):
+            # Only CRLF shares a cluster across a control boundary (GB3–GB5).
+            if not (char == "\n" and index and text[index - 1] == "\r"):
+                count += 1
+            in_cluster = after_zwj = unpaired_indicator = False
+            continue
         if 0x1F1E6 <= codepoint <= 0x1F1FF:
             # Unicode GB12/GB13 pair consecutive regional indicators from the
             # start of each run. A lone indicator still counts on its own.
@@ -46,7 +74,6 @@ def count_graphemes(text: str) -> int:
             after_zwj = False
             continue
         unpaired_indicator = False
-        cat = unicodedata.category(char)
         if after_zwj:
             after_zwj = char == "\u200d"
             continue

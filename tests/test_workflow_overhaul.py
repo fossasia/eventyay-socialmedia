@@ -120,12 +120,17 @@ def test_templates_view_character_limit_validation(
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
-    ("literal_length", "accepted"),
-    [(299, True), (300, False)],
-    ids=["flag-at-limit", "flag-over-limit"],
+    ("text", "accepted"),
+    [
+        ("a" * 299 + "🇮🇳", True),
+        ("a" * 300 + "🇮🇳", False),
+        ("a\u200b" * 200, False),
+        ("👩‍👩‍👧‍👦" * 121, False),
+    ],
+    ids=["flag-at-limit", "flag-over-limit", "zero-width-spaces", "byte-limit"],
 )
-def test_bluesky_template_counts_flags_as_one_grapheme(
-    logged_in_organizer_client, organizer, event, settings, literal_length, accepted
+def test_bluesky_template_text_limits(
+    logged_in_organizer_client, organizer, event, settings, text, accepted
 ):
     settings.SITE_URL = "https://testserver"
     url = reverse(
@@ -133,7 +138,7 @@ def test_bluesky_template_counts_flags_as_one_grapheme(
         kwargs={"organizer": organizer.slug, "event": event.slug},
     )
     field = "socialmedia_bluesky_cfp_template"
-    template = "a" * literal_length + "🇮🇳{event_name}"
+    template = text + "{event_name}"
     response = logged_in_organizer_client.post(url, {field: template})
 
     if accepted:
