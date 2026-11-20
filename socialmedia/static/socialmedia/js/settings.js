@@ -59,28 +59,35 @@
     return text.match(/\r\n|[\u{1F1E6}-\u{1F1FF}]{1,2}|[\x00-\x7F]/gu)?.length || 0;
   }
 
-  function postTextMetrics(text, platform) {
-    const limit = PLATFORM_LIMITS[platform];
-    let count = text.length;
-    let byteWarning = "";
-    if (platform === "bluesky") {
-      text = text.trim();
-      const bytes = utf8Encoder?.encode(text).length;
-      const byteLabel = `${bytes} / ${BLUESKY_BYTE_LIMIT} bytes`;
-      count = blueskySegmenter
-        ? Array.from(blueskySegmenter.segment(text)).length
-        : countBasicGraphemes(text);
-      if (count === null) {
-        return {
-          label: bytes == null ? "Character count unavailable" : byteLabel,
-          exceeds: bytes > BLUESKY_BYTE_LIMIT,
-        };
-      }
-      if (bytes > BLUESKY_BYTE_LIMIT) byteWarning = ` · ${byteLabel}`;
+  function blueskyTextMetrics(text) {
+    const limit = PLATFORM_LIMITS.bluesky;
+    const bytes = utf8Encoder?.encode(text).length;
+    const byteLabel = `${bytes} / ${BLUESKY_BYTE_LIMIT} bytes`;
+    const count = blueskySegmenter
+      ? Array.from(blueskySegmenter.segment(text)).length
+      : countBasicGraphemes(text);
+    const exceedsBytes = bytes > BLUESKY_BYTE_LIMIT;
+    if (count === null) {
+      return {
+        label: bytes == null ? "Character count unavailable" : byteLabel,
+        exceeds: exceedsBytes,
+      };
     }
+
     return {
-      label: limit ? `${count} / ${limit} chars${byteWarning}` : `${count} chars`,
-      exceeds: (limit != null && count > limit) || byteWarning !== "",
+      label: `${count} / ${limit} chars${exceedsBytes ? ` · ${byteLabel}` : ""}`,
+      exceeds: count > limit || exceedsBytes,
+    };
+  }
+
+  function postTextMetrics(text, platform) {
+    if (platform === "bluesky") return blueskyTextMetrics(text.trim());
+
+    const limit = PLATFORM_LIMITS[platform];
+    const count = text.length;
+    return {
+      label: limit ? `${count} / ${limit} chars` : `${count} chars`,
+      exceeds: limit != null && count > limit,
     };
   }
 
@@ -2398,27 +2405,15 @@
       const input = document.getElementById(targetId);
       if (!input || isNaN(limit)) return;
 
-      const isGraphemeCount = targetId.includes("bluesky");
-      const countLength = (val) => {
-        if (!val) return 0;
-        if (isGraphemeCount) {
-          if (typeof Intl !== "undefined" && Intl.Segmenter) {
-            return Array.from(new Intl.Segmenter().segment(val)).length;
-          }
-          return Array.from(val).length;
-        }
-        return val.length;
-      };
-
+      const isBluesky = targetId.startsWith("id_socialmedia_bluesky_");
       const updateBar = () => {
         const val = input.value || "";
-        const len = countLength(val);
-        bar.textContent = `${len} / ${limit} chars`;
-        if (len > limit) {
-          bar.classList.add("has-error");
-        } else {
-          bar.classList.remove("has-error");
-        }
+        // Template validation measures only the literal text before interpolation.
+        const { label, exceeds } = isBluesky
+          ? blueskyTextMetrics(val.trim().replace(/\{[^}]+\}/g, ""))
+          : { label: `${val.length} / ${limit} chars`, exceeds: val.length > limit };
+        bar.textContent = label;
+        bar.classList.toggle("has-error", exceeds);
       };
       input.addEventListener("input", updateBar);
       updateBar();
