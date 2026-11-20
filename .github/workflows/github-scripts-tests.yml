@@ -1,0 +1,35 @@
+# Runs the unit tests for the helper modules in .github/scripts/ (used by
+# github-script workflows such as approval-labels.yml). The tests use node:test
+# with a fake GitHub client, so they need no token and no network.
+
+name: GitHub scripts tests
+
+on:
+  pull_request:
+    paths:
+      - ".github/scripts/**"
+      - ".github/workflows/approval-labels*.yml"
+      - ".github/workflows/github-scripts-tests.yml"
+  push:
+    branches: [dev]
+    paths:
+      - ".github/scripts/**"
+      - ".github/workflows/approval-labels*.yml"
+      - ".github/workflows/github-scripts-tests.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - run: node --test .github/scripts/*.test.mjs
