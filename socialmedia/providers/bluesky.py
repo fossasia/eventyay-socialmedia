@@ -21,29 +21,96 @@ logger = logging.getLogger(__name__)
 MAX_POST_GRAPHEMES = 300
 MAX_POST_BYTES = 3000
 
+# Assigned format characters marked Control in Unicode GraphemeBreakProperty.
+_FORMAT_CONTROLS = frozenset({0x00AD, 0x061C, 0x180E, 0x200B, 0xFEFF, 0xE0001})
+_FORMAT_CONTROL_RANGES = (
+    (0x200E, 0x200F),
+    (0x202A, 0x202E),
+    (0x2060, 0x2064),
+    (0x2066, 0x206F),
+    (0xFFF9, 0xFFFB),
+    (0x13430, 0x1343F),
+    (0x1BCA0, 0x1BCA3),
+    (0x1D173, 0x1D17A),
+)
 
-def _count_graphemes(text: str) -> int:
+
+_HANGUL_CONTINUATIONS = {
+    "L": ("L", "V", "LV", "LVT"),
+    "LV": ("V", "T"),
+    "V": ("V", "T"),
+    "LVT": ("T",),
+    "T": ("T",),
+}
+
+
+def _hangul_type(codepoint: int) -> str | None:
+    if 0x1100 <= codepoint <= 0x115F or 0xA960 <= codepoint <= 0xA97C:
+        return "L"
+    if 0x1160 <= codepoint <= 0x11A7 or 0xD7B0 <= codepoint <= 0xD7C6:
+        return "V"
+    if 0x11A8 <= codepoint <= 0x11FF or 0xD7CB <= codepoint <= 0xD7FB:
+        return "T"
+    if 0xAC00 <= codepoint <= 0xD7A3:
+        return "LV" if (codepoint - 0xAC00) % 28 == 0 else "LVT"
+    return None
+
+
+def count_graphemes(text: str) -> int:
     """Count user-perceived characters (grapheme clusters) in text.
 
     Supports base characters combined with combining marks, skin tone
-    modifiers, variation selectors, and zero-width joiners.
+    modifiers, variation selectors, zero-width joiners, flag pairs, and
+    conjoining Hangul syllables.
     """
     if not text:
         return 0
     count = 0
     in_cluster = False
     after_zwj = False
-    for char in text:
+    unpaired_indicator = False
+    for index, char in enumerate(text):
+        codepoint = ord(char)
         cat = unicodedata.category(char)
-        if after_zwj:
+        if cat in ("Cc", "Zl", "Zp") or (
+            cat == "Cf"
+            and (
+                codepoint in _FORMAT_CONTROLS
+                or any(
+                    start <= codepoint <= end for start, end in _FORMAT_CONTROL_RANGES
+                )
+            )
+        ):
+            # Only CRLF shares a cluster across a control boundary (GB3–GB5).
+            if not (char == "\n" and index and text[index - 1] == "\r"):
+                count += 1
+            in_cluster = after_zwj = unpaired_indicator = False
+            continue
+        if 0x1F1E6 <= codepoint <= 0x1F1FF:
+            # Unicode GB12/GB13 pair consecutive regional indicators from the
+            # start of each run. A lone indicator still counts on its own.
+            if not unpaired_indicator:
+                count += 1
+            unpaired_indicator = not unpaired_indicator
+            in_cluster = True
+            after_zwj = False
+            continue
+        unpaired_indicator = False
+        hangul = _hangul_type(codepoint) if codepoint >= 0x1100 else None
+        if hangul and index:
+            # GB6–GB8 only join immediately adjacent Hangul types.
+            previous_type = _hangul_type(ord(text[index - 1]))
+            if previous_type and hangul in _HANGUL_CONTINUATIONS[previous_type]:
+                continue
+        if after_zwj and not hangul:
             after_zwj = char == "\u200d"
             continue
         if in_cluster and (
             unicodedata.combining(char) != 0
             or cat in ("Mn", "Mc", "Me", "Cf")
-            or 0x1F3FB <= ord(char) <= 0x1F3FF
-            or 0xFE00 <= ord(char) <= 0xFE0F
-            or 0xE0100 <= ord(char) <= 0xE01EF
+            or 0x1F3FB <= codepoint <= 0x1F3FF
+            or 0xFE00 <= codepoint <= 0xFE0F
+            or 0xE0100 <= codepoint <= 0xE01EF
         ):
             if char == "\u200d":
                 after_zwj = True
@@ -324,7 +391,7 @@ class BlueskyProvider(BaseSocialProvider):
                 "Post text or media is required for Bluesky publishing."
             )
 
-        grapheme_count = _count_graphemes(text)
+        grapheme_count = count_graphemes(text)
         byte_count = len(text.encode("utf-8"))
         if grapheme_count > MAX_POST_GRAPHEMES or byte_count > MAX_POST_BYTES:
             raise PublishingError(

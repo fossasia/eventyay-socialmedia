@@ -10,7 +10,7 @@ from socialmedia.providers.base import (
 )
 from socialmedia.providers.bluesky import (
     BlueskyProvider,
-    _count_graphemes,
+    count_graphemes,
     extract_atproto_facets,
 )
 from socialmedia.providers.linkedin import LinkedInProvider
@@ -408,8 +408,17 @@ def test_bluesky_validate_credentials(mock_post, mock_account):
     assert provider.validate_credentials() is False
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Hello Bluesky from https://eventyay.com #eventyay",
+        "a" * 268 + "🇮🇳 https://eventyay.com #eventyay",
+        "a" * 268 + "가 https://eventyay.com #eventyay",
+    ],
+    ids=["plain-text", "flag-at-grapheme-limit", "hangul-at-grapheme-limit"],
+)
 @patch("requests.post")
-def test_bluesky_publish_post_text_only(mock_post, mock_account):
+def test_bluesky_publish_post_text_only(mock_post, mock_account, text):
     mock_account.provider = "bluesky"
     mock_account.platform_username = "@test.bsky.social"
     mock_account.credentials = {
@@ -438,7 +447,7 @@ def test_bluesky_publish_post_text_only(mock_post, mock_account):
 
     mock_post.side_effect = [res_session, res_record]
 
-    res = provider.publish_post("Hello Bluesky from https://eventyay.com #eventyay")
+    res = provider.publish_post(text)
     assert res["post_id"] == "3l7example"
     assert res["url"] == "https://bsky.app/profile/test.bsky.social/post/3l7example"
 
@@ -447,9 +456,7 @@ def test_bluesky_publish_post_text_only(mock_post, mock_account):
     payload = create_call.kwargs["json"]
     assert payload["repo"] == "did:plc:12345"
     assert payload["collection"] == "app.bsky.feed.post"
-    assert (
-        payload["record"]["text"] == "Hello Bluesky from https://eventyay.com #eventyay"
-    )
+    assert payload["record"]["text"] == text
     assert len(payload["record"]["facets"]) == 2
 
 
@@ -615,7 +622,12 @@ def test_bluesky_extract_atproto_facets_skips_overlapping_url_anchors():
     assert facets[1]["features"][0]["tag"] == "eventyay"
 
 
-def test_bluesky_publish_post_exceeds_limits(mock_account):
+@pytest.mark.parametrize(
+    "text",
+    ["a" * 301, "a" * 300 + "🇮🇳", "a" + "\u0301" * 1500],
+    ids=["ascii-limit", "flag-limit", "byte-limit"],
+)
+def test_bluesky_publish_post_exceeds_limits(mock_account, text):
     mock_account.provider = "bluesky"
     mock_account.credentials = {
         "handle": "test.bsky.social",
@@ -624,9 +636,8 @@ def test_bluesky_publish_post_exceeds_limits(mock_account):
     }
     provider = BlueskyProvider(mock_account)
 
-    long_text = "a" * 301
     with pytest.raises(PublishingError, match="Post exceeds Bluesky limits"):
-        provider.publish_post(long_text)
+        provider.publish_post(text)
 
 
 @patch("requests.post")
@@ -659,10 +670,43 @@ def test_bluesky_publish_post_empty_text_and_no_embed(mock_post, mock_account):
 def test_bluesky_count_graphemes_zwj_sequence():
     # Family emoji sequence: Woman + ZWJ + Woman + ZWJ + Girl + ZWJ + Boy
     family = "👩‍👩‍👧‍👦"
-    assert _count_graphemes(family) == 1
-    assert _count_graphemes("👨‍⚕️") == 1
+    assert count_graphemes(family) == 1
+    assert count_graphemes("👨‍⚕️") == 1
     # 76 family emojis = 76 graphemes
-    assert _count_graphemes(family * 76) == 76
+    assert count_graphemes(family * 76) == 76
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [("🇮🇳🇫🇷🇺", 3), ("🇮x🇳", 3), ("🇮\u0301🇳", 2)],
+)
+def test_bluesky_count_graphemes_groups_consecutive_regional_indicators(text, expected):
+    assert count_graphemes(text) == expected
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [("a\u200bb", 3), ("a\u200d\u200bb", 3), ("🇮\u200b🇳", 3), ("a\r\nb", 3)],
+)
+def test_bluesky_count_graphemes_separates_controls(text, expected):
+    assert count_graphemes(text) == expected
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("\u1100\u1161" * 151, 151),
+        ("\u1100\u1102\u1161\u1175\u11a8\u11ab", 1),
+        ("\ua960\ud7b0\ud7cb", 1),
+        ("\u1100\uac00\u1161\u11a8", 1),
+        ("\u1100\uac01\u11a8", 1),
+        ("\uac01\u1161", 2),
+        ("\u1100\u0301\u1161", 2),
+        ("a\u200d\u1100\u1161", 2),
+    ],
+)
+def test_bluesky_count_graphemes_joins_hangul(text, expected):
+    assert count_graphemes(text) == expected
 
 
 def test_bluesky_extract_atproto_facets_preserves_exclamation_in_url():
