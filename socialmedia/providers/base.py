@@ -3,12 +3,19 @@ import logging
 import mimetypes
 import os
 import socket
+import time
 from typing import Any
 from urllib.parse import urljoin, urlparse
 
 import requests
+from django.conf import settings
 
 from socialmedia.models import SocialMediaAccount
+from socialmedia.operational_log import (
+    log_request_outcome,
+    logged_request,
+    logged_stream_outcome,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -70,9 +77,7 @@ def _safe_fetch_url(
     """
     # DEBUG shortcut: serve own-server media from disk, skip network entirely.
     try:
-        from django.conf import settings as _settings
-
-        _debug = bool(getattr(_settings, "DEBUG", False))
+        _debug = bool(getattr(settings, "DEBUG", False))
     except Exception:
         _debug = False
 
@@ -86,21 +91,40 @@ def _safe_fetch_url(
             resp.headers["Content-Type"] = mime_type
             return resp
         # In DEBUG mode, still allow the request to proceed (no IP block).
-        resp = requests.get(url, timeout=timeout, stream=True)
-        resp.raise_for_status()
-        resp._content = resp.content
+        started = time.monotonic()
+        resp = logged_request(
+            "socialmedia",
+            "GET",
+            url,
+            timeout=timeout,
+            stream=True,
+            defer_log=True,
+            started=started,
+        )
+        with logged_stream_outcome("socialmedia", started, resp):
+            resp.raise_for_status()
+            resp._content = resp.content
         return resp
 
     current_url = url
     for _ in range(max_redirects + 1):
         _validate_url_host(current_url)
-        resp = requests.get(
-            current_url, timeout=timeout, stream=True, allow_redirects=False
+        started = time.monotonic()
+        resp = logged_request(
+            "socialmedia",
+            "GET",
+            current_url,
+            timeout=timeout,
+            stream=True,
+            allow_redirects=False,
+            defer_log=True,
+            started=started,
         )
         if resp.is_redirect or resp.status_code in (301, 302, 303, 307, 308):
             location = resp.headers.get("Location")
             if not location:
                 break
+            log_request_outcome("socialmedia", started, response=resp)
             current_url = urljoin(current_url, location)
             resp.close()
             continue
@@ -108,23 +132,24 @@ def _safe_fetch_url(
     else:
         raise ValueError(f"Too many redirects while fetching {url!r}")
 
-    resp.raise_for_status()
+    with logged_stream_outcome("socialmedia", started, resp):
+        resp.raise_for_status()
 
-    # Read up to _MAX_MEDIA_BYTES; reject oversized responses.
-    chunks = []
-    total = 0
-    for chunk in resp.iter_content(chunk_size=65536):
-        total += len(chunk)
-        if total > _MAX_MEDIA_BYTES:
-            resp.close()
-            raise ValueError(
-                f"Response from {url!r} exceeds maximum allowed size "
-                f"({_MAX_MEDIA_BYTES // (1024 * 1024)} MB)."
-            )
-        chunks.append(chunk)
+        # Read up to _MAX_MEDIA_BYTES; reject oversized responses.
+        chunks = []
+        total = 0
+        for chunk in resp.iter_content(chunk_size=65536):
+            total += len(chunk)
+            if total > _MAX_MEDIA_BYTES:
+                resp.close()
+                raise ValueError(
+                    f"Response from {url!r} exceeds maximum allowed size "
+                    f"({_MAX_MEDIA_BYTES // (1024 * 1024)} MB)."
+                )
+            chunks.append(chunk)
 
-    resp._content = b"".join(chunks)
-    resp.encoding = resp.apparent_encoding
+        resp._content = b"".join(chunks)
+        resp.encoding = resp.apparent_encoding
     return resp
 
 
@@ -145,12 +170,10 @@ def _try_local_media_fallback(url: str) -> tuple[bytes, str] | None:
         cannot be resolved or is outside MEDIA_ROOT.
     """
     try:
-        from django.conf import settings
+        media_root = getattr(settings, "MEDIA_ROOT", None)
+        media_url = getattr(settings, "MEDIA_URL", "/media/")
     except Exception:
         return None
-
-    media_root = getattr(settings, "MEDIA_ROOT", None)
-    media_url = getattr(settings, "MEDIA_URL", "/media/")
     if not media_root:
         return None
 

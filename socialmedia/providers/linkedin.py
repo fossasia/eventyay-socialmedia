@@ -4,6 +4,9 @@ import os
 from typing import Any
 
 import requests
+from django.conf import settings
+
+from socialmedia.operational_log import logged_request
 
 from .base import (
     BaseSocialProvider,
@@ -58,7 +61,9 @@ class LinkedInProvider(BaseSocialProvider):
         """
         headers = self._get_headers()
         try:
-            resp = requests.get(self.ME_API_URL, headers=headers, timeout=15)
+            resp = logged_request(
+                "linkedin", "GET", self.ME_API_URL, headers=headers, timeout=15
+            )
             if resp.status_code == 200:
                 user_id = resp.json().get("id")
                 if user_id:
@@ -104,7 +109,9 @@ class LinkedInProvider(BaseSocialProvider):
         headers = self._get_headers()
         # Try /v2/me first (returns numeric Person ID for ugcPosts API)
         try:
-            resp = requests.get(self.ME_API_URL, headers=headers, timeout=15)
+            resp = logged_request(
+                "linkedin", "GET", self.ME_API_URL, headers=headers, timeout=15
+            )
             if resp.status_code == 200:
                 user_id = resp.json().get("id")
                 if user_id:
@@ -114,7 +121,9 @@ class LinkedInProvider(BaseSocialProvider):
 
         # Try /v2/userinfo (OpenID Connect)
         try:
-            resp = requests.get(self.USERINFO_API_URL, headers=headers, timeout=15)
+            resp = logged_request(
+                "linkedin", "GET", self.USERINFO_API_URL, headers=headers, timeout=15
+            )
             if resp.status_code == 200:
                 sub = resp.json().get("sub")
                 if sub:
@@ -143,7 +152,9 @@ class LinkedInProvider(BaseSocialProvider):
         last_error = ""
         for url in profile_endpoints:
             try:
-                resp = requests.get(url, headers=headers, timeout=15)
+                resp = logged_request(
+                    "linkedin", "GET", url, headers=headers, timeout=15
+                )
                 if resp.status_code == 200:
                     return True
                 last_error = f"HTTP {resp.status_code}: {resp.text[:200]}"
@@ -162,8 +173,6 @@ class LinkedInProvider(BaseSocialProvider):
         Raises:
             PublishingError: If the path escapes MEDIA_ROOT or does not exist.
         """
-        from django.conf import settings
-
         media_root = getattr(settings, "MEDIA_ROOT", None)
         if not media_root:
             raise PublishingError(
@@ -213,7 +222,9 @@ class LinkedInProvider(BaseSocialProvider):
         }
 
         try:
-            reg_resp = requests.post(
+            reg_resp = logged_request(
+                "linkedin",
+                "POST",
                 self.REGISTER_UPLOAD_API_URL,
                 json=register_payload,
                 headers=headers,
@@ -261,8 +272,13 @@ class LinkedInProvider(BaseSocialProvider):
                 "Authorization": headers["Authorization"],
                 "Content-Type": content_type,
             }
-            up_resp = requests.put(
-                upload_url, data=content, headers=upload_headers, timeout=30
+            up_resp = logged_request(
+                "linkedin",
+                "PUT",
+                upload_url,
+                data=content,
+                headers=upload_headers,
+                timeout=30,
             )
             if up_resp.status_code in (200, 201):
                 return asset_urn
@@ -348,7 +364,9 @@ class LinkedInProvider(BaseSocialProvider):
         rest_err_msg = None
         try:
             # 1. Try Versioned REST Posts API
-            resp = requests.post(
+            resp = logged_request(
+                "linkedin",
+                "POST",
                 "https://api.linkedin.com/rest/posts",
                 json=rest_payload,
                 headers=rest_headers,
@@ -358,7 +376,9 @@ class LinkedInProvider(BaseSocialProvider):
                 # Fallback to previous minor version
                 fallback_headers = dict(rest_headers)
                 fallback_headers["LinkedIn-Version"] = "202503"
-                resp = requests.post(
+                resp = logged_request(
+                    "linkedin",
+                    "POST",
                     "https://api.linkedin.com/rest/posts",
                     json=rest_payload,
                     headers=fallback_headers,
@@ -384,8 +404,13 @@ class LinkedInProvider(BaseSocialProvider):
                 rest_err_msg = resp.text
 
             # 2. Fallback to legacy ugcPosts API
-            resp = requests.post(
-                self.UGC_POSTS_API_URL, json=payload, headers=headers, timeout=20
+            resp = logged_request(
+                "linkedin",
+                "POST",
+                self.UGC_POSTS_API_URL,
+                json=payload,
+                headers=headers,
+                timeout=20,
             )
             if resp.status_code in (200, 201):
                 data = resp.json()

@@ -6,6 +6,9 @@ import socket
 from urllib.parse import urlparse
 
 import requests
+from django.conf import settings
+
+from socialmedia.operational_log import logged_request
 
 from .providers.base import PublishingError
 
@@ -15,8 +18,6 @@ logger = logging.getLogger(__name__)
 def _is_debug() -> bool:
     """Return True if Django DEBUG mode is active."""
     try:
-        from django.conf import settings
-
         return bool(getattr(settings, "DEBUG", False))
     except Exception:
         return False
@@ -33,12 +34,10 @@ def _try_local_media_fallback(url: str) -> tuple[bytes, str] | None:
         ``(content_bytes, mime_type)`` on success, or ``None`` if unmappable.
     """
     try:
-        from django.conf import settings
+        media_root = getattr(settings, "MEDIA_ROOT", None)
+        media_url = getattr(settings, "MEDIA_URL", "/media/")
     except Exception:
         return None
-
-    media_root = getattr(settings, "MEDIA_ROOT", None)
-    media_url = getattr(settings, "MEDIA_URL", "/media/")
     if not media_root:
         return None
 
@@ -179,4 +178,4 @@ def safe_fetch_url(url: str, timeout: int = 20) -> requests.Response:
     hostname = urlparse(url).hostname
 
     with DNSResolverContext(hostname, safe_ip):
-        return requests.get(url, timeout=timeout)
+        return logged_request("socialmedia", "GET", url, timeout=timeout)

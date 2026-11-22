@@ -18,6 +18,7 @@ from eventyay.control.signals import (
 )
 
 from .models import SocialMediaAccount, SocialMediaPost, SocialMediaPostStatus
+from .operational_log import OUTCOME_FAILURE, log_operation
 
 HAS_SOCIAL_MEDIA_PERM = hasattr(Team, "can_manage_social_media")
 DIRECT_PUBLISH_PROVIDERS = ["telegram", "mastodon", "twitter", "linkedin", "bluesky"]
@@ -184,6 +185,14 @@ def claim_post_for_publishing(post_pk: int, provider_name: str):
                 f"No active {provider_name} account found for organizer."
             )
             locked_post.save(update_fields=["status", "error_message", "updated_at"])
+            log_operation(
+                "social.post",
+                OUTCOME_FAILURE,
+                backend=provider_name,
+                event_id=locked_post.event_id,
+                object_id=post_pk,
+                error_code="missing_account",
+            )
             logger.warning(
                 "Post %s marked as FAILED: No active %s account found for organizer '%s'.",
                 post_pk,
@@ -269,6 +278,13 @@ def publish_scheduled_posts(sender, **kwargs):
             provider_names = active_provs
 
         if not provider_names:
+            log_operation(
+                "social.post",
+                OUTCOME_FAILURE,
+                event_id=post.event_id,
+                object_id=post.pk,
+                error_code="no_active_provider",
+            )
             logger.warning(
                 "Post %s (event '%s', scheduled for %s) has no active direct providers configured.",
                 post.pk,

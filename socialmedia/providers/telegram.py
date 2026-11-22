@@ -3,6 +3,7 @@ from typing import Any
 
 import requests
 
+from socialmedia.operational_log import logged_request
 from socialmedia.telegram_utils import normalize_telegram_chat_id
 
 from .base import BaseSocialProvider, PublishingError
@@ -22,18 +23,29 @@ class TelegramProvider(BaseSocialProvider):
         self.chat_id = normalize_telegram_chat_id(self.account.platform_username)
         self.base_url = f"https://api.telegram.org/bot{self.token}/"
 
+    def _redact_token(self, value: object) -> str:
+        text = str(value)
+        if self.token:
+            return text.replace(self.token, "<redacted>")
+        return text
+
     def validate_credentials(self) -> bool:
         if not self.token:
             return False
         try:
-            response = requests.get(
-                f"{self.base_url}getMe", timeout=DEFAULT_REQUEST_TIMEOUT
+            response = logged_request(
+                "telegram",
+                "GET",
+                f"{self.base_url}getMe",
+                timeout=DEFAULT_REQUEST_TIMEOUT,
             )
             if response.status_code != 200 or not response.json().get("ok", False):
                 return False
 
             if self.chat_id:
-                response = requests.get(
+                response = logged_request(
+                    "telegram",
+                    "GET",
                     f"{self.base_url}getChat",
                     params={"chat_id": self._resolve_chat_id()},
                     timeout=DEFAULT_REQUEST_TIMEOUT,
@@ -42,7 +54,9 @@ class TelegramProvider(BaseSocialProvider):
 
             return True
         except Exception as e:
-            logger.error(f"Telegram credentials validation failed: {e}")
+            logger.error(
+                "Telegram credentials validation failed: %s", self._redact_token(e)
+            )
             return False
 
     def send_test_message(self) -> dict[str, Any]:
@@ -56,7 +70,13 @@ class TelegramProvider(BaseSocialProvider):
                 "chat_id": self._resolve_chat_id(),
                 "text": "✅ Connection successful from Eventyay!",
             }
-            response = requests.post(url, data=payload, timeout=DEFAULT_REQUEST_TIMEOUT)
+            response = logged_request(
+                "telegram",
+                "POST",
+                url,
+                data=payload,
+                timeout=DEFAULT_REQUEST_TIMEOUT,
+            )
             if response.status_code == 200:
                 result = response.json()
                 if result.get("ok"):
@@ -82,9 +102,12 @@ class TelegramProvider(BaseSocialProvider):
                 ),
             }
         except requests.RequestException as e:
-            return {"success": False, "message": f"Network error: {e}"}
+            return {
+                "success": False,
+                "message": f"Network error: {self._redact_token(e)}",
+            }
         except Exception as e:
-            return {"success": False, "message": str(e)}
+            return {"success": False, "message": self._redact_token(e)}
 
     def _resolve_chat_id(self):
         """Return chat_id as int if numeric, otherwise keep as string.
@@ -99,8 +122,11 @@ class TelegramProvider(BaseSocialProvider):
 
     def _get_bot_info(self) -> str:
         try:
-            me_res = requests.get(
-                f"{self.base_url}getMe", timeout=DEFAULT_REQUEST_TIMEOUT
+            me_res = logged_request(
+                "telegram",
+                "GET",
+                f"{self.base_url}getMe",
+                timeout=DEFAULT_REQUEST_TIMEOUT,
             )
             if me_res.status_code == 200:
                 me_data = me_res.json()
@@ -110,7 +136,9 @@ class TelegramProvider(BaseSocialProvider):
                     first_name = result.get("first_name") or "Telegram bot"
                     return f"@{username} ({first_name})"
         except Exception as exc:
-            logger.warning("Failed to fetch Telegram bot info: %s", exc)
+            logger.warning(
+                "Failed to fetch Telegram bot info: %s", self._redact_token(exc)
+            )
         return "Unknown Bot"
 
     def _error_hint(self, description: str) -> str:
@@ -148,12 +176,19 @@ class TelegramProvider(BaseSocialProvider):
                 ) -> requests.Response:
                     if is_url:
                         try:
-                            r = requests.get(media_item, timeout=MEDIA_UPLOAD_TIMEOUT)
+                            r = logged_request(
+                                "telegram",
+                                "GET",
+                                media_item,
+                                timeout=MEDIA_UPLOAD_TIMEOUT,
+                            )
                             r.raise_for_status()
                             content_type = r.headers.get("content-type", "image/jpeg")
                             ext = "png" if "png" in content_type else "jpg"
                             files = {"photo": (f"photo.{ext}", r.content, content_type)}
-                            return requests.post(
+                            return logged_request(
+                                "telegram",
+                                "POST",
                                 url,
                                 data=current_payload,
                                 files=files,
@@ -162,17 +197,23 @@ class TelegramProvider(BaseSocialProvider):
                         except Exception as download_err:
                             logger.warning(
                                 "Could not download photo locally (%s)",
-                                download_err,
+                                type(download_err).__name__,
                             )
                             photo_payload = dict(current_payload)
                             photo_payload["photo"] = media_item
-                            return requests.post(
-                                url, data=photo_payload, timeout=MEDIA_UPLOAD_TIMEOUT
+                            return logged_request(
+                                "telegram",
+                                "POST",
+                                url,
+                                data=photo_payload,
+                                timeout=MEDIA_UPLOAD_TIMEOUT,
                             )
                     else:
                         with open(media_item, "rb") as f:
                             files = {"photo": f}
-                            return requests.post(
+                            return logged_request(
+                                "telegram",
+                                "POST",
                                 url,
                                 data=current_payload,
                                 files=files,
@@ -196,16 +237,24 @@ class TelegramProvider(BaseSocialProvider):
                         "parse_mode": "Markdown",
                     }
                 )
-                response = requests.post(
-                    url, data=payload, timeout=DEFAULT_REQUEST_TIMEOUT
+                response = logged_request(
+                    "telegram",
+                    "POST",
+                    url,
+                    data=payload,
+                    timeout=DEFAULT_REQUEST_TIMEOUT,
                 )
                 if (
                     response.status_code != 200
                     and "can't parse entities" in response.text.lower()
                 ):
                     payload.pop("parse_mode", None)
-                    response = requests.post(
-                        url, data=payload, timeout=DEFAULT_REQUEST_TIMEOUT
+                    response = logged_request(
+                        "telegram",
+                        "POST",
+                        url,
+                        data=payload,
+                        timeout=DEFAULT_REQUEST_TIMEOUT,
                     )
 
             if response.status_code != 200:
@@ -235,10 +284,12 @@ class TelegramProvider(BaseSocialProvider):
 
         except requests.RequestException as e:
             raise PublishingError(
-                f"Network error communicating with Telegram Bot API: {e}"
+                f"Network error communicating with Telegram Bot API: {self._redact_token(e)}"
             ) from e
         except Exception as e:
-            raise PublishingError(f"Error publishing to Telegram: {e}") from e
+            raise PublishingError(
+                f"Error publishing to Telegram: {self._redact_token(e)}"
+            ) from e
 
     @classmethod
     def get_setup_instructions(cls) -> list[str]:

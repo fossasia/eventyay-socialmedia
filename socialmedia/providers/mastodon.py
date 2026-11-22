@@ -1,9 +1,12 @@
 import logging
 import os
 import tempfile
+import time
 from typing import Any
 
 from mastodon import Mastodon
+
+from socialmedia.operational_log import OUTCOME_FAILURE, OUTCOME_SUCCESS, log_operation
 
 from ..utils import safe_fetch_url
 from .base import BaseSocialProvider, PublishingError
@@ -36,18 +39,43 @@ class MastodonProvider(BaseSocialProvider):
                 ) from e
         return self._client
 
+    def _call_sdk(self, fn, *args, **kwargs):
+        """Invoke a Mastodon SDK method and record a privacy-safe request log."""
+        started = time.monotonic()
+        try:
+            result = fn(*args, **kwargs)
+        except Exception as exc:
+            log_operation(
+                "connection.request",
+                OUTCOME_FAILURE,
+                backend="mastodon",
+                duration_ms=int((time.monotonic() - started) * 1000),
+                error_code=type(exc).__name__,
+            )
+            raise
+        log_operation(
+            "connection.request",
+            OUTCOME_SUCCESS,
+            backend="mastodon",
+            duration_ms=int((time.monotonic() - started) * 1000),
+        )
+        return result
+
     def validate_credentials(self) -> bool:
         try:
-            self.client.account_verify_credentials()
+            self._call_sdk(self.client.account_verify_credentials)
             return True
         except Exception as e:
-            logger.error(f"Mastodon credentials validation failed: {e}")
+            logger.error("Mastodon credentials validation failed: %s", type(e).__name__)
             return False
 
     def send_test_message(self) -> dict[str, Any]:
         try:
-            self.client.account_verify_credentials()
-            self.client.status_post(status="✅ Connection successful from Eventyay!")
+            self._call_sdk(self.client.account_verify_credentials)
+            self._call_sdk(
+                self.client.status_post,
+                status="✅ Connection successful from Eventyay!",
+            )
             return {"success": True, "message": "Test post published successfully."}
         except Exception as e:
             return {"success": False, "message": f"Mastodon API error: {e}"}
@@ -86,18 +114,21 @@ class MastodonProvider(BaseSocialProvider):
                             tmp.write(r.content)
                             tmp_path = tmp.name
                         try:
-                            res = self.client.media_post(
-                                tmp_path, mime_type=content_type or None
+                            res = self._call_sdk(
+                                self.client.media_post,
+                                tmp_path,
+                                mime_type=content_type or None,
                             )
                             media_ids.append(res["id"])
                         finally:
                             if os.path.exists(tmp_path):
                                 os.remove(tmp_path)
                     else:
-                        res = self.client.media_post(file_path)
+                        res = self._call_sdk(self.client.media_post, file_path)
                         media_ids.append(res["id"])
 
-            status = self.client.status_post(
+            status = self._call_sdk(
+                self.client.status_post,
                 status=text,
                 media_ids=media_ids if media_ids else None,
             )

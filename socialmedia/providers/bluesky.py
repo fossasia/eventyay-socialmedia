@@ -7,6 +7,9 @@ from datetime import UTC, datetime
 from typing import Any
 
 import requests
+from django.conf import settings
+
+from socialmedia.operational_log import logged_request
 
 from .base import (
     BaseSocialProvider,
@@ -182,7 +185,9 @@ class BlueskyProvider(BaseSocialProvider):
 
         endpoint = f"{pds_url}/xrpc/com.atproto.server.createSession"
         try:
-            resp = requests.post(
+            resp = logged_request(
+                "bluesky",
+                "POST",
                 endpoint,
                 json={"identifier": identifier, "password": password},
                 timeout=15,
@@ -218,8 +223,6 @@ class BlueskyProvider(BaseSocialProvider):
     @staticmethod
     def _safe_open_local(media_item: str) -> tuple[bytes, str]:
         """Open a local media path safely, confined to MEDIA_ROOT."""
-        from django.conf import settings
-
         media_root = getattr(settings, "MEDIA_ROOT", None)
         if not media_root:
             raise PublishingError(
@@ -283,7 +286,9 @@ class BlueskyProvider(BaseSocialProvider):
         }
 
         try:
-            resp = requests.post(
+            resp = logged_request(
+                "bluesky",
+                "POST",
                 upload_url,
                 data=content,
                 headers=headers,
@@ -357,7 +362,9 @@ class BlueskyProvider(BaseSocialProvider):
                         }
                     )
                 except Exception as exc:
-                    logger.warning("Bluesky media upload failed for %s: %s", item, exc)
+                    logger.warning(
+                        "Bluesky media upload failed (%s)", type(exc).__name__
+                    )
                     if isinstance(exc, PublishingError):
                         raise
 
@@ -397,7 +404,9 @@ class BlueskyProvider(BaseSocialProvider):
         }
 
         try:
-            resp = requests.post(
+            resp = logged_request(
+                "bluesky",
+                "POST",
                 create_url,
                 json=payload,
                 headers=headers,
