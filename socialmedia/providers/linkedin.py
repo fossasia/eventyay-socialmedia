@@ -383,6 +383,7 @@ class LinkedInProvider(BaseSocialProvider):
                     json=rest_payload,
                     headers=fallback_headers,
                     timeout=20,
+                    retry_count=1,
                 )
             if resp.status_code in (200, 201):
                 post_id = None

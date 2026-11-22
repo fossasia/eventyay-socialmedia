@@ -7,6 +7,7 @@ from .operational_log import (
     OUTCOME_FAILURE,
     OUTCOME_SUCCESS,
     log_operation,
+    mark_job_failed,
     traced_job,
 )
 from .providers.registry import get_provider
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 @app.task
 @traced_job("publish_single_post")
-def publish_single_post(post_pk: int, provider_name: str):
+def publish_single_post(post_pk: int, provider_name: str, *, job_id: str | None = None):
     """Celery task to publish a single scheduled social media post asynchronously.
 
     Claims the post using database row locking (select_for_update) and executes
@@ -60,11 +61,10 @@ def publish_single_post(post_pk: int, provider_name: str):
         )
     except Exception as e:
         logger.error(
-            "Failed to publish post %s to %s: %s (status -> FAILED).",
+            "Failed to publish post %s to %s (%s) (status -> FAILED).",
             post_pk,
             provider_name,
-            e,
-            exc_info=True,
+            type(e).__name__,
         )
         log_operation(
             "social.post",
@@ -73,6 +73,7 @@ def publish_single_post(post_pk: int, provider_name: str):
             object_id=post_pk,
             error_code="publish_failed",
         )
+        mark_job_failed("publish_failed")
         claimed_post.status = SocialMediaPostStatus.FAILED
         claimed_post.error_message = str(e)
         claimed_post.save(update_fields=["status", "error_message", "updated_at"])

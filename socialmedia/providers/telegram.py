@@ -91,7 +91,10 @@ class TelegramProvider(BaseSocialProvider):
                 err_data = response.json()
                 desc = err_data.get("description", response.text)
             except Exception as exc:
-                logger.debug("Failed to parse Telegram error response body: %s", exc)
+                logger.debug(
+                    "Failed to parse Telegram error response body (%s)",
+                    type(exc).__name__,
+                )
                 desc = response.text
 
             return {
@@ -255,6 +258,7 @@ class TelegramProvider(BaseSocialProvider):
                         url,
                         data=payload,
                         timeout=DEFAULT_REQUEST_TIMEOUT,
+                        retry_count=1,
                     )
 
             if response.status_code != 200:
@@ -285,11 +289,11 @@ class TelegramProvider(BaseSocialProvider):
         except requests.RequestException as e:
             raise PublishingError(
                 f"Network error communicating with Telegram Bot API: {self._redact_token(e)}"
-            ) from e
+            ) from None
         except Exception as e:
             raise PublishingError(
                 f"Error publishing to Telegram: {self._redact_token(e)}"
-            ) from e
+            ) from None
 
     @classmethod
     def get_setup_instructions(cls) -> list[str]:

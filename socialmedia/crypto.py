@@ -35,5 +35,5 @@ def decrypt_credentials(encrypted_text: str) -> dict:
         decrypted_bytes = fernet.decrypt(encrypted_text.encode("utf-8"))
         return json.loads(decrypted_bytes.decode("utf-8"))
     except Exception as exc:
-        logger.warning("Failed to decrypt credentials: %s", exc)
+        logger.warning("Failed to decrypt credentials (%s)", type(exc).__name__)
         return {}

@@ -536,3 +536,207 @@ def test_route_handlers_log_operational_outcomes_without_pii(captured, monkeypat
     assert captured[-1][2]["event_id"] == 99
     assert captured[-1][2]["object_id"] == 55
     assert "Private draft text" not in str(captured)
+
+
+def test_publish_single_post_failure_marks_job_failed_with_shared_job_id(
+    captured, monkeypatch
+):
+    import socialmedia.tasks as tasks_mod
+
+    saved_states = []
+
+    class DummyPost:
+        pk = 202
+        post_text = "Post body"
+        media_url = None
+        status = "exported"
+        error_message = ""
+
+        def save(self, update_fields=None):
+            saved_states.append((self.status, self.error_message))
+
+    dummy_post = DummyPost()
+    dummy_account = SimpleNamespace(provider="bluesky")
+
+    def boom_publish(text, media=None):
+        raise RuntimeError("secret-provider-detail")
+
+    dummy_provider = SimpleNamespace(publish_post=boom_publish)
+    monkeypatch.setattr(
+        tasks_mod,
+        "claim_post_for_publishing",
+        lambda post_pk, provider_name: (dummy_post, dummy_account),
+    )
+    monkeypatch.setattr(tasks_mod, "get_provider", lambda account: dummy_provider)
+
+    tasks_mod.publish_single_post(202, "bluesky", job_id="exec-corr-202")
+
+    assert dummy_post.status == "failed"
+    assert saved_states == [("failed", "secret-provider-detail")]
+    actions = [(item[1], item[2]["outcome"]) for item in captured]
+    assert actions == [
+        ("job.start", "success"),
+        ("social.post", "failure"),
+        ("job.fail", "failure"),
+    ]
+    assert all(item[2]["job_id"] == "exec-corr-202" for item in captured)
+    assert captured[2][2]["error_code"] == "publish_failed"
+    assert "secret-provider-detail" not in str(captured)
+
+
+def test_save_and_generate_emits_settings_and_generation_only_on_commit(
+    captured, monkeypatch
+):
+    import socialmedia.views as views_mod
+
+    callbacks = []
+    monkeypatch.setattr(
+        views_mod.transaction, "on_commit", lambda fn: callbacks.append(fn)
+    )
+    monkeypatch.setattr(views_mod.messages, "success", lambda *a, **kw: None)
+    monkeypatch.setattr(views_mod, "reverse", lambda *a, **kw: "/social/posts/")
+    raw_form_valid = views_mod.SocialMediaTemplatesView.form_valid.__wrapped__
+
+    def make_view(sync_fn):
+        monkeypatch.setattr(views_mod, "sync_posts_to_db", sync_fn)
+        view = views_mod.SocialMediaTemplatesView()
+        view._save_decoupled = lambda form: None
+        view.request = SimpleNamespace(
+            POST={"action": "save_and_generate"},
+            user=SimpleNamespace(is_authenticated=True, pk=11),
+            event=SimpleNamespace(
+                pk=88,
+                slug="ev",
+                organizer=SimpleNamespace(pk=1, slug="org"),
+                settings=SimpleNamespace(set=lambda *a, **kw: None),
+                log_action=lambda *a, **kw: None,
+            ),
+            resolver_match=SimpleNamespace(view_name="plugins:socialmedia:templates"),
+        )
+        return view
+
+    form = SimpleNamespace(
+        cleaned_data={},
+        changed_data=[],
+        has_changed=lambda: False,
+        save=lambda: None,
+    )
+
+    # 1. Rolled-back save_and_generate: sync_posts_to_db raises -> on_commit not run -> no log emitted
+    def fail_sync(event, request):
+        raise RuntimeError("db sync failed")
+
+    view_fail = make_view(fail_sync)
+    with pytest.raises(RuntimeError):
+        raw_form_valid(view_fail, form)
+    callbacks.clear()
+    assert captured == []
+
+    # 2. Committed save_and_generate: on_commit callbacks fire -> both logs emitted
+    view_ok = make_view(lambda event, request: None)
+    resp = raw_form_valid(view_ok, form)
+    assert resp.status_code == 302
+    assert captured == []
+    for cb in callbacks:
+        cb()
+    assert [item[1] for item in captured] == [
+        "social.settings.updated",
+        "social.posts.generated",
+    ]
+    assert all(item[2]["event_id"] == 88 for item in captured)
+    assert all(item[2]["user_id"] == 11 for item in captured)
+
+
+def test_export_csv_normalizes_unrecognized_format_in_log(captured, monkeypatch):
+    import socialmedia.views as views_mod
+
+    req_base = dict(
+        method="POST",
+        user=SimpleNamespace(
+            is_authenticated=True,
+            pk=15,
+            has_event_permission=lambda *a, **kw: True,
+        ),
+        organizer=SimpleNamespace(pk=1, slug="org"),
+        event=SimpleNamespace(
+            pk=44,
+            slug="ev",
+            organizer=SimpleNamespace(pk=1, slug="org"),
+            get_plugins=lambda: ["socialmedia"],
+        ),
+        resolver_match=SimpleNamespace(view_name="plugins:socialmedia:export"),
+    )
+
+    req_unknown = SimpleNamespace(
+        body=json.dumps({"posts": [], "format": "custom-user-format"}).encode("utf-8"),
+        **req_base,
+    )
+    resp = views_mod.export_csv(req_unknown, "org", "ev")
+    assert resp.status_code == 200
+    assert captured[-1][1] == "social.posts.exported"
+    assert captured[-1][2]["backend"] == "generic"
+    assert "custom-user-format" not in str(captured)
+
+    req_known = SimpleNamespace(
+        body=json.dumps({"posts": [], "format": "buffer"}).encode("utf-8"),
+        **req_base,
+    )
+    resp_known = views_mod.export_csv(req_known, "org", "ev")
+    assert resp_known.status_code == 200
+    assert captured[-1][2]["backend"] == "buffer"
+
+
+def test_organizer_account_delete_view_logs_on_form_valid_and_delete(
+    captured, monkeypatch
+):
+    import socialmedia.views as views_mod
+
+    success_msgs = []
+    monkeypatch.setattr(
+        views_mod.messages, "success", lambda req, msg: success_msgs.append(str(msg))
+    )
+
+    # Browser POST path calls form_valid(form)
+    deleted_in_form = []
+    view_post = views_mod.OrganizerAccountDeleteView()
+    view_post.request = SimpleNamespace(
+        GET={},
+        user=SimpleNamespace(is_authenticated=True, pk=21),
+        organizer=SimpleNamespace(pk=1, slug="org"),
+    )
+    view_post.object = SimpleNamespace(
+        pk=301,
+        provider="mastodon",
+        delete=lambda: deleted_in_form.append(301),
+    )
+    view_post.get_success_url = lambda: "/accounts/"
+
+    resp_post = view_post.form_valid(SimpleNamespace())
+    assert resp_post.status_code == 302
+    assert deleted_in_form == [301]
+    assert captured[-1][1] == "social.account.deleted"
+    assert captured[-1][2]["backend"] == "mastodon"
+    assert captured[-1][2]["object_id"] == 301
+    assert captured[-1][2]["user_id"] == 21
+    assert len(success_msgs) == 1
+
+    # Direct HTTP DELETE path calls delete(request)
+    deleted_in_delete = []
+    view_del = views_mod.OrganizerAccountDeleteView()
+    view_del.request = view_post.request
+    acct = SimpleNamespace(
+        pk=302,
+        provider="telegram",
+        delete=lambda: deleted_in_delete.append(302),
+    )
+    view_del.get_object = lambda queryset=None: acct
+    view_del.get_success_url = lambda: "/accounts/"
+
+    resp_del = view_del.delete(view_del.request)
+    assert resp_del.status_code == 302
+    assert deleted_in_delete == [302]
+    assert captured[-1][1] == "social.account.deleted"
+    assert captured[-1][2]["backend"] == "telegram"
+    assert captured[-1][2]["object_id"] == 302
+    assert captured[-1][2]["user_id"] == 21
+    assert len(success_msgs) == 2

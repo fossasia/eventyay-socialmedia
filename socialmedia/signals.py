@@ -18,7 +18,13 @@ from eventyay.control.signals import (
 )
 
 from .models import SocialMediaAccount, SocialMediaPost, SocialMediaPostStatus
-from .operational_log import OUTCOME_FAILURE, log_operation
+from .operational_log import (
+    OUTCOME_FAILURE,
+    OUTCOME_SUCCESS,
+    log_operation,
+    new_correlation_id,
+    traced_job,
+)
 
 HAS_SOCIAL_MEDIA_PERM = hasattr(Team, "can_manage_social_media")
 DIRECT_PUBLISH_PROVIDERS = ["telegram", "mastodon", "twitter", "linkedin", "bluesky"]
@@ -214,6 +220,7 @@ def claim_post_for_publishing(post_pk: int, provider_name: str):
 
 @receiver(periodic_task, dispatch_uid="socialmedia_publish_scheduled_posts")
 @scopes_disabled()
+@traced_job("publish_scheduled_posts")
 def publish_scheduled_posts(sender, **kwargs):
     """Periodic task dispatcher to publish scheduled social media posts
     for direct native platform integrations (Telegram, Mastodon, Twitter/X, LinkedIn).
@@ -303,7 +310,21 @@ def publish_scheduled_posts(sender, **kwargs):
                 provider_name,
                 is_eager,
             )
+            dispatch_job_id = new_correlation_id()
+            log_operation(
+                "job.dispatch",
+                OUTCOME_SUCCESS,
+                job_name="publish_single_post",
+                backend=provider_name,
+                event_id=post.event_id,
+                object_id=post.pk,
+                job_id=dispatch_job_id,
+            )
             if is_eager:
-                publish_single_post(post.pk, provider_name)
+                publish_single_post(post.pk, provider_name, job_id=dispatch_job_id)
             else:
-                publish_single_post.apply_async(args=[post.pk, provider_name])
+                publish_single_post.apply_async(
+                    args=[post.pk, provider_name],
+                    kwargs={"job_id": dispatch_job_id},
+                    task_id=dispatch_job_id,
+                )

@@ -217,7 +217,7 @@ class BlueskyProvider(BaseSocialProvider):
             session = self._create_session()
             return bool(session.get("accessJwt"))
         except Exception as e:
-            logger.error("Bluesky credentials validation failed: %s", e)
+            logger.error("Bluesky credentials validation failed: %s", type(e).__name__)
             return False
 
     @staticmethod
