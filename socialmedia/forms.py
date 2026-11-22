@@ -6,6 +6,7 @@ from eventyay.base.forms import SettingsForm
 from .export import DEFAULT_TEMPLATES, PLATFORMS
 from .models import SocialMediaAccount
 from .providers.base import _validate_url_host
+from .providers.bluesky import MAX_POST_BYTES, MAX_POST_GRAPHEMES, count_graphemes
 from .telegram_utils import normalize_telegram_chat_id
 
 MAX_OFFSETS = 10
@@ -24,7 +25,7 @@ PLATFORM_CHAR_LIMITS = {
     "mastodon": 500,
     "telegram": 4096,
     "linkedin": 3000,
-    "bluesky": 300,
+    "bluesky": MAX_POST_GRAPHEMES,
 }
 
 # Extra help-text hints per platform
@@ -95,15 +96,17 @@ def _validate_offsets(value, max_value, unit_label="days"):
     return ", ".join(str(v) for v in sorted(cleaned, reverse=True))
 
 
-def _check_platform_char_limit(value, limit, platform_name):
+def _check_platform_char_limit(value, platform):
     """Raise ValidationError if the template text (excluding {token} placeholders)
     already exceeds the platform character limit."""
     import re
 
+    limit = PLATFORM_CHAR_LIMITS.get(platform)
     if not value or not limit:
         return value
     stripped = re.sub(r"\{[^}]+\}", "", value)
-    if len(stripped) > limit:
+    length = count_graphemes(stripped) if platform == "bluesky" else len(stripped)
+    if length > limit:
         raise forms.ValidationError(
             _(
                 "The template text (excluding placeholders) is %(length)s characters, "
@@ -111,10 +114,18 @@ def _check_platform_char_limit(value, limit, platform_name):
                 "Shorten the template so interpolated posts fit within the limit."
             ),
             params={
-                "length": len(stripped),
-                "platform": platform_name,
+                "length": length,
+                "platform": PLATFORMS.get(platform, platform),
                 "limit": limit,
             },
+        )
+    if platform == "bluesky" and len(stripped.encode("utf-8")) > MAX_POST_BYTES:
+        raise forms.ValidationError(
+            _(
+                "The template text (excluding placeholders) exceeds "
+                "the Bluesky limit of %(limit)s UTF-8 bytes."
+            ),
+            params={"limit": MAX_POST_BYTES},
         )
     return value
 
@@ -542,9 +553,7 @@ class SocialMediaTemplatesForm(SettingsForm):
 
     def _clean_platform_template(self, field_name, platform):
         value = self.cleaned_data.get(field_name, "")
-        limit = PLATFORM_CHAR_LIMITS.get(platform)
-        platform_label = PLATFORMS.get(platform, platform)
-        return _check_platform_char_limit(value, limit, platform_label)
+        return _check_platform_char_limit(value, platform)
 
 
 def _add_platform_clean_methods():
