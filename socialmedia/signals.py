@@ -311,6 +311,27 @@ def publish_scheduled_posts(sender, **kwargs):
                 is_eager,
             )
             dispatch_job_id = new_correlation_id()
+            try:
+                if is_eager:
+                    publish_single_post(post.pk, provider_name, job_id=dispatch_job_id)
+                else:
+                    publish_single_post.apply_async(
+                        args=[post.pk, provider_name],
+                        kwargs={"job_id": dispatch_job_id},
+                        task_id=dispatch_job_id,
+                    )
+            except Exception:
+                log_operation(
+                    "job.dispatch",
+                    OUTCOME_FAILURE,
+                    job_name="publish_single_post",
+                    backend=provider_name,
+                    event_id=post.event_id,
+                    object_id=post.pk,
+                    job_id=dispatch_job_id,
+                    error_code="dispatch_failed",
+                )
+                raise
             log_operation(
                 "job.dispatch",
                 OUTCOME_SUCCESS,
@@ -320,11 +341,3 @@ def publish_scheduled_posts(sender, **kwargs):
                 object_id=post.pk,
                 job_id=dispatch_job_id,
             )
-            if is_eager:
-                publish_single_post(post.pk, provider_name, job_id=dispatch_job_id)
-            else:
-                publish_single_post.apply_async(
-                    args=[post.pk, provider_name],
-                    kwargs={"job_id": dispatch_job_id},
-                    task_id=dispatch_job_id,
-                )

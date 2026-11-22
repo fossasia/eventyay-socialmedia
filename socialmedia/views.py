@@ -524,74 +524,100 @@ class SocialMediaTemplatesView(DecoupleMixin, FormView):
         }
         return ctx
 
-    @transaction.atomic
     def form_valid(self, form):
-        self._save_decoupled(form)
-        form.save()
-
-        # Synchronize comma-separated offset settings from enabled waves and custom waves
-        for ptype, waves in CONTENT_TYPE_WAVES.items():
-            active_offs = []
-            has_wave_setting = False
-            for wkey, _wlabel, def_off, _wunit in waves:
-                en_key = f"socialmedia_{ptype}_{wkey}_enabled"
-                off_key = f"socialmedia_{ptype}_{wkey}_offset"
-                if en_key in form.cleaned_data:
-                    has_wave_setting = True
-                    if form.cleaned_data.get(en_key):
-                        val = form.cleaned_data.get(off_key)
-                        active_offs.append(str(val if val is not None else def_off))
-
-            # Include custom waves offsets
-            cw_raw = form.cleaned_data.get(f"socialmedia_{ptype}_custom_waves")
-            if cw_raw:
-                try:
-                    c_list = json.loads(cw_raw) if isinstance(cw_raw, str) else cw_raw
-                    for cw in c_list:
-                        if cw.get("enabled", True) and cw.get("offset") is not None:
-                            active_offs.append(str(cw["offset"]))
-                except Exception:
-                    pass
-
-            if has_wave_setting:
-                self.request.event.settings.set(
-                    f"socialmedia_{ptype}_offset",
-                    ", ".join(active_offs) if active_offs else "0",
-                )
-
-        if form.has_changed():
-            self.request.event.log_action(
-                "eventyay.event.settings",
-                user=self.request.user,
-                data={k: form.cleaned_data.get(k) for k in form.changed_data},
-            )
-        _log_settings_saved_on_commit(self.request, "plugins:socialmedia:templates")
-        messages.success(self.request, _("Templates have been saved."))
-
         action = self.request.POST.get("action")
-        if action == "save_and_generate":
-            sync_posts_to_db(self.request.event, self.request)
-            event_id = _event_id(self.request)
-            user_id = _user_id(self.request)
-            transaction.on_commit(
-                lambda: log_operation(
-                    "social.posts.generated",
-                    OUTCOME_SUCCESS,
-                    event_id=event_id,
-                    user_id=user_id,
+        try:
+            with transaction.atomic():
+                self._save_decoupled(form)
+                form.save()
+
+                # Synchronize comma-separated offset settings from enabled waves and custom waves
+                for ptype, waves in CONTENT_TYPE_WAVES.items():
+                    active_offs = []
+                    has_wave_setting = False
+                    for wkey, _wlabel, def_off, _wunit in waves:
+                        en_key = f"socialmedia_{ptype}_{wkey}_enabled"
+                        off_key = f"socialmedia_{ptype}_{wkey}_offset"
+                        if en_key in form.cleaned_data:
+                            has_wave_setting = True
+                            if form.cleaned_data.get(en_key):
+                                val = form.cleaned_data.get(off_key)
+                                active_offs.append(
+                                    str(val if val is not None else def_off)
+                                )
+
+                    # Include custom waves offsets
+                    cw_raw = form.cleaned_data.get(f"socialmedia_{ptype}_custom_waves")
+                    if cw_raw:
+                        try:
+                            c_list = (
+                                json.loads(cw_raw)
+                                if isinstance(cw_raw, str)
+                                else cw_raw
+                            )
+                            for cw in c_list:
+                                if (
+                                    cw.get("enabled", True)
+                                    and cw.get("offset") is not None
+                                ):
+                                    active_offs.append(str(cw["offset"]))
+                        except Exception:
+                            pass
+
+                    if has_wave_setting:
+                        self.request.event.settings.set(
+                            f"socialmedia_{ptype}_offset",
+                            ", ".join(active_offs) if active_offs else "0",
+                        )
+
+                if form.has_changed():
+                    self.request.event.log_action(
+                        "eventyay.event.settings",
+                        user=self.request.user,
+                        data={k: form.cleaned_data.get(k) for k in form.changed_data},
+                    )
+                _log_settings_saved_on_commit(
+                    self.request, "plugins:socialmedia:templates"
                 )
+                messages.success(self.request, _("Templates have been saved."))
+
+                if action == "save_and_generate":
+                    sync_posts_to_db(self.request.event, self.request)
+                    event_id = _event_id(self.request)
+                    user_id = _user_id(self.request)
+                    transaction.on_commit(
+                        lambda: log_operation(
+                            "social.posts.generated",
+                            OUTCOME_SUCCESS,
+                            event_id=event_id,
+                            user_id=user_id,
+                        )
+                    )
+                    messages.success(self.request, _("Posts generated successfully."))
+                    return redirect(
+                        reverse(
+                            "plugins:socialmedia:posts",
+                            kwargs={
+                                "organizer": self.request.event.organizer.slug,
+                                "event": self.request.event.slug,
+                            },
+                        )
+                    )
+                return super().form_valid(form)
+        except Exception:
+            log_operation(
+                (
+                    "social.posts.generated"
+                    if action == "save_and_generate"
+                    else "social.settings.updated"
+                ),
+                OUTCOME_FAILURE,
+                event_id=_event_id(self.request),
+                user_id=_user_id(self.request),
+                route=_route_name(self.request) or "plugins:socialmedia:templates",
+                error_code="save_failed",
             )
-            messages.success(self.request, _("Posts generated successfully."))
-            return redirect(
-                reverse(
-                    "plugins:socialmedia:posts",
-                    kwargs={
-                        "organizer": self.request.event.organizer.slug,
-                        "event": self.request.event.slug,
-                    },
-                )
-            )
-        return super().form_valid(form)
+            raise
 
     def form_invalid(self, form):
         messages.error(

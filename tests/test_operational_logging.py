@@ -591,11 +591,20 @@ def test_save_and_generate_emits_settings_and_generation_only_on_commit(
 
     callbacks = []
     monkeypatch.setattr(
+        views_mod.transaction,
+        "atomic",
+        lambda *a, **kw: (a[0] if a and callable(a[0]) else MagicMock()),
+    )
+    monkeypatch.setattr(
         views_mod.transaction, "on_commit", lambda fn: callbacks.append(fn)
     )
     monkeypatch.setattr(views_mod.messages, "success", lambda *a, **kw: None)
     monkeypatch.setattr(views_mod, "reverse", lambda *a, **kw: "/social/posts/")
-    raw_form_valid = views_mod.SocialMediaTemplatesView.form_valid.__wrapped__
+    monkeypatch.setattr(
+        views_mod,
+        "redirect",
+        lambda url: SimpleNamespace(status_code=302, url=url),
+    )
 
     def make_view(sync_fn):
         monkeypatch.setattr(views_mod, "sync_posts_to_db", sync_fn)
@@ -622,19 +631,25 @@ def test_save_and_generate_emits_settings_and_generation_only_on_commit(
         save=lambda: None,
     )
 
-    # 1. Rolled-back save_and_generate: sync_posts_to_db raises -> on_commit not run -> no log emitted
+    # 1. Rolled-back save_and_generate: sync_posts_to_db raises -> on_commit not run -> failure log emitted
     def fail_sync(event, request):
         raise RuntimeError("db sync failed")
 
     view_fail = make_view(fail_sync)
     with pytest.raises(RuntimeError):
-        raw_form_valid(view_fail, form)
+        view_fail.form_valid(form)
     callbacks.clear()
-    assert captured == []
+    assert len(captured) == 1
+    assert captured[0][1] == "social.posts.generated"
+    assert captured[0][2]["outcome"] == "failure"
+    assert captured[0][2]["error_code"] == "save_failed"
+    assert captured[0][2]["event_id"] == 88
+    assert captured[0][2]["user_id"] == 11
+    captured.clear()
 
     # 2. Committed save_and_generate: on_commit callbacks fire -> both logs emitted
     view_ok = make_view(lambda event, request: None)
-    resp = raw_form_valid(view_ok, form)
+    resp = view_ok.form_valid(form)
     assert resp.status_code == 302
     assert captured == []
     for cb in callbacks:
@@ -645,6 +660,87 @@ def test_save_and_generate_emits_settings_and_generation_only_on_commit(
     ]
     assert all(item[2]["event_id"] == 88 for item in captured)
     assert all(item[2]["user_id"] == 11 for item in captured)
+
+
+def test_publish_scheduled_posts_logs_dispatch_after_submission_and_failure_on_error(
+    captured, monkeypatch
+):
+    from django.conf import settings
+
+    import socialmedia.signals as signals_mod
+    import socialmedia.tasks as tasks_mod
+
+    monkeypatch.setattr(settings, "CELERY_TASK_ALWAYS_EAGER", False, raising=False)
+    monkeypatch.setattr(settings, "CELERY_ALWAYS_EAGER", False, raising=False)
+
+    dummy_post = SimpleNamespace(
+        pk=404,
+        event_id=99,
+        entity_id="cfp_1_bluesky",
+        scheduled_at="2026-11-22T00:00:00Z",
+        is_pinned=True,
+        event=SimpleNamespace(
+            pk=99,
+            slug="ev",
+            organizer=SimpleNamespace(pk=1, slug="org"),
+            settings=SimpleNamespace(get=lambda *a, **kw: True),
+        ),
+    )
+
+    class DummyPostQS:
+        def filter(self, *a, **kw):
+            return self
+
+        def order_by(self, *a):
+            return self
+
+        def count(self):
+            return 1
+
+        def __iter__(self):
+            return iter([dummy_post])
+
+    monkeypatch.setattr(
+        signals_mod.SocialMediaPost.objects,
+        "select_related",
+        lambda *a, **kw: DummyPostQS(),
+    )
+    monkeypatch.setattr(signals_mod, "new_correlation_id", lambda: "dispatch-corr-404")
+
+    # 1. apply_async succeeds -> job.dispatch emitted AFTER submission returns
+    dispatched = []
+
+    def ok_apply_async(args=None, kwargs=None, task_id=None):
+        # Not yet logged while inside apply_async
+        assert not any(item[1] == "job.dispatch" for item in captured)
+        dispatched.append((args, kwargs, task_id))
+
+    monkeypatch.setattr(tasks_mod.publish_single_post, "apply_async", ok_apply_async)
+    signals_mod.publish_scheduled_posts.__wrapped__(sender=None)
+    assert len(dispatched) == 1
+    dispatch_logs = [item for item in captured if item[1] == "job.dispatch"]
+    assert len(dispatch_logs) == 1
+    assert dispatch_logs[0][2]["outcome"] == "success"
+    assert dispatch_logs[0][2]["job_id"] == "dispatch-corr-404"
+    assert dispatch_logs[0][2]["event_id"] == 99
+    assert dispatch_logs[0][2]["object_id"] == 404
+    captured.clear()
+
+    # 2. apply_async raises -> job.dispatch emitted with outcome=failure and re-raised
+    def fail_apply_async(args=None, kwargs=None, task_id=None):
+        raise RuntimeError("broker down")
+
+    monkeypatch.setattr(tasks_mod.publish_single_post, "apply_async", fail_apply_async)
+    with pytest.raises(RuntimeError, match="broker down"):
+        signals_mod.publish_scheduled_posts.__wrapped__(sender=None)
+
+    dispatch_fail_logs = [item for item in captured if item[1] == "job.dispatch"]
+    assert len(dispatch_fail_logs) == 1
+    assert dispatch_fail_logs[0][2]["outcome"] == "failure"
+    assert dispatch_fail_logs[0][2]["error_code"] == "dispatch_failed"
+    assert dispatch_fail_logs[0][2]["job_id"] == "dispatch-corr-404"
+    assert dispatch_fail_logs[0][2]["event_id"] == 99
+    assert dispatch_fail_logs[0][2]["object_id"] == 404
 
 
 def test_export_csv_normalizes_unrecognized_format_in_log(captured, monkeypatch):
