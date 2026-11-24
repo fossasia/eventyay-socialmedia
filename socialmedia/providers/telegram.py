@@ -1,4 +1,6 @@
 import logging
+import re
+import urllib.parse
 from typing import Any
 
 import requests
@@ -26,7 +28,12 @@ class TelegramProvider(BaseSocialProvider):
     def _redact_token(self, value: object) -> str:
         text = str(value)
         if self.token:
-            return text.replace(self.token, "<redacted>")
+            text = text.replace(self.token, "<redacted>")
+            text = text.replace(urllib.parse.quote(str(self.token)), "<redacted>")
+        text = re.sub(
+            r"api\.telegram\.org/bot[^/\s]+", "api.telegram.org/bot<redacted>", text
+        )
+        text = re.sub(r"/bot[^/\s]+", "/bot<redacted>", text)
         return text
 
     def validate_credentials(self) -> bool:
@@ -55,7 +62,9 @@ class TelegramProvider(BaseSocialProvider):
             return True
         except Exception as e:
             logger.error(
-                "Telegram credentials validation failed: %s", self._redact_token(e)
+                "Telegram credentials validation failed: %s",
+                self._redact_token(e),
+                exc_info=True,
             )
             return False
 
@@ -107,10 +116,13 @@ class TelegramProvider(BaseSocialProvider):
         except requests.RequestException as e:
             return {
                 "success": False,
-                "message": f"Network error: {self._redact_token(e)}",
+                "message": f"Network error: {type(e).__name__}",
             }
         except Exception as e:
-            return {"success": False, "message": self._redact_token(e)}
+            return {
+                "success": False,
+                "message": f"Telegram API error: {type(e).__name__}",
+            }
 
     def _resolve_chat_id(self):
         """Return chat_id as int if numeric, otherwise keep as string.

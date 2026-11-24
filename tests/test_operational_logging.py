@@ -593,7 +593,7 @@ def test_save_and_generate_emits_settings_and_generation_only_on_commit(
     monkeypatch.setattr(
         views_mod.transaction,
         "atomic",
-        lambda *a, **kw: (a[0] if a and callable(a[0]) else MagicMock()),
+        lambda *a, **kw: a[0] if a and callable(a[0]) else MagicMock(),
     )
     monkeypatch.setattr(
         views_mod.transaction, "on_commit", lambda fn: callbacks.append(fn)

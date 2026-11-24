@@ -78,7 +78,10 @@ class MastodonProvider(BaseSocialProvider):
             )
             return {"success": True, "message": "Test post published successfully."}
         except Exception as e:
-            return {"success": False, "message": f"Mastodon API error: {e}"}
+            return {
+                "success": False,
+                "message": f"Mastodon API error: {type(e).__name__}",
+            }
 
     def publish_post(self, text: str, media: list[str] | None = None) -> dict[str, Any]:
         try:

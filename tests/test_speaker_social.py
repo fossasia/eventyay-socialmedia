@@ -117,11 +117,11 @@ def test_platform_default_templates_contain_social_handles():
 
     for platform in ["twitter", "telegram", "linkedin", "mastodon"]:
         speaker_tpl = PLATFORM_DEFAULT_TEMPLATES[platform]["speaker"]["announcement"]
-        assert (
-            "{speaker_social_handle}" in speaker_tpl
-        ), f"Missing in {platform} speaker announcement"
+        assert "{speaker_social_handle}" in speaker_tpl, (
+            f"Missing in {platform} speaker announcement"
+        )
 
         session_tpl = PLATFORM_DEFAULT_TEMPLATES[platform]["session"]["announcement"]
-        assert (
-            "{speaker_social_handles}" in session_tpl
-        ), f"Missing in {platform} session announcement"
+        assert "{speaker_social_handles}" in session_tpl, (
+            f"Missing in {platform} session announcement"
+        )
