@@ -1,12 +1,16 @@
 import csv
 import io
+import json
 import logging
 import re
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pytz
+from django.conf import settings as django_settings
 from django.utils import timezone
 from django.utils.timezone import is_naive, make_aware
+
+from .models import SocialMediaPost, SocialMediaPostStatus
 
 logger = logging.getLogger(__name__)
 
@@ -724,8 +728,6 @@ def localize(dt, event):
 def event_absolute_url(path, request=None):
     if request:
         return request.build_absolute_uri(path)
-    from django.conf import settings as django_settings
-
     base = getattr(django_settings, "SITE_URL", "").rstrip("/")
     return f"{base}{path}" if base else path
 
@@ -763,8 +765,6 @@ CONTENT_TYPE_WAVES = {
 
 def _get_custom_waves(event, key):
     """Return list of organizer-created custom waves for content type `key`."""
-    import json
-
     raw = event.settings.get(f"socialmedia_{key}_custom_waves")
     if not raw:
         return []
@@ -1477,10 +1477,6 @@ def build_posts(event, request=None):
 
 def sync_posts_to_db(event, request=None):
     """Sync built posts into SocialMediaPost database records."""
-    from datetime import datetime
-
-    from .models import SocialMediaPost, SocialMediaPostStatus
-
     posts = build_posts(event, request)
     tz = pytz.timezone(getattr(event, "timezone", None) or "UTC")
 

@@ -1,3 +1,4 @@
+import functools
 import json
 import logging
 from datetime import datetime
@@ -15,6 +16,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_GET, require_POST
 from django.views.generic import CreateView, DeleteView, FormView, ListView, UpdateView
+from django_scopes import scope
 from eventyay.base.models import Team
 from eventyay.control.permissions import OrganizerPermissionRequiredMixin
 from eventyay.control.views.event import DecoupleMixin
@@ -23,13 +25,16 @@ from eventyay.control.views.organizer_views.organizer_detail_view_mixin import (
 )
 
 from .export import (
+    CONTENT_TYPE_WAVES,
     PLATFORMS,
+    _get_custom_waves,
     build_posts,
     generate_csv_from_posts,
     sync_posts_to_db,
 )
 from .forms import PROVIDER_FORMS, SocialMediaSettingsForm, SocialMediaTemplatesForm
 from .models import SocialMediaAccount, SocialMediaPost, SocialMediaPostStatus
+from .operational_log import OUTCOME_FAILURE, OUTCOME_SUCCESS, log_operation
 from .providers.registry import get_provider, get_provider_class
 
 HAS_SOCIAL_MEDIA_PERM = hasattr(Team, "can_manage_social_media")
@@ -56,7 +61,53 @@ def _check_plugin_active(request):
     else:
         active = "socialmedia" in (request.event.plugins or "").split(",")
     if not active:
+        log_operation(
+            "plugin.disabled",
+            OUTCOME_FAILURE,
+            event_id=_event_id(request),
+            user_id=_user_id(request),
+            route=_route_name(request),
+            backend="socialmedia",
+            error_code="plugin_disabled",
+        )
         raise Http404(_("Social media plugin is not enabled for this event."))
+
+
+def _user_id(request):
+    user = getattr(request, "user", None)
+    if user is not None and getattr(user, "is_authenticated", False):
+        pk = getattr(user, "pk", None)
+        if isinstance(pk, int) and not isinstance(pk, bool):
+            return pk
+    return None
+
+
+def _event_id(request):
+    event = getattr(request, "event", None)
+    pk = getattr(event, "pk", None)
+    if isinstance(pk, int) and not isinstance(pk, bool):
+        return pk
+    return None
+
+
+def _route_name(request):
+    match = getattr(request, "resolver_match", None)
+    return getattr(match, "view_name", None) if match else None
+
+
+def _log_settings_saved_on_commit(request, default_route: str) -> None:
+    event_id = _event_id(request)
+    user_id = _user_id(request)
+    route = _route_name(request) or default_route
+    transaction.on_commit(
+        lambda: log_operation(
+            "social.settings.updated",
+            OUTCOME_SUCCESS,
+            event_id=event_id,
+            user_id=user_id,
+            route=route,
+        )
+    )
 
 
 def _check_permission(request):
@@ -69,6 +120,14 @@ def _check_permission(request):
         EVENT_PERMISSION,
         request=request,
     ):
+        log_operation(
+            "permission.denied",
+            OUTCOME_FAILURE,
+            event_id=_event_id(request),
+            user_id=_user_id(request),
+            route=_route_name(request),
+            error_code="forbidden",
+        )
         raise PermissionDenied()
 
 
@@ -111,6 +170,13 @@ class SocialMediaSettingsView(DecoupleMixin, FormView):
 
     def dispatch(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
+            log_operation(
+                "auth.denied",
+                OUTCOME_FAILURE,
+                event_id=_event_id(request),
+                route=_route_name(request) or "plugins:socialmedia:posts",
+                error_code="unauthorized",
+            )
             raise PermissionDenied()
         _check_plugin_active(request)
         _check_permission(request)
@@ -192,6 +258,7 @@ class SocialMediaSettingsView(DecoupleMixin, FormView):
                 user=self.request.user,
                 data={k: form.cleaned_data.get(k) for k in form.changed_data},
             )
+        _log_settings_saved_on_commit(self.request, "plugins:socialmedia:posts")
         messages.success(self.request, _("Your changes have been saved."))
         return super().form_valid(form)
 
@@ -214,6 +281,13 @@ class SocialMediaPostSettingsView(DecoupleMixin, FormView):
 
     def dispatch(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
+            log_operation(
+                "auth.denied",
+                OUTCOME_FAILURE,
+                event_id=_event_id(request),
+                route=_route_name(request) or "plugins:socialmedia:posts",
+                error_code="unauthorized",
+            )
             raise PermissionDenied()
         _check_plugin_active(request)
         _check_permission(request)
@@ -270,6 +344,9 @@ class SocialMediaPostSettingsView(DecoupleMixin, FormView):
                 user=self.request.user,
                 data={k: form.cleaned_data.get(k) for k in form.changed_data},
             )
+        _log_settings_saved_on_commit(
+            self.request, "plugins:socialmedia:plugin_settings"
+        )
         messages.success(self.request, _("Your settings have been saved."))
 
         action = self.request.POST.get("action")
@@ -304,6 +381,13 @@ class SocialMediaTemplatesView(DecoupleMixin, FormView):
 
     def dispatch(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
+            log_operation(
+                "auth.denied",
+                OUTCOME_FAILURE,
+                event_id=_event_id(request),
+                route=_route_name(request) or "plugins:socialmedia:posts",
+                error_code="unauthorized",
+            )
             raise PermissionDenied()
         _check_plugin_active(request)
         _check_permission(request)
@@ -434,75 +518,106 @@ class SocialMediaTemplatesView(DecoupleMixin, FormView):
                 "tokens": ["{event_name}", "{schedule_link}", "{hashtags}"],
             },
         ]
-        from .export import _get_custom_waves
-
         ctx["custom_waves"] = {
             ptype: _get_custom_waves(self.request.event, ptype)
             for ptype in ["cfp", "speaker", "session", "ticket", "schedule"]
         }
         return ctx
 
-    @transaction.atomic
     def form_valid(self, form):
-        import json
-
-        from .export import CONTENT_TYPE_WAVES
-
-        self._save_decoupled(form)
-        form.save()
-
-        # Synchronize comma-separated offset settings from enabled waves and custom waves
-        for ptype, waves in CONTENT_TYPE_WAVES.items():
-            active_offs = []
-            has_wave_setting = False
-            for wkey, _wlabel, def_off, _wunit in waves:
-                en_key = f"socialmedia_{ptype}_{wkey}_enabled"
-                off_key = f"socialmedia_{ptype}_{wkey}_offset"
-                if en_key in form.cleaned_data:
-                    has_wave_setting = True
-                    if form.cleaned_data.get(en_key):
-                        val = form.cleaned_data.get(off_key)
-                        active_offs.append(str(val if val is not None else def_off))
-
-            # Include custom waves offsets
-            cw_raw = form.cleaned_data.get(f"socialmedia_{ptype}_custom_waves")
-            if cw_raw:
-                try:
-                    c_list = json.loads(cw_raw) if isinstance(cw_raw, str) else cw_raw
-                    for cw in c_list:
-                        if cw.get("enabled", True) and cw.get("offset") is not None:
-                            active_offs.append(str(cw["offset"]))
-                except Exception:
-                    pass
-
-            if has_wave_setting:
-                self.request.event.settings.set(
-                    f"socialmedia_{ptype}_offset",
-                    ", ".join(active_offs) if active_offs else "0",
-                )
-
-        if form.has_changed():
-            self.request.event.log_action(
-                "eventyay.event.settings",
-                user=self.request.user,
-                data={k: form.cleaned_data.get(k) for k in form.changed_data},
-            )
-        messages.success(self.request, _("Templates have been saved."))
-
         action = self.request.POST.get("action")
-        if action == "save_and_generate":
-            sync_posts_to_db(self.request.event, self.request)
-            messages.success(self.request, _("Posts generated successfully."))
-            return redirect(
-                reverse(
-                    "plugins:socialmedia:posts",
-                    kwargs={
-                        "organizer": self.request.event.organizer.slug,
-                        "event": self.request.event.slug,
-                    },
+        try:
+            with transaction.atomic():
+                self._save_decoupled(form)
+                form.save()
+
+                # Synchronize comma-separated offset settings from enabled waves and custom waves
+                for ptype, waves in CONTENT_TYPE_WAVES.items():
+                    active_offs = []
+                    has_wave_setting = False
+                    for wkey, _wlabel, def_off, _wunit in waves:
+                        en_key = f"socialmedia_{ptype}_{wkey}_enabled"
+                        off_key = f"socialmedia_{ptype}_{wkey}_offset"
+                        if en_key in form.cleaned_data:
+                            has_wave_setting = True
+                            if form.cleaned_data.get(en_key):
+                                val = form.cleaned_data.get(off_key)
+                                active_offs.append(
+                                    str(val if val is not None else def_off)
+                                )
+
+                    # Include custom waves offsets
+                    cw_raw = form.cleaned_data.get(f"socialmedia_{ptype}_custom_waves")
+                    if cw_raw:
+                        try:
+                            c_list = (
+                                json.loads(cw_raw)
+                                if isinstance(cw_raw, str)
+                                else cw_raw
+                            )
+                            for cw in c_list:
+                                if (
+                                    cw.get("enabled", True)
+                                    and cw.get("offset") is not None
+                                ):
+                                    active_offs.append(str(cw["offset"]))
+                        except Exception:
+                            pass
+
+                    if has_wave_setting:
+                        self.request.event.settings.set(
+                            f"socialmedia_{ptype}_offset",
+                            ", ".join(active_offs) if active_offs else "0",
+                        )
+
+                if form.has_changed():
+                    self.request.event.log_action(
+                        "eventyay.event.settings",
+                        user=self.request.user,
+                        data={k: form.cleaned_data.get(k) for k in form.changed_data},
+                    )
+                _log_settings_saved_on_commit(
+                    self.request, "plugins:socialmedia:templates"
                 )
+                messages.success(self.request, _("Templates have been saved."))
+
+                if action == "save_and_generate":
+                    sync_posts_to_db(self.request.event, self.request)
+                    event_id = _event_id(self.request)
+                    user_id = _user_id(self.request)
+                    transaction.on_commit(
+                        lambda: log_operation(
+                            "social.posts.generated",
+                            OUTCOME_SUCCESS,
+                            event_id=event_id,
+                            user_id=user_id,
+                        )
+                    )
+                    messages.success(self.request, _("Posts generated successfully."))
+                    return redirect(
+                        reverse(
+                            "plugins:socialmedia:posts",
+                            kwargs={
+                                "organizer": self.request.event.organizer.slug,
+                                "event": self.request.event.slug,
+                            },
+                        )
+                    )
+                return super().form_valid(form)
+        except Exception:
+            log_operation(
+                (
+                    "social.posts.generated"
+                    if action == "save_and_generate"
+                    else "social.settings.updated"
+                ),
+                OUTCOME_FAILURE,
+                event_id=_event_id(self.request),
+                user_id=_user_id(self.request),
+                route=_route_name(self.request) or "plugins:socialmedia:templates",
+                error_code="save_failed",
             )
-        return super().form_valid(form)
+            raise
 
     def form_invalid(self, form):
         messages.error(
@@ -525,6 +640,13 @@ class PublishingLogView(DecoupleMixin, FormView):
 
     def dispatch(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
+            log_operation(
+                "auth.denied",
+                OUTCOME_FAILURE,
+                event_id=_event_id(request),
+                route=_route_name(request) or "plugins:socialmedia:posts",
+                error_code="unauthorized",
+            )
             raise PermissionDenied()
         _check_plugin_active(request)
         _check_permission(request)
@@ -536,8 +658,6 @@ class PublishingLogView(DecoupleMixin, FormView):
         return kwargs
 
     def get(self, request, *args, **kwargs):
-        from django_scopes import scope
-
         status_filter = request.GET.get("status", "")
         valid_statuses = ["published", "exported", "failed", "scheduled", "draft"]
 
@@ -614,6 +734,13 @@ def preview_posts(request, organizer, event):
     try:
         has_posts = SocialMediaPost.objects.filter(event=request.event).exists()
         if not has_posts:
+            log_operation(
+                "social.posts.previewed",
+                OUTCOME_SUCCESS,
+                event_id=_event_id(request),
+                user_id=_user_id(request),
+                object_id=0,
+            )
             return JsonResponse({"posts": [], "has_generated_posts": False})
 
         raw_posts = build_posts(request.event, request)
@@ -671,8 +798,22 @@ def preview_posts(request, organizer, event):
 
             posts.append(p)
     except Exception as exc:  # pragma: no cover
-        logger.exception("Error generating preview posts: %s", exc)
+        logger.error("Error generating preview posts (%s)", type(exc).__name__)
+        log_operation(
+            "social.posts.previewed",
+            OUTCOME_FAILURE,
+            event_id=_event_id(request),
+            user_id=_user_id(request),
+            error_code="preview_failed",
+        )
         return JsonResponse({"error": "Internal server error"}, status=500)
+    log_operation(
+        "social.posts.previewed",
+        OUTCOME_SUCCESS,
+        event_id=_event_id(request),
+        user_id=_user_id(request),
+        object_id=len(posts),
+    )
     return JsonResponse({"posts": posts, "has_generated_posts": True})
 
 
@@ -683,6 +824,12 @@ def generate_posts_view(request, organizer, event):
     _check_plugin_active(request)
     try:
         sync_posts_to_db(request.event, request)
+        log_operation(
+            "social.posts.generated",
+            OUTCOME_SUCCESS,
+            event_id=_event_id(request),
+            user_id=_user_id(request),
+        )
         return JsonResponse(
             {
                 "success": True,
@@ -690,7 +837,14 @@ def generate_posts_view(request, organizer, event):
             }
         )
     except Exception as exc:
-        logger.exception("Error generating posts: %s", exc)
+        logger.error("Error generating posts (%s)", type(exc).__name__)
+        log_operation(
+            "social.posts.generated",
+            OUTCOME_FAILURE,
+            event_id=_event_id(request),
+            user_id=_user_id(request),
+            error_code="generation_failed",
+        )
         return JsonResponse(
             {"success": False, "error": str(_("Internal server error"))},
             status=500,
@@ -711,6 +865,14 @@ def bulk_post_action(request, organizer, event):
 
         if action == "discard":
             if not db_ids and not posts:
+                log_operation(
+                    "social.posts.bulk_action",
+                    OUTCOME_FAILURE,
+                    event_id=_event_id(request),
+                    user_id=_user_id(request),
+                    job_name="discard",
+                    error_code="missing_ids",
+                )
                 return JsonResponse(
                     {
                         "success": False,
@@ -727,6 +889,14 @@ def bulk_post_action(request, organizer, event):
             updated_count = qs.update(
                 status=SocialMediaPostStatus.EXCLUDED,
                 updated_at=timezone.now(),
+            )
+            log_operation(
+                "social.posts.bulk_action",
+                OUTCOME_SUCCESS,
+                event_id=_event_id(request),
+                user_id=_user_id(request),
+                job_name="discard",
+                object_id=updated_count,
             )
             return JsonResponse(
                 {
@@ -756,6 +926,14 @@ def bulk_post_action(request, organizer, event):
                 post.save(update_fields=["status", "error_message", "updated_at"])
                 retried_count += 1
 
+            log_operation(
+                "social.posts.bulk_action",
+                OUTCOME_SUCCESS,
+                event_id=_event_id(request),
+                user_id=_user_id(request),
+                job_name="retry",
+                object_id=retried_count,
+            )
             return JsonResponse(
                 {
                     "success": True,
@@ -768,11 +946,25 @@ def bulk_post_action(request, organizer, event):
                 }
             )
 
+        log_operation(
+            "social.posts.bulk_action",
+            OUTCOME_FAILURE,
+            event_id=_event_id(request),
+            user_id=_user_id(request),
+            error_code="unknown_action",
+        )
         return JsonResponse(
             {"success": False, "error": str(_("Unknown action."))}, status=400
         )
     except Exception as exc:
-        logger.exception("Error executing bulk action: %s", exc)
+        logger.error("Error executing bulk action (%s)", type(exc).__name__)
+        log_operation(
+            "social.posts.bulk_action",
+            OUTCOME_FAILURE,
+            event_id=_event_id(request),
+            user_id=_user_id(request),
+            error_code="bulk_action_failed",
+        )
         return JsonResponse(
             {"success": False, "error": str(_("Internal server error"))},
             status=500,
@@ -817,6 +1009,13 @@ def update_post(request, organizer, event):
                 )
 
             if not db_post:
+                log_operation(
+                    "social.post.updated",
+                    OUTCOME_FAILURE,
+                    event_id=_event_id(request),
+                    user_id=_user_id(request),
+                    error_code="not_found",
+                )
                 return JsonResponse({"error": "Post not found"}, status=404)
 
             update_fields = ["updated_at"]
@@ -825,11 +1024,27 @@ def update_post(request, organizer, event):
                 update_fields.append("post_text")
             if status is not None:
                 if status not in SocialMediaPostStatus.values:
+                    log_operation(
+                        "social.post.updated",
+                        OUTCOME_FAILURE,
+                        event_id=_event_id(request),
+                        user_id=_user_id(request),
+                        object_id=db_post.pk,
+                        error_code="invalid_status",
+                    )
                     return JsonResponse({"error": "Invalid status"}, status=400)
                 if (
                     db_post.status == SocialMediaPostStatus.PUBLISHED
                     and status != SocialMediaPostStatus.PUBLISHED
                 ):
+                    log_operation(
+                        "social.post.updated",
+                        OUTCOME_FAILURE,
+                        event_id=_event_id(request),
+                        user_id=_user_id(request),
+                        object_id=db_post.pk,
+                        error_code="published_immutable",
+                    )
                     return JsonResponse(
                         {"error": str(_("Published posts cannot change status."))},
                         status=400,
@@ -838,6 +1053,14 @@ def update_post(request, organizer, event):
                 update_fields.append("status")
             if post_date and post_time:
                 if db_post.status == SocialMediaPostStatus.PUBLISHED:
+                    log_operation(
+                        "social.post.updated",
+                        OUTCOME_FAILURE,
+                        event_id=_event_id(request),
+                        user_id=_user_id(request),
+                        object_id=db_post.pk,
+                        error_code="published_immutable",
+                    )
                     return JsonResponse(
                         {"error": str(_("Published posts cannot be rescheduled."))},
                         status=400,
@@ -892,6 +1115,13 @@ def update_post(request, organizer, event):
             db_post.save(update_fields=list(set(update_fields)))
 
         # Return the authoritative post state so the frontend can update the UI
+        log_operation(
+            "social.post.updated",
+            OUTCOME_SUCCESS,
+            event_id=_event_id(request),
+            user_id=_user_id(request),
+            object_id=db_post.pk,
+        )
         tz_name = getattr(request.event, "timezone", None) or "UTC"
         event_tz = pytz.timezone(tz_name)
         local_scheduled_at = db_post.scheduled_at.astimezone(event_tz)
@@ -905,9 +1135,23 @@ def update_post(request, organizer, event):
             }
         )
     except (json.JSONDecodeError, ValueError) as exc:
+        log_operation(
+            "social.post.updated",
+            OUTCOME_FAILURE,
+            event_id=_event_id(request),
+            user_id=_user_id(request),
+            error_code="invalid_request",
+        )
         return JsonResponse({"error": str(exc)}, status=400)
     except Exception as exc:
-        logger.exception("Error updating post: %s", exc)
+        logger.error("Error updating post (%s)", type(exc).__name__)
+        log_operation(
+            "social.post.updated",
+            OUTCOME_FAILURE,
+            event_id=_event_id(request),
+            user_id=_user_id(request),
+            error_code="update_failed",
+        )
         return JsonResponse({"error": "Internal server error"}, status=500)
 
 
@@ -922,17 +1166,98 @@ def export_csv(request, organizer, event):
         posts = body.get("posts", [])
         export_format = body.get("format", "generic")
     except (json.JSONDecodeError, KeyError):
+        log_operation(
+            "social.posts.exported",
+            OUTCOME_FAILURE,
+            event_id=_event_id(request),
+            user_id=_user_id(request),
+            error_code="invalid_request",
+        )
         return HttpResponse("Invalid request body.", status=400)
 
     csv_data = generate_csv_from_posts(posts, export_format)
+    log_format = (
+        export_format
+        if export_format in ("generic", "postiz", "buffer", "hootsuite")
+        else "generic"
+    )
+    log_operation(
+        "social.posts.exported",
+        OUTCOME_SUCCESS,
+        event_id=_event_id(request),
+        user_id=_user_id(request),
+        backend=log_format,
+    )
     filename = f"{request.event.slug}_socialmedia_posts.csv"
     response = HttpResponse(csv_data, content_type="text/csv; charset=utf-8")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
 
 
+def _validate_account_connection(request, form):
+    """Validate provider credentials when saving an account; warn on failure."""
+    provider_name = None
+    try:
+        account = form.save(commit=False)
+        account.organizer = request.organizer
+        provider_name = account.provider
+        provider = get_provider(account)
+        if not provider.validate_credentials():
+            raise Exception("Credentials validation returned False.")
+        log_operation(
+            "social.account.validated",
+            OUTCOME_SUCCESS,
+            backend=provider_name,
+            user_id=_user_id(request),
+        )
+    except Exception as e:
+        logger.warning(
+            "Connection verification failed during save: %s", type(e).__name__
+        )
+        log_operation(
+            "social.account.validated",
+            OUTCOME_FAILURE,
+            backend=provider_name,
+            user_id=_user_id(request),
+            error_code="validation_failed",
+        )
+        messages.warning(
+            request,
+            _(
+                "Credentials could not be verified. "
+                "The account was saved but may not work."
+            ),
+        )
+
+
+class _LoggedOrganizerPermissionMixin(OrganizerPermissionRequiredMixin):
+    """Log authenticated organizer permission denials without touching redirects."""
+
+    @classmethod
+    def as_view(cls, **initkwargs):
+        view = super().as_view(**initkwargs)
+
+        @functools.wraps(view)
+        def wrapped(request, *args, **kwargs):
+            try:
+                return view(request, *args, **kwargs)
+            except PermissionDenied:
+                if getattr(getattr(request, "user", None), "is_authenticated", False):
+                    log_operation(
+                        "permission.denied",
+                        OUTCOME_FAILURE,
+                        user_id=_user_id(request),
+                        object_id=kwargs.get("pk"),
+                        route=_route_name(request),
+                        error_code="forbidden",
+                    )
+                raise
+
+        return wrapped
+
+
 class OrganizerAccountsListView(
-    OrganizerPermissionRequiredMixin, OrganizerDetailViewMixin, ListView
+    _LoggedOrganizerPermissionMixin, OrganizerDetailViewMixin, ListView
 ):
     model = SocialMediaAccount
     template_name = "socialmedia/organizer/accounts.html"
@@ -957,7 +1282,7 @@ class OrganizerAccountsListView(
 
 
 class OrganizerAccountCreateView(
-    OrganizerPermissionRequiredMixin, OrganizerDetailViewMixin, CreateView
+    _LoggedOrganizerPermissionMixin, OrganizerDetailViewMixin, CreateView
 ):
     model = SocialMediaAccount
     template_name = "socialmedia/organizer/account_form.html"
@@ -991,26 +1316,18 @@ class OrganizerAccountCreateView(
         form.instance.organizer = self.request.organizer
         self._validate_connection(form)
         response = super().form_valid(form)
+        log_operation(
+            "social.account.created",
+            OUTCOME_SUCCESS,
+            backend=self.object.provider,
+            object_id=self.object.pk,
+            user_id=_user_id(self.request),
+        )
         messages.success(self.request, _("Account successfully connected."))
         return response
 
     def _validate_connection(self, form):
-        try:
-            account = form.save(commit=False)
-            account = form.save(commit=False)
-            account.organizer = self.request.organizer
-            provider = get_provider(account)
-            if not provider.validate_credentials():
-                raise Exception("Credentials validation returned False.")
-        except Exception as e:
-            logger.warning(f"Connection verification failed during save: {e}")
-            messages.warning(
-                self.request,
-                _(
-                    "Credentials could not be verified. "
-                    "The account was saved but may not work."
-                ),
-            )
+        _validate_account_connection(self.request, form)
 
     def get_success_url(self):
         url = reverse(
@@ -1024,7 +1341,7 @@ class OrganizerAccountCreateView(
 
 
 class OrganizerAccountUpdateView(
-    OrganizerPermissionRequiredMixin, OrganizerDetailViewMixin, UpdateView
+    _LoggedOrganizerPermissionMixin, OrganizerDetailViewMixin, UpdateView
 ):
     model = SocialMediaAccount
     template_name = "socialmedia/organizer/account_form.html"
@@ -1053,26 +1370,18 @@ class OrganizerAccountUpdateView(
     def form_valid(self, form):
         self._validate_connection(form)
         response = super().form_valid(form)
+        log_operation(
+            "social.account.updated",
+            OUTCOME_SUCCESS,
+            backend=self.object.provider,
+            object_id=self.object.pk,
+            user_id=_user_id(self.request),
+        )
         messages.success(self.request, _("Account settings updated."))
         return response
 
     def _validate_connection(self, form):
-        try:
-            account = form.save(commit=False)
-            account = form.save(commit=False)
-            account.organizer = self.request.organizer
-            provider = get_provider(account)
-            if not provider.validate_credentials():
-                raise Exception("Credentials validation returned False.")
-        except Exception as e:
-            logger.warning(f"Connection verification failed during save: {e}")
-            messages.warning(
-                self.request,
-                _(
-                    "Credentials could not be verified. "
-                    "The account was saved but may not work."
-                ),
-            )
+        _validate_account_connection(self.request, form)
 
     def get_success_url(self):
         url = reverse(
@@ -1086,7 +1395,7 @@ class OrganizerAccountUpdateView(
 
 
 class OrganizerAccountDeleteView(
-    OrganizerPermissionRequiredMixin, OrganizerDetailViewMixin, DeleteView
+    _LoggedOrganizerPermissionMixin, OrganizerDetailViewMixin, DeleteView
 ):
     model = SocialMediaAccount
     template_name = "socialmedia/organizer/account_delete.html"
@@ -1118,10 +1427,29 @@ class OrganizerAccountDeleteView(
         ctx["active_posts_count"] = count
         return ctx
 
-    def delete(self, request, *args, **kwargs):
-        response = super().delete(request, *args, **kwargs)
+    def _perform_delete(self, account, do_delete):
+        provider = account.provider
+        account_pk = account.pk
+        response = do_delete()
+        log_operation(
+            "social.account.deleted",
+            OUTCOME_SUCCESS,
+            backend=provider,
+            object_id=account_pk,
+            user_id=_user_id(self.request),
+        )
         messages.success(self.request, _("Account successfully disconnected."))
         return response
+
+    def form_valid(self, form):
+        parent_form_valid = super().form_valid
+        return self._perform_delete(self.object, lambda: parent_form_valid(form))
+
+    def delete(self, request, *args, **kwargs):
+        parent_delete = super().delete
+        return self._perform_delete(
+            self.get_object(), lambda: parent_delete(request, *args, **kwargs)
+        )
 
     def get_success_url(self):
         url = reverse(
@@ -1138,6 +1466,12 @@ class OrganizerAccountDeleteView(
 def test_connection(request, organizer, pk):
     """AJAX POST — send a test message to verify the connection works."""
     if not request.user.is_authenticated:
+        log_operation(
+            "auth.denied",
+            OUTCOME_FAILURE,
+            route=_route_name(request) or "plugins:socialmedia:organizer_account_test",
+            error_code="unauthorized",
+        )
         return JsonResponse(
             {"success": False, "message": "Authentication required."},
             status=403,
@@ -1147,6 +1481,13 @@ def test_connection(request, organizer, pk):
         ORGANIZER_PERMISSION,
         request=request,
     ):
+        log_operation(
+            "permission.denied",
+            OUTCOME_FAILURE,
+            route=_route_name(request) or "plugins:socialmedia:organizer_account_test",
+            user_id=_user_id(request),
+            error_code="forbidden",
+        )
         return JsonResponse(
             {"success": False, "message": "Permission denied."},
             status=403,
@@ -1164,8 +1505,25 @@ def test_connection(request, organizer, pk):
     try:
         provider = get_provider(account)
         result = provider.send_test_message()
+        succeeded = bool(isinstance(result, dict) and result.get("success"))
+        log_operation(
+            "social.account.test",
+            OUTCOME_SUCCESS if succeeded else OUTCOME_FAILURE,
+            backend=account.provider,
+            object_id=account.pk,
+            user_id=_user_id(request),
+            error_code=None if succeeded else "test_failed",
+        )
         return JsonResponse(result)
     except Exception as e:
+        log_operation(
+            "social.account.test",
+            OUTCOME_FAILURE,
+            backend=account.provider,
+            object_id=account.pk,
+            user_id=_user_id(request),
+            error_code="test_failed",
+        )
         return JsonResponse({"success": False, "message": str(e)}, status=500)
 
 
@@ -1205,6 +1563,13 @@ def publish_post_now(request, organizer, event):
                 ).first()
 
         if not db_post:
+            log_operation(
+                "social.post",
+                OUTCOME_FAILURE,
+                event_id=_event_id(request),
+                user_id=_user_id(request),
+                error_code="not_found",
+            )
             return JsonResponse(
                 {"success": False, "message": _("Post not found.")}, status=404
             )
@@ -1216,6 +1581,14 @@ def publish_post_now(request, organizer, event):
                 .first()
             )
             if not locked_post:
+                log_operation(
+                    "social.post",
+                    OUTCOME_FAILURE,
+                    event_id=_event_id(request),
+                    object_id=db_post.pk,
+                    user_id=_user_id(request),
+                    error_code="post_locked",
+                )
                 return JsonResponse(
                     {
                         "success": False,
@@ -1229,6 +1602,14 @@ def publish_post_now(request, organizer, event):
 
             entity_id = db_post.entity_id or ""
             if any(entity_id.endswith(f"_{prov}") for prov in ["postiz", "buffer"]):
+                log_operation(
+                    "social.post",
+                    OUTCOME_FAILURE,
+                    event_id=_event_id(request),
+                    object_id=db_post.pk,
+                    user_id=_user_id(request),
+                    error_code="legacy_provider",
+                )
                 return JsonResponse(
                     {
                         "success": False,
@@ -1276,6 +1657,15 @@ def publish_post_now(request, organizer, event):
                     f"No active {expected_prov} account found for organizer."
                 )
                 db_post.save(update_fields=["status", "error_message", "updated_at"])
+                log_operation(
+                    "social.post",
+                    OUTCOME_FAILURE,
+                    event_id=_event_id(request),
+                    object_id=db_post.pk,
+                    backend=provider_name,
+                    user_id=_user_id(request),
+                    error_code="missing_account",
+                )
                 return JsonResponse(
                     {
                         "success": False,
@@ -1299,8 +1689,25 @@ def publish_post_now(request, organizer, event):
                 media = [db_post.media_url] if db_post.media_url else None
                 provider.publish_post(text=db_post.post_text, media=media)
                 published_providers.append(account.provider)
+                log_operation(
+                    "social.post",
+                    OUTCOME_SUCCESS,
+                    event_id=_event_id(request),
+                    object_id=db_post.pk,
+                    backend=account.provider,
+                    user_id=_user_id(request),
+                )
             except Exception as e:
                 errors.append(f"{account.provider}: {str(e)}")
+                log_operation(
+                    "social.post",
+                    OUTCOME_FAILURE,
+                    event_id=_event_id(request),
+                    object_id=db_post.pk,
+                    backend=account.provider,
+                    user_id=_user_id(request),
+                    error_code="publish_failed",
+                )
 
         if errors:
             db_post.status = SocialMediaPostStatus.FAILED
@@ -1312,10 +1719,10 @@ def publish_post_now(request, organizer, event):
                 db_post.error_message = err_details
             db_post.save()
             logger.error(
-                "Manual publishing failed for post %s (event '%s'): %s",
+                "Manual publishing failed for post %s (event '%s', error_count=%d).",
                 db_post.pk,
                 request.event.slug,
-                db_post.error_message,
+                len(errors),
             )
             return JsonResponse(
                 {
@@ -1346,6 +1753,20 @@ def publish_post_now(request, organizer, event):
         )
 
     except (json.JSONDecodeError, ValueError) as exc:
+        log_operation(
+            "social.post",
+            OUTCOME_FAILURE,
+            event_id=_event_id(request),
+            user_id=_user_id(request),
+            error_code="invalid_request",
+        )
         return JsonResponse({"success": False, "message": str(exc)}, status=400)
     except Exception as e:
+        log_operation(
+            "social.post",
+            OUTCOME_FAILURE,
+            event_id=_event_id(request),
+            user_id=_user_id(request),
+            error_code="publish_failed",
+        )
         return JsonResponse({"success": False, "message": str(e)}, status=500)

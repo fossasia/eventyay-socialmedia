@@ -18,6 +18,13 @@ from eventyay.control.signals import (
 )
 
 from .models import SocialMediaAccount, SocialMediaPost, SocialMediaPostStatus
+from .operational_log import (
+    OUTCOME_FAILURE,
+    OUTCOME_SUCCESS,
+    log_operation,
+    new_correlation_id,
+    traced_job,
+)
 
 HAS_SOCIAL_MEDIA_PERM = hasattr(Team, "can_manage_social_media")
 DIRECT_PUBLISH_PROVIDERS = ["telegram", "mastodon", "twitter", "linkedin", "bluesky"]
@@ -184,6 +191,14 @@ def claim_post_for_publishing(post_pk: int, provider_name: str):
                 f"No active {provider_name} account found for organizer."
             )
             locked_post.save(update_fields=["status", "error_message", "updated_at"])
+            log_operation(
+                "social.post",
+                OUTCOME_FAILURE,
+                backend=provider_name,
+                event_id=locked_post.event_id,
+                object_id=post_pk,
+                error_code="missing_account",
+            )
             logger.warning(
                 "Post %s marked as FAILED: No active %s account found for organizer '%s'.",
                 post_pk,
@@ -205,6 +220,7 @@ def claim_post_for_publishing(post_pk: int, provider_name: str):
 
 @receiver(periodic_task, dispatch_uid="socialmedia_publish_scheduled_posts")
 @scopes_disabled()
+@traced_job("publish_scheduled_posts")
 def publish_scheduled_posts(sender, **kwargs):
     """Periodic task dispatcher to publish scheduled social media posts
     for direct native platform integrations (Telegram, Mastodon, Twitter/X, LinkedIn).
@@ -269,6 +285,13 @@ def publish_scheduled_posts(sender, **kwargs):
             provider_names = active_provs
 
         if not provider_names:
+            log_operation(
+                "social.post",
+                OUTCOME_FAILURE,
+                event_id=post.event_id,
+                object_id=post.pk,
+                error_code="no_active_provider",
+            )
             logger.warning(
                 "Post %s (event '%s', scheduled for %s) has no active direct providers configured.",
                 post.pk,
@@ -287,7 +310,34 @@ def publish_scheduled_posts(sender, **kwargs):
                 provider_name,
                 is_eager,
             )
-            if is_eager:
-                publish_single_post(post.pk, provider_name)
-            else:
-                publish_single_post.apply_async(args=[post.pk, provider_name])
+            dispatch_job_id = new_correlation_id()
+            try:
+                if is_eager:
+                    publish_single_post(post.pk, provider_name, job_id=dispatch_job_id)
+                else:
+                    publish_single_post.apply_async(
+                        args=[post.pk, provider_name],
+                        kwargs={"job_id": dispatch_job_id},
+                        task_id=dispatch_job_id,
+                    )
+            except Exception:
+                log_operation(
+                    "job.dispatch",
+                    OUTCOME_FAILURE,
+                    job_name="publish_single_post",
+                    backend=provider_name,
+                    event_id=post.event_id,
+                    object_id=post.pk,
+                    job_id=dispatch_job_id,
+                    error_code="dispatch_failed",
+                )
+                raise
+            log_operation(
+                "job.dispatch",
+                OUTCOME_SUCCESS,
+                job_name="publish_single_post",
+                backend=provider_name,
+                event_id=post.event_id,
+                object_id=post.pk,
+                job_id=dispatch_job_id,
+            )

@@ -1,10 +1,15 @@
+import json
+import re
+
+import requests
 from django import forms
 from django.core.validators import URLValidator
 from django.utils.translation import gettext_lazy as _
 from eventyay.base.forms import SettingsForm
 
-from .export import DEFAULT_TEMPLATES, PLATFORMS
+from .export import CONTENT_TYPE_WAVES, DEFAULT_TEMPLATES, PLATFORMS
 from .models import SocialMediaAccount
+from .operational_log import logged_request
 from .providers.base import _validate_url_host
 from .telegram_utils import normalize_telegram_chat_id
 
@@ -98,8 +103,6 @@ def _validate_offsets(value, max_value, unit_label="days"):
 def _check_platform_char_limit(value, limit, platform_name):
     """Raise ValidationError if the template text (excluding {token} placeholders)
     already exceeds the platform character limit."""
-    import re
-
     if not value or not limit:
         return value
     stripped = re.sub(r"\{[^}]+\}", "", value)
@@ -412,7 +415,6 @@ class SocialMediaTemplatesForm(SettingsForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        from .export import CONTENT_TYPE_WAVES
 
         # 1. Platform general template fields
         for platform in PLATFORM_ORDER:
@@ -476,8 +478,6 @@ class SocialMediaTemplatesForm(SettingsForm):
             parsed = val
         else:
             try:
-                import json
-
                 parsed = json.loads(val)
             except Exception as e:
                 raise forms.ValidationError(
@@ -511,8 +511,6 @@ class SocialMediaTemplatesForm(SettingsForm):
                 raise forms.ValidationError(
                     _("Custom wave label cannot exceed 50 characters.")
                 )
-        import json
-
         return json.dumps(parsed)
 
     def clean_socialmedia_cfp_custom_waves(self):
@@ -846,10 +844,10 @@ class LinkedInAccountForm(forms.ModelForm):
 
         # Exchange authorization code for access token
         if auth_code and client_id and client_secret:
-            import requests as http_requests
-
             try:
-                resp = http_requests.post(
+                resp = logged_request(
+                    "linkedin",
+                    "POST",
                     "https://www.linkedin.com/oauth/v2/accessToken",
                     data={
                         "grant_type": "authorization_code",
@@ -880,7 +878,7 @@ class LinkedInAccountForm(forms.ModelForm):
                         _("LinkedIn token exchange failed: %(error)s"),
                         params={"error": error_msg},
                     )
-            except http_requests.RequestException as e:
+            except requests.RequestException as e:
                 raise forms.ValidationError(
                     _("Could not connect to LinkedIn: %(error)s"),
                     params={"error": str(e)},

@@ -3,7 +3,10 @@ import os
 from typing import Any
 
 import requests
+from django.conf import settings
 from requests_oauthlib import OAuth1
+
+from socialmedia.operational_log import logged_request
 
 from .base import (
     BaseSocialProvider,
@@ -60,8 +63,13 @@ class TwitterProvider(BaseSocialProvider):
             )
 
         try:
-            resp = requests.get(
-                self.VERIFY_API_URL, auth=auth, headers=headers, timeout=15
+            resp = logged_request(
+                "twitter",
+                "GET",
+                self.VERIFY_API_URL,
+                auth=auth,
+                headers=headers,
+                timeout=15,
             )
             if resp.status_code == 200:
                 return True
@@ -82,8 +90,6 @@ class TwitterProvider(BaseSocialProvider):
         Raises:
             PublishingError: If the path escapes MEDIA_ROOT or the file does not exist.
         """
-        from django.conf import settings
-
         media_root = getattr(settings, "MEDIA_ROOT", None)
         if not media_root:
             raise PublishingError(
@@ -161,7 +167,9 @@ class TwitterProvider(BaseSocialProvider):
 
             # Pass bytes directly — requests accepts (filename, bytes, mime_type) tuples.
             files = {"media": (filename, content, content_type)}
-            resp = requests.post(
+            resp = logged_request(
+                "twitter",
+                "POST",
                 self.MEDIA_UPLOAD_URL,
                 files=files,
                 auth=auth,
@@ -231,7 +239,9 @@ class TwitterProvider(BaseSocialProvider):
             payload["media"] = {"media_ids": media_ids}
 
         try:
-            resp = requests.post(
+            resp = logged_request(
+                "twitter",
+                "POST",
                 self.TWEET_API_URL,
                 json=payload,
                 auth=auth,
